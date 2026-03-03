@@ -6,7 +6,6 @@ import '../../data/song/song.dart';
 
 part 'from_uuid.g.dart';
 
-// todo make simple wrappers like this for all db access to make migration from drift possible if necessary
 @riverpod
 Future<Song> songFromUuid(Ref ref, String uuid) async {
   Song? songOrNull = await dbSongFromUuid(uuid);
