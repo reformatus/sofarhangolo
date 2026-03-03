@@ -1,5 +1,10 @@
+import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+import '../../main.dart';
+import '../../services/ui/messenger_service.dart';
+import '../../ui/common/log/dialog.dart';
 
 part 'provider.g.dart';
 
@@ -13,6 +18,16 @@ class ShowLogLevel extends _$ShowLogLevel {
 
 @Riverpod(keepAlive: true)
 class LogMessages extends _$LogMessages {
+  Color _snackBarColorForLevel(Level level) {
+    if (level.value >= Level.SEVERE.value) {
+      return Colors.red;
+    }
+    if (level.value >= Level.WARNING.value) {
+      return Colors.orange;
+    }
+    return Colors.blue;
+  }
+
   @override
   List<LogMessage> build() {
     return [];
@@ -20,7 +35,28 @@ class LogMessages extends _$LogMessages {
 
   void addRecord(LogRecord record) {
     state.add(LogMessage(record));
-    // TODO show message snackbar when necessary
+    if (record.level.value >= Level.WARNING.value) {
+      final messenger = ref.read(messengerServiceProviderProvider);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(record.message),
+          backgroundColor: _snackBarColorForLevel(record.level),
+          action: SnackBarAction(
+            label: 'Napló',
+            onPressed: () {
+              final context = appNavigatorKey.currentContext;
+              if (context == null) {
+                return;
+              }
+              showDialog<void>(
+                context: context,
+                builder: (_) => const LogViewDialog(),
+              );
+            },
+          ),
+        ),
+      );
+    }
     ref.notifyListeners();
   }
 
