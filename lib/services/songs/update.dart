@@ -130,8 +130,10 @@ Stream<({int toUpdateCount, int updatedCount})> updateBankSongs(
                     song,
                     mode: InsertMode.insertOrReplace,
                   ); // todo handle user modified data, etc
-              updatedCount++;
+
               deleteAssetsForSong(song);
+
+              updatedCount++;
             } catch (f, t) {
               hadErrors = true;
               log.severe(
