@@ -44,7 +44,7 @@ class BankChooser extends ConsumerWidget {
                 icon: Icon(Icons.cloud_sync_outlined),
                 tooltip: 'Frissítés most',
                 onPressed: () {
-                  ref.read(updateAllBanksSongsProvider);
+                  ref.invalidate(updateAllBanksSongsProvider);
                   showOnlineBanksUpdatingBanner();
                 },
               ),

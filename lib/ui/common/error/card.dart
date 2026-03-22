@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../services/error/app_error.dart';
 import '../../base/home/parts/feedback/send_mail.dart';
 
 class LErrorCard extends StatelessWidget {
@@ -11,7 +12,38 @@ class LErrorCard extends StatelessWidget {
     this.stack,
     required this.icon,
     this.showReportButton = true,
+    this.onRetry,
+    this.retryLabel,
   });
+
+  factory LErrorCard.fromAppError({
+    Key? key,
+    required AppError error,
+    VoidCallback? onRetry,
+    String? retryLabel,
+    bool? showReportButton,
+  }) {
+    return LErrorCard(
+      key: key,
+      type: switch (error.category) {
+        AppErrorCategory.network => LErrorType.warning,
+        AppErrorCategory.backend => LErrorType.error,
+        AppErrorCategory.frontend => LErrorType.error,
+      },
+      title: error.title,
+      message: error.userMessage,
+      stack: error.stack,
+      icon: switch (error.category) {
+        AppErrorCategory.network => Icons.wifi_off,
+        AppErrorCategory.backend => Icons.cloud_off,
+        AppErrorCategory.frontend => Icons.bug_report,
+      },
+      showReportButton:
+          showReportButton ?? error.category == AppErrorCategory.frontend,
+      onRetry: onRetry,
+      retryLabel: retryLabel,
+    );
+  }
 
   final LErrorType type;
   final String title;
@@ -19,6 +51,8 @@ class LErrorCard extends StatelessWidget {
   final String? stack;
   final IconData icon;
   final bool showReportButton;
+  final VoidCallback? onRetry;
+  final String? retryLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +114,15 @@ class LErrorCard extends StatelessWidget {
                         ),
                       ),
                   ],
+                ),
+              ),
+            if (onRetry != null)
+              Padding(
+                padding: EdgeInsetsGeometry.only(left: 8, right: 8, bottom: 8),
+                child: FilledButton.icon(
+                  onPressed: onRetry,
+                  icon: Icon(Icons.refresh),
+                  label: Text(retryLabel ?? 'Újra'),
                 ),
               ),
             if (showReportButton)

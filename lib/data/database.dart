@@ -71,6 +71,8 @@ class LyricDatabase extends _$LyricDatabase {
           await customStatement(
             "INSERT INTO songs_fts(songs_fts) VALUES('rebuild')",
           );
+
+          // set bank updated to old date (to trigger in background refresh) - or make good way to do this
         },
       ),
     );

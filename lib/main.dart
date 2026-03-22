@@ -27,7 +27,13 @@ void main() async {
   dataDir = await getApplicationDocumentsDirectory();
   db = LyricDatabase();
 
-  runApp(const ProviderScope(child: LyricApp()));
+  runApp(
+    ProviderScope(
+      // Disable Riverpod's built-in retry; Dio's RetryInterceptor handles network retries.
+      retry: (_, __) => null,
+      child: const LyricApp(),
+    ),
+  );
 }
 
 class LyricApp extends ConsumerStatefulWidget {

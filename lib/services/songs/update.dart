@@ -29,11 +29,12 @@ double? getProgress(({int toUpdateCount, int updatedCount})? record) {
 }
 
 /// Update all songs on all banks
-@riverpod
+@Riverpod(keepAlive: true)
 Stream<Map<Bank, ({int toUpdateCount, int updatedCount})?>> updateAllBanksSongs(
   Ref ref,
 ) async* {
   final dio = ref.read(dioProvider);
+
   await updateBanks(dio);
 
   Map<Bank, ({int toUpdateCount, int updatedCount})?> bankStates =
@@ -102,26 +103,11 @@ Stream<({int toUpdateCount, int updatedCount})> updateBankSongs(
     for (List<ProtoSong> protoSongs in toUpdateBatches) {
       queue.add(() async {
         try {
-          List<Song>? songs;
-          int retries = 0;
-          do {
-            try {
-              songs = await bankApi.getDetailsForSongs(
-                bank,
-                protoSongs.map((e) => e.uuid).toList(),
-              );
-            } catch (e) {
-              if (retries >= 3) {
-                // Give up after 3 attempts
-                rethrow;
-              }
-              log.info(
-                '$protoSongs azonosítójú dalok részleteinek lekérdezésekor hiba lépett fel, újrapróbálkozás: ($retries / 3)',
-              );
-              await Future.delayed(Duration(milliseconds: 500 * retries * retries));
-              retries++;
-            }
-          } while (songs == null);
+          // TODO add batch-splitting on error
+          final songs = await bankApi.getDetailsForSongs(
+            bank,
+            protoSongs.map((e) => e.uuid).toList(),
+          );
           for (Song song in songs) {
             try {
               await db
@@ -146,7 +132,7 @@ Stream<({int toUpdateCount, int updatedCount})> updateBankSongs(
         } catch (e, s) {
           hadErrors = true;
           log.severe(
-            '$protoSongs azonosítójú dalok lekérdezése sokadik próbálkozásra sem sikerült:',
+            '$protoSongs azonosítójú dalok lekérdezése nem sikerült:',
             e,
             s,
           );

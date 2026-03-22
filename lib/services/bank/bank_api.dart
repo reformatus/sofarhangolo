@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 
 import '../../data/bank/bank.dart';
 import '../../data/song/song.dart';
+import '../error/app_error.dart';
 
 class BankApi {
   final Dio dio;
@@ -50,7 +51,11 @@ class BankApi {
         return [song];
       }
     } catch (e) {
-      throw Exception('Error while updating songs with uuids $uuids\n$e');
+      throw AppError.from(
+        e,
+        userMessage: 'Hiba történt néhány dal feldolgozása közben.',
+        technicalMessage: 'Error while updating songs with uuids $uuids\n$e',
+      );
     }
   }
 

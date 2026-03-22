@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/bank/bank.dart';
+import '../../services/error/app_error.dart';
 import '../../services/connectivity/provider.dart';
 import '../../services/songs/update.dart';
 import '../../services/ui/messenger_service.dart';
@@ -69,14 +70,33 @@ class UpdatingBanner extends ConsumerWidget {
     return AnimatedSwitcher(
       duration: Durations.medium2,
       child: bankStates.when(
-        error: (error, stackTrace) => LErrorCard(
-          key: const ValueKey('error'),
-          type: LErrorType.error,
-          title: 'Hiba a tárak frissítése közben',
-          message: error.toString(),
-          stack: stackTrace.toString(),
-          icon: Icons.error,
-        ),
+        error: (error, stackTrace) {
+          final appError = AppError.from(error, stackTrace: stackTrace);
+
+          if (appError.category == AppErrorCategory.frontend) {
+            return LErrorCard(
+              key: const ValueKey('error'),
+              type: LErrorType.error,
+              title: 'Hiba a tárak frissítése közben',
+              message: error.toString(),
+              stack: stackTrace.toString(),
+              icon: Icons.error,
+              onRetry: () {
+                ref.invalidate(updateAllBanksSongsProvider);
+                showOnlineBanksUpdatingBanner();
+              },
+            );
+          }
+
+          return LErrorCard.fromAppError(
+            key: const ValueKey('error'),
+            error: appError,
+            onRetry: () {
+              ref.invalidate(updateAllBanksSongsProvider);
+              showOnlineBanksUpdatingBanner();
+            },
+          );
+        },
         loading: () => _buildBannerStructure(
           key: const ValueKey('loading'),
           isLoading: true,

@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import '../../config/config.dart';
 import '../../data/database.dart';
+import '../error/app_error.dart';
 import 'from_uuid.dart';
 
 import '../../data/bank/bank.dart';
@@ -11,7 +12,12 @@ Future updateBanks(Dio dio) async {
   try {
     protoBanks = (await dio.get<List>('${appConfig.apiRoot}/banks')).data!;
   } catch (e) {
-    throw Exception('Nem sikerült lekérni az elérhető daltárakat: $e');
+    throw AppError.from(
+      e,
+      userMessage:
+          'Nem sikerült lekérni az elérhető daltárakat. Próbáld újra később.',
+      technicalMessage: 'Nem sikerült lekérni az elérhető daltárakat: $e',
+    );
   }
 
   for (final protoBank in protoBanks) {
@@ -20,8 +26,12 @@ Future updateBanks(Dio dio) async {
     try {
       details = (await dio.get<Map>('${protoBank['api']}/about')).data!;
     } catch (e) {
-      throw Exception(
-        'Nem sikerült lekérni a(z) ${protoBank['name']} tár adatait: $e',
+      throw AppError.from(
+        e,
+        userMessage:
+            'Nem sikerült lekérni a(z) ${protoBank['name']} tár adatait. Próbáld újra később.',
+        technicalMessage:
+            'Nem sikerült lekérni a(z) ${protoBank['name']} tár adatait: $e',
       );
     }
 

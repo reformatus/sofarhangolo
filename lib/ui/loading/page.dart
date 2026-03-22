@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../config/config.dart';
+import '../../services/error/app_error.dart';
 import '../../services/bank/bank_updated.dart';
 import '../../services/preferences/preferences_parent.dart';
 import '../../services/songs/update.dart';
@@ -103,13 +104,30 @@ class _LoadingPageState extends ConsumerState<LoadingPage> {
           return Center(
             child: hasEverUpdatedProvider.value == false
                 ? switch (bankStates) {
-                    AsyncError(:final error, :final stackTrace) => LErrorCard(
-                      type: LErrorType.error,
-                      title: 'Hiba a tárak frissítése közben',
-                      message: error.toString(),
-                      stack: stackTrace.toString(),
-                      icon: Icons.error,
-                    ),
+                    AsyncError(:final error, :final stackTrace) => () {
+                      final appError = AppError.from(
+                        error,
+                        stackTrace: stackTrace,
+                      );
+
+                      if (appError.category == AppErrorCategory.frontend) {
+                        return LErrorCard(
+                          type: LErrorType.error,
+                          title: 'Hiba a tárak frissítése közben',
+                          message: error.toString(),
+                          stack: stackTrace.toString(),
+                          icon: Icons.error,
+                          onRetry: () =>
+                              ref.invalidate(updateAllBanksSongsProvider),
+                        );
+                      }
+
+                      return LErrorCard.fromAppError(
+                        error: appError,
+                        onRetry: () =>
+                            ref.invalidate(updateAllBanksSongsProvider),
+                      );
+                    }(),
                     AsyncValue(:final value) =>
                       value == null
                           ? Center(child: CircularProgressIndicator())

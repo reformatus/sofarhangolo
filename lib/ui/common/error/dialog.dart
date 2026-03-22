@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../../services/error/app_error.dart';
 import 'card.dart';
 
 import '../../base/home/parts/feedback/send_mail.dart';
@@ -13,7 +15,38 @@ class ErrorDialog extends StatelessWidget {
     this.stack,
     required this.icon,
     this.showReportButton = true,
+    this.onRetry,
+    this.retryLabel,
   });
+
+  factory ErrorDialog.fromAppError({
+    Key? key,
+    required AppError error,
+    VoidCallback? onRetry,
+    String? retryLabel,
+    bool? showReportButton,
+  }) {
+    return ErrorDialog(
+      key: key,
+      type: switch (error.category) {
+        AppErrorCategory.network => LErrorType.warning,
+        AppErrorCategory.backend => LErrorType.error,
+        AppErrorCategory.frontend => LErrorType.error,
+      },
+      title: error.title,
+      message: error.userMessage,
+      stack: error.stack,
+      icon: switch (error.category) {
+        AppErrorCategory.network => Icons.wifi_off,
+        AppErrorCategory.backend => Icons.cloud_off,
+        AppErrorCategory.frontend => Icons.bug_report,
+      },
+      showReportButton:
+          showReportButton ?? error.category == AppErrorCategory.frontend,
+      onRetry: onRetry,
+      retryLabel: retryLabel,
+    );
+  }
 
   final LErrorType type;
   final String title;
@@ -21,6 +54,8 @@ class ErrorDialog extends StatelessWidget {
   final String? stack;
   final IconData icon;
   final bool showReportButton;
+  final VoidCallback? onRetry;
+  final String? retryLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +69,12 @@ class ErrorDialog extends StatelessWidget {
         showReportButton: false,
       ),
       actions: [
+        if (onRetry != null)
+          FilledButton.icon(
+            onPressed: onRetry,
+            icon: Icon(Icons.refresh),
+            label: Text(retryLabel ?? 'Újrapróbálás'),
+          ),
         FilledButton.tonalIcon(
           onPressed: () => sendFeedbackEmail(
             errorMessage: '$title ($message)',

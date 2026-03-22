@@ -22,7 +22,7 @@ Future<bool> hasEverUpdatedAnything(Ref ref) async {
             .get())
         .isNotEmpty;
   } catch (e, s) {
-    log.severe('Error caught while checking updated banks', e, s);
+    log.severe('Hiba történt a tárak legutóbbi frissítésének betöltésekor', e, s);
     return false;
   }
 }
