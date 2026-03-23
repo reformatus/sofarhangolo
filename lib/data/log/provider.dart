@@ -18,6 +18,8 @@ class ShowLogLevel extends _$ShowLogLevel {
 
 @Riverpod(keepAlive: true)
 class LogMessages extends _$LogMessages {
+  int _warningSnackBarSerial = 0;
+
   Color _snackBarColorForLevel(Level level) {
     if (level.value >= Level.SEVERE.value) {
       return Colors.red;
@@ -37,9 +39,26 @@ class LogMessages extends _$LogMessages {
     state.add(LogMessage(record));
     if (record.level.value >= Level.WARNING.value) {
       final messenger = ref.read(messengerServiceProviderProvider);
+      _warningSnackBarSerial++;
+      final thisSnackBarSerial = _warningSnackBarSerial;
+      messenger.state?.removeCurrentSnackBar(
+        reason: SnackBarClosedReason.remove,
+      );
       messenger.showSnackBar(
         SnackBar(
-          content: Text(record.message),
+          duration: const Duration(seconds: 6),
+          content: Row(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.close),
+                tooltip: 'Bezárás',
+                onPressed: () {
+                  messenger.state?.hideCurrentSnackBar();
+                },
+              ),
+              Expanded(child: Text(record.message)),
+            ],
+          ),
           backgroundColor: _snackBarColorForLevel(record.level),
           action: SnackBarAction(
             label: 'Napló',
@@ -56,6 +75,15 @@ class LogMessages extends _$LogMessages {
           ),
         ),
       );
+
+      Future<void>.delayed(const Duration(seconds: 6), () {
+        if (thisSnackBarSerial != _warningSnackBarSerial) {
+          return;
+        }
+        messenger.state?.hideCurrentSnackBar(
+          reason: SnackBarClosedReason.timeout,
+        );
+      });
     }
     ref.notifyListeners();
   }
