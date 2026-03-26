@@ -42,6 +42,8 @@ class _AddToCueSearchState extends ConsumerState<AddToCueSearch> {
   late final SearchController searchController;
   @override
   Widget build(BuildContext context) {
+    final cuesAsync = ref.watch(watchAllCuesProvider);
+
     Future<void> handleCueSelection(
       SearchController controller,
       Cue cue,
@@ -71,8 +73,8 @@ class _AddToCueSearchState extends ConsumerState<AddToCueSearch> {
       );
     }
 
-    Future<List<Cue>> filterCues(String searchText) async {
-      final cues = await ref.read(watchAllCuesProvider.future);
+    List<Cue> filterCues(String searchText) {
+      final cues = cuesAsync.hasValue ? cuesAsync.requireValue : <Cue>[];
       return cues
           .where(
             (cue) =>
@@ -89,7 +91,7 @@ class _AddToCueSearchState extends ConsumerState<AddToCueSearch> {
       viewOnSubmitted: (value) async {
         if (value.isEmpty) return;
 
-        final filteredCues = await filterCues(value);
+        final filteredCues = filterCues(value);
         if (filteredCues.isNotEmpty) {
           await handleCueSelection(searchController, filteredCues.first);
         }
@@ -120,9 +122,33 @@ class _AddToCueSearchState extends ConsumerState<AddToCueSearch> {
       },
       suggestionsBuilder: (context, controller) async {
         try {
-          final filteredCues = await filterCues(controller.text);
+          final filteredCues = filterCues(controller.text);
 
           if (!mounted) return [];
+
+          if (cuesAsync.hasError) {
+            return [
+              LErrorCard(
+                type: LErrorType.error,
+                title: 'Nem sikerült betölteni a listákat :(',
+                message: cuesAsync.error.toString(),
+                stack: cuesAsync.stackTrace.toString(),
+                icon: Icons.list,
+              ),
+            ];
+          }
+
+          if (cuesAsync.isLoading && !cuesAsync.hasValue) {
+            return [
+              ListTile(
+                leading: SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                title: Text('Listák betöltése...'),
+              ),
+            ];
+          }
 
           return [
                 if (controller.text.isEmpty || filteredCues.isEmpty)
