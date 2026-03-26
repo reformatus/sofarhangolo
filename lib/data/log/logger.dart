@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
 import 'provider.dart';
@@ -9,8 +12,13 @@ Logger log = Logger.root;
 // far future todo add write and rotate logs on disk
 void initLogger(WidgetRef ref) {
   log.onRecord.listen((record) {
-    Future(() {
-      ref.read(logMessagesProvider.notifier).addRecord(record);
-    });
+    if (kDebugMode) {
+      print(record);
+    }
+    unawaited(
+      Future(() {
+        ref.read(logMessagesProvider.notifier).addRecord(record);
+      }),
+    );
   });
 }

@@ -40,7 +40,7 @@ class LyricDatabase extends _$LyricDatabase {
     : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration {
@@ -73,6 +73,10 @@ class LyricDatabase extends _$LyricDatabase {
           );
 
           // set bank updated to old date (to trigger in background refresh) - or make good way to do this
+        },
+        from2To3: (m, schema) async {
+          await m.addColumn(schema.banks, schema.banks.failedSongUuids);
+          await m.addColumn(schema.banks, schema.banks.totalSongsInBank);
         },
       ),
     );

@@ -30,7 +30,7 @@ void main() async {
   runApp(
     ProviderScope(
       // Disable Riverpod's built-in retry; Dio's RetryInterceptor handles network retries.
-      retry: (_, __) => null,
+      retry: (_, _) => null,
       child: const LyricApp(),
     ),
   );

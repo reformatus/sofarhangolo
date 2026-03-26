@@ -1,3 +1,4 @@
+import 'dart:convert';
 
 import 'package:drift/drift.dart';
 
@@ -25,22 +26,6 @@ import '../database.dart';
 
 // these get added to the database on first run
 // todo add a way to add and disable banks
-final List<Bank> defaultBanks = [
-  /*Bank(1, 'TESZT Sófár Kottatár', Uri.parse('https://kiskutyafule.csecsy.hu/api/')),*/
-  /*Bank(
-    0,
-    true,
-    2,
-    10,
-    null,
-    'Sófár Kottatár',
-    Uri.parse('https://sofarkotta.hu/api/'),
-  ),*/
-  /*Bank(1, true, null, 'Református Énekeskönyv (1948)',
-      Uri.parse('https://banks.lyricapp.org/reformatus-enekeskonyv/48/')),
-  Bank(2, true, null, 'Református Énekeskönyv (2021)',
-      Uri.parse('https://banks.lyricapp.org/reformatus-enekeskonyv/21/')),*/
-];
 
 class Bank extends Insertable<Bank> {
   final int id;
@@ -60,6 +45,8 @@ class Bank extends Insertable<Bank> {
   bool isEnabled;
   bool isOfflineMode;
   DateTime? lastUpdated;
+  final String? failedSongUuids;
+  final int? totalSongsInBank;
 
   Bank(
     this.id,
@@ -79,7 +66,42 @@ class Bank extends Insertable<Bank> {
     this.isEnabled,
     this.isOfflineMode,
     this.lastUpdated,
+    this.failedSongUuids,
+    this.totalSongsInBank,
   );
+
+  List<ProtoSong> get failedProtoSongs {
+    final rawFailedSongs = failedSongUuids;
+    if (rawFailedSongs == null || rawFailedSongs.trim().isEmpty) return [];
+
+    try {
+      final decoded = jsonDecode(rawFailedSongs);
+      if (decoded is! List) return [];
+
+      return decoded
+          .whereType<Map>()
+          .map((entry) {
+            final uuid = entry['uuid'];
+            final title = entry['title'];
+            if (uuid is! String || title is! String) return null;
+            return ProtoSong(uuid, title);
+          })
+          .whereType<ProtoSong>()
+          .toList(growable: false);
+    } catch (_) {
+      return [];
+    }
+  }
+
+  static String? encodeFailedProtoSongs(Map<String, String> songsByUuid) {
+    if (songsByUuid.isEmpty) return null;
+
+    return jsonEncode(
+      songsByUuid.entries
+          .map((entry) => {'uuid': entry.key, 'title': entry.value})
+          .toList(growable: false),
+    );
+  }
 
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -99,6 +121,8 @@ class Bank extends Insertable<Bank> {
       isEnabled: Value(isEnabled),
       isOfflineMode: Value(isOfflineMode),
       lastUpdated: Value(lastUpdated),
+      failedSongUuids: Value(failedSongUuids),
+      totalSongsInBank: Value(totalSongsInBank),
     ).toColumns(nullToAbsent);
   }
 }
@@ -122,6 +146,8 @@ class Banks extends Table {
   BoolColumn get isEnabled => boolean()();
   BoolColumn get isOfflineMode => boolean()();
   DateTimeColumn get lastUpdated => dateTime().nullable()();
+  TextColumn get failedSongUuids => text().nullable()();
+  IntColumn get totalSongsInBank => integer().nullable()();
 }
 
 class ProtoSong {

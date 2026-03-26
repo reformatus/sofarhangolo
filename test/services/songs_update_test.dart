@@ -223,5 +223,101 @@ void main() {
       final assets = await db.select(db.assets).get();
       expect(assets, isEmpty);
     });
+
+    test('persists failed songs and retries them on next run', () async {
+      final bank = await insertBank();
+
+      dio.httpClientAdapter = RecordingHttpAdapter(
+        responseBuilder: (options) {
+          if (options.path.contains('/songs')) {
+            return ResponseBody.fromString(
+              '[{"uuid":"song-1","title":"Song 1"}]',
+              200,
+            );
+          }
+
+          if (options.path.contains('/song/song-1')) {
+            return ResponseBody.fromString('server error', 500);
+          }
+
+          return ResponseBody.fromString('[]', 200);
+        },
+      );
+
+      await updateBankSongs(bank, dio).drain<void>();
+
+      final bankAfterFirstRun =
+          await (db.banks.select()..where((b) => b.uuid.equals(bank.uuid)))
+              .getSingle();
+      expect(bankAfterFirstRun.failedProtoSongs.map((e) => e.uuid), ['song-1']);
+
+      final adapter = RecordingHttpAdapter(
+        responseBuilder: (options) {
+          if (options.path.contains('/songs')) {
+            return ResponseBody.fromString('[]', 200);
+          }
+
+          if (options.path.contains('/song/song-1')) {
+            return ResponseBody.fromString(
+              '[{"uuid":"song-1","title":"Song 1","lyrics":"Line","lyricsFormat":"opensong"}]',
+              200,
+            );
+          }
+
+          return ResponseBody.fromString('[]', 200);
+        },
+      );
+      dio.httpClientAdapter = adapter;
+
+      await updateBankSongs(bankAfterFirstRun, dio).drain<void>();
+
+      expect(
+        adapter.requests.any((r) => r.path.contains('/song/song-1')),
+        isTrue,
+      );
+
+      final bankAfterSecondRun =
+          await (db.banks.select()..where((b) => b.uuid.equals(bank.uuid)))
+              .getSingle();
+      expect(bankAfterSecondRun.failedProtoSongs, isEmpty);
+    });
+
+    test('sets totalSongsInBank on first full sync', () async {
+      final bank = await insertBank();
+
+      dio.httpClientAdapter = RecordingHttpAdapter(
+        responseBuilder: (options) {
+          if (options.path.contains('/songs')) {
+            return ResponseBody.fromString(
+              '[{"uuid":"song-1","title":"Song 1"},{"uuid":"song-2","title":"Song 2"}]',
+              200,
+            );
+          }
+
+          if (options.path.contains('/song/song-1')) {
+            return ResponseBody.fromString(
+              '[{"uuid":"song-1","title":"Song 1","lyrics":"Line","lyricsFormat":"opensong"}]',
+              200,
+            );
+          }
+
+          if (options.path.contains('/song/song-2')) {
+            return ResponseBody.fromString(
+              '[{"uuid":"song-2","title":"Song 2","lyrics":"Line","lyricsFormat":"opensong"}]',
+              200,
+            );
+          }
+
+          return ResponseBody.fromString('[]', 200);
+        },
+      );
+
+      await updateBankSongs(bank, dio).drain<void>();
+
+      final updatedBank =
+          await (db.banks.select()..where((b) => b.uuid.equals(bank.uuid)))
+              .getSingle();
+      expect(updatedBank.totalSongsInBank, 2);
+    });
   });
 }

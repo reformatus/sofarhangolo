@@ -1,0 +1,821 @@
+{
+  "_meta": {
+    "description": "This file contains a serialized version of schema entities for drift.",
+    "version": "1.3.0"
+  },
+  "options": {
+    "store_date_time_values_as_text": true
+  },
+  "entities": [
+    {
+      "id": 0,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "banks",
+        "was_declared_in_moor": false,
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "defaultConstraints": "PRIMARY KEY AUTOINCREMENT",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "PRIMARY KEY AUTOINCREMENT"
+            },
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "auto-increment"
+            ]
+          },
+          {
+            "name": "uuid",
+            "getter_name": "uuid",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "logo",
+            "getter_name": "logo",
+            "moor_type": "blob",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "tiny_logo",
+            "getter_name": "tinyLogo",
+            "moor_type": "blob",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "name",
+            "getter_name": "name",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "description",
+            "getter_name": "description",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "legal",
+            "getter_name": "legal",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "about_link",
+            "getter_name": "aboutLink",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "contact_email",
+            "getter_name": "contactEmail",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "base_url",
+            "getter_name": "baseUrl",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [],
+            "type_converter": {
+              "dart_expr": "const UriConverter()",
+              "dart_type_name": "Uri"
+            }
+          },
+          {
+            "name": "parallel_update_jobs",
+            "getter_name": "parallelUpdateJobs",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "amount_of_songs_in_request",
+            "getter_name": "amountOfSongsInRequest",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "no_cms",
+            "getter_name": "noCms",
+            "moor_type": "bool",
+            "nullable": false,
+            "customConstraints": null,
+            "defaultConstraints": "CHECK (\"no_cms\" IN (0, 1))",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "CHECK (\"no_cms\" IN (0, 1))"
+            },
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "song_fields",
+            "getter_name": "songFields",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [],
+            "type_converter": {
+              "dart_expr": "const MapConverter()",
+              "dart_type_name": "Map<String, dynamic>"
+            }
+          },
+          {
+            "name": "is_enabled",
+            "getter_name": "isEnabled",
+            "moor_type": "bool",
+            "nullable": false,
+            "customConstraints": null,
+            "defaultConstraints": "CHECK (\"is_enabled\" IN (0, 1))",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "CHECK (\"is_enabled\" IN (0, 1))"
+            },
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "is_offline_mode",
+            "getter_name": "isOfflineMode",
+            "moor_type": "bool",
+            "nullable": false,
+            "customConstraints": null,
+            "defaultConstraints": "CHECK (\"is_offline_mode\" IN (0, 1))",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "CHECK (\"is_offline_mode\" IN (0, 1))"
+            },
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "last_updated",
+            "getter_name": "lastUpdated",
+            "moor_type": "dateTime",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "failed_song_uuids",
+            "getter_name": "failedSongUuids",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "total_songs_in_bank",
+            "getter_name": "totalSongsInBank",
+            "moor_type": "int",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 1,
+      "references": [
+        0
+      ],
+      "type": "table",
+      "data": {
+        "name": "songs",
+        "was_declared_in_moor": false,
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "defaultConstraints": "PRIMARY KEY AUTOINCREMENT",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "PRIMARY KEY AUTOINCREMENT"
+            },
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "auto-increment"
+            ]
+          },
+          {
+            "name": "uuid",
+            "getter_name": "uuid",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "source_bank",
+            "getter_name": "sourceBank",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "defaultConstraints": "REFERENCES banks (uuid)",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "REFERENCES banks (uuid)"
+            },
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              {
+                "foreign_key": {
+                  "to": {
+                    "table": "banks",
+                    "column": "uuid"
+                  },
+                  "initially_deferred": false,
+                  "on_update": null,
+                  "on_delete": null
+                }
+              }
+            ]
+          },
+          {
+            "name": "content_map",
+            "getter_name": "contentMap",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [],
+            "type_converter": {
+              "dart_expr": "const SongContentConverter()",
+              "dart_type_name": "Map<String, String>"
+            }
+          },
+          {
+            "name": "title",
+            "getter_name": "title",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "lyrics",
+            "getter_name": "lyrics",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "lyrics_format",
+            "getter_name": "lyricsFormat",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": "const CustomExpression('\\'opensong\\'')",
+            "default_client_dart": null,
+            "dsl_features": [],
+            "type_converter": {
+              "dart_expr": "const LyricsFormatConverter()",
+              "dart_type_name": "LyricsFormat"
+            }
+          },
+          {
+            "name": "key_field",
+            "getter_name": "keyField",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [],
+            "type_converter": {
+              "dart_expr": "const KeyFieldConverter()",
+              "dart_type_name": "KeyField?"
+            }
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 2,
+      "references": [
+        1
+      ],
+      "type": "index",
+      "data": {
+        "on": 1,
+        "name": "songs_uuid",
+        "sql": null,
+        "unique": true,
+        "columns": [
+          {
+            "column": "uuid",
+            "order_by": null
+          }
+        ]
+      }
+    },
+    {
+      "id": 3,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "preference_storage",
+        "was_declared_in_moor": false,
+        "columns": [
+          {
+            "name": "key",
+            "getter_name": "key",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "value",
+            "getter_name": "value",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [],
+            "type_converter": {
+              "dart_expr": "const MapConverter()",
+              "dart_type_name": "Map<String, dynamic>"
+            }
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [],
+        "explicit_pk": [
+          "key"
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "cues",
+        "was_declared_in_moor": false,
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "defaultConstraints": "PRIMARY KEY AUTOINCREMENT",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "PRIMARY KEY AUTOINCREMENT"
+            },
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "auto-increment"
+            ]
+          },
+          {
+            "name": "uuid",
+            "getter_name": "uuid",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "title",
+            "getter_name": "title",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "description",
+            "getter_name": "description",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "cue_version",
+            "getter_name": "cueVersion",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "content",
+            "getter_name": "content",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [],
+            "type_converter": {
+              "dart_expr": "const CueContentConverter()",
+              "dart_type_name": "List<Map<dynamic, dynamic>>"
+            }
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 5,
+      "references": [
+        4
+      ],
+      "type": "index",
+      "data": {
+        "on": 4,
+        "name": "cues_uuid",
+        "sql": null,
+        "unique": true,
+        "columns": [
+          {
+            "column": "uuid",
+            "order_by": null
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "references": [],
+      "type": "table",
+      "data": {
+        "name": "assets",
+        "was_declared_in_moor": false,
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "defaultConstraints": "PRIMARY KEY AUTOINCREMENT",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "PRIMARY KEY AUTOINCREMENT"
+            },
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "auto-increment"
+            ]
+          },
+          {
+            "name": "song_uuid",
+            "getter_name": "songUuid",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "source_url",
+            "getter_name": "sourceUrl",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "field_name",
+            "getter_name": "fieldName",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "content",
+            "getter_name": "content",
+            "moor_type": "blob",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 7,
+      "references": [
+        6
+      ],
+      "type": "index",
+      "data": {
+        "on": 6,
+        "name": "asset_source_url",
+        "sql": null,
+        "unique": true,
+        "columns": [
+          {
+            "column": "source_url",
+            "order_by": null
+          }
+        ]
+      }
+    },
+    {
+      "id": 8,
+      "references": [
+        1
+      ],
+      "type": "table",
+      "data": {
+        "name": "songs_fts",
+        "was_declared_in_moor": true,
+        "columns": [
+          {
+            "name": "title",
+            "getter_name": "title",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "lyrics",
+            "getter_name": "lyrics",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": "",
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": true,
+        "create_virtual_stmt": "CREATE VIRTUAL TABLE \"songs_fts\" USING fts5(title, lyrics, content='songs', content_rowid='id', tokenize='trigram remove_diacritics 1')",
+        "without_rowid": false,
+        "constraints": []
+      }
+    },
+    {
+      "id": 9,
+      "references": [
+        1,
+        8
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 1,
+        "references_in_body": [
+          1,
+          8
+        ],
+        "name": "songs_ai",
+        "sql": "CREATE TRIGGER songs_ai AFTER INSERT ON songs BEGIN\n  INSERT INTO songs_fts(rowid, title, lyrics)\n  VALUES (new.id, new.title, new.lyrics);\nEND;"
+      }
+    },
+    {
+      "id": 10,
+      "references": [
+        1,
+        8
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 1,
+        "references_in_body": [
+          1,
+          8
+        ],
+        "name": "songs_ad",
+        "sql": "CREATE TRIGGER songs_ad AFTER DELETE ON songs BEGIN\n  INSERT INTO songs_fts(songs_fts, rowid, title, lyrics)\n  VALUES ('delete', rowid, old.title, old.lyrics);\nEND;"
+      }
+    },
+    {
+      "id": 11,
+      "references": [
+        1,
+        8
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 1,
+        "references_in_body": [
+          1,
+          8
+        ],
+        "name": "songs_au",
+        "sql": "CREATE TRIGGER songs_au AFTER UPDATE ON songs BEGIN\n  INSERT INTO songs_fts(songs_fts, rowid, title, lyrics)\n  VALUES ('delete', rowid, old.title, old.lyrics);\n  INSERT INTO songs_fts(rowid, title, lyrics)\n  VALUES (new.id, new.title, new.lyrics);\nEND;"
+      }
+    }
+  ],
+  "fixed_sql": [
+    {
+      "name": "banks",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"banks\" (\"id\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \"uuid\" TEXT NOT NULL, \"logo\" BLOB NULL, \"tiny_logo\" BLOB NULL, \"name\" TEXT NOT NULL, \"description\" TEXT NULL, \"legal\" TEXT NULL, \"about_link\" TEXT NULL, \"contact_email\" TEXT NULL, \"base_url\" TEXT NOT NULL, \"parallel_update_jobs\" INTEGER NOT NULL, \"amount_of_songs_in_request\" INTEGER NOT NULL, \"no_cms\" INTEGER NOT NULL CHECK (\"no_cms\" IN (0, 1)), \"song_fields\" TEXT NOT NULL, \"is_enabled\" INTEGER NOT NULL CHECK (\"is_enabled\" IN (0, 1)), \"is_offline_mode\" INTEGER NOT NULL CHECK (\"is_offline_mode\" IN (0, 1)), \"last_updated\" TEXT NULL, \"failed_song_uuids\" TEXT NULL, \"total_songs_in_bank\" INTEGER NULL);"
+        }
+      ]
+    },
+    {
+      "name": "songs",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"songs\" (\"id\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \"uuid\" TEXT NOT NULL, \"source_bank\" TEXT NULL REFERENCES banks (uuid), \"content_map\" TEXT NOT NULL, \"title\" TEXT NOT NULL, \"lyrics\" TEXT NOT NULL, \"lyrics_format\" TEXT NOT NULL DEFAULT 'opensong', \"key_field\" TEXT NOT NULL);"
+        }
+      ]
+    },
+    {
+      "name": "songs_uuid",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE UNIQUE INDEX songs_uuid ON songs (uuid)"
+        }
+      ]
+    },
+    {
+      "name": "preference_storage",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"preference_storage\" (\"key\" TEXT NOT NULL, \"value\" TEXT NOT NULL, PRIMARY KEY (\"key\"));"
+        }
+      ]
+    },
+    {
+      "name": "cues",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"cues\" (\"id\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \"uuid\" TEXT NOT NULL, \"title\" TEXT NOT NULL, \"description\" TEXT NOT NULL, \"cue_version\" INTEGER NOT NULL, \"content\" TEXT NOT NULL);"
+        }
+      ]
+    },
+    {
+      "name": "cues_uuid",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE UNIQUE INDEX cues_uuid ON cues (uuid)"
+        }
+      ]
+    },
+    {
+      "name": "assets",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"assets\" (\"id\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \"song_uuid\" TEXT NOT NULL, \"source_url\" TEXT NOT NULL, \"field_name\" TEXT NOT NULL, \"content\" BLOB NOT NULL);"
+        }
+      ]
+    },
+    {
+      "name": "asset_source_url",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE UNIQUE INDEX asset_source_url ON assets (source_url)"
+        }
+      ]
+    },
+    {
+      "name": "songs_fts",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE VIRTUAL TABLE IF NOT EXISTS \"songs_fts\" USING fts5(title, lyrics, content='songs', content_rowid='id', tokenize='trigram remove_diacritics 1');"
+        }
+      ]
+    },
+    {
+      "name": "songs_ai",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER songs_ai AFTER INSERT ON songs BEGIN INSERT INTO songs_fts (\"rowid\", title, lyrics) VALUES (new.id, new.title, new.lyrics);END"
+        }
+      ]
+    },
+    {
+      "name": "songs_ad",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER songs_ad AFTER DELETE ON songs BEGIN INSERT INTO songs_fts (songs_fts, \"rowid\", title, lyrics) VALUES ('delete', \"rowid\", old.title, old.lyrics);END"
+        }
+      ]
+    },
+    {
+      "name": "songs_au",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER songs_au AFTER UPDATE ON songs BEGIN INSERT INTO songs_fts (songs_fts, \"rowid\", title, lyrics) VALUES ('delete', \"rowid\", old.title, old.lyrics);INSERT INTO songs_fts (\"rowid\", title, lyrics) VALUES (new.id, new.title, new.lyrics);END"
+        }
+      ]
+    }
+  ]
+}

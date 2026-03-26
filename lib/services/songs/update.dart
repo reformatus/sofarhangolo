@@ -77,8 +77,7 @@ updateBankSongs(Bank bank, Dio dio) {
       // stay in indefinite loading state until we know protosong count
       // return protosong count for display
       List<ProtoSong> toUpdate;
-      // TODO: merge persisted failed ProtoSongs here once bank-level storage exists,
-      // so previously failed songs are always retried on every update.
+      int? totalSongsInBank = bank.totalSongsInBank;
       if (bank.noCms) {
         // when the bank static without cms, update all songs if there have been changes.
         final remoteLastUpdated = await bankApi.getRemoteLastUpdated(bank);
@@ -88,9 +87,24 @@ updateBankSongs(Bank bank, Dio dio) {
           toUpdate = [];
         } else {
           toUpdate = await bankApi.getProtoSongs(bank);
+          totalSongsInBank = toUpdate.length;
         }
       } else {
         toUpdate = await bankApi.getProtoSongs(bank, since: bank.lastUpdated);
+        if (bank.lastUpdated == null) {
+          totalSongsInBank = toUpdate.length;
+        }
+      }
+
+      final persistedFailedSongs = bank.failedProtoSongs;
+      if (persistedFailedSongs.isNotEmpty) {
+        final Map<String, ProtoSong> mergedByUuid = {
+          for (final protoSong in toUpdate) protoSong.uuid: protoSong,
+        };
+        for (final failedSong in persistedFailedSongs) {
+          mergedByUuid.putIfAbsent(failedSong.uuid, () => failedSong);
+        }
+        toUpdate = mergedByUuid.values.toList(growable: false);
       }
 
       int updatedCount = 0;
@@ -109,6 +123,17 @@ updateBankSongs(Bank bank, Dio dio) {
         hadErrors = true;
         failedSongsByUuid[protoSong.uuid] = protoSong.title;
         emitProgress();
+      }
+
+      Future<void> persistBankState() async {
+        await (db.banks.update()..where((b) => b.id.equals(bank.id))).write(
+          BanksCompanion(
+            failedSongUuids: Value(
+              Bank.encodeFailedProtoSongs(failedSongsByUuid),
+            ),
+            totalSongsInBank: Value.absentIfNull(totalSongsInBank),
+          ),
+        );
       }
 
       Future<void> upsertSong(Song song) async {
@@ -262,8 +287,8 @@ updateBankSongs(Bank bank, Dio dio) {
             '${bank.name} tárból $songsWithErrors dal frissítése sikertelen volt!',
           );
         }
-        // TODO: persist failedSongsByUuid per bank once DB support is added,
-        // then always include that list in the next update run.
+
+        await persistBankState();
 
         await setAsUpdatedNow(bank);
       }

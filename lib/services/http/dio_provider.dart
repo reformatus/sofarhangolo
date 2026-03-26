@@ -21,10 +21,6 @@ Dio _buildAppDio() {
       retries: 2,
       retryDelays: const [Duration(milliseconds: 200), Duration(seconds: 3)],
       retryEvaluator: (error, attempt) {
-        print(
-          "\n---\nRetrying ${DateTime.now().toString()}\n$error\nfor the $attempt. time",
-        );
-
         if (error.type == DioExceptionType.connectionTimeout ||
             error.type == DioExceptionType.sendTimeout ||
             error.type == DioExceptionType.receiveTimeout ||

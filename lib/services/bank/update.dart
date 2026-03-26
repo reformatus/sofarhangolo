@@ -16,7 +16,6 @@ Future updateBanks(Dio dio) async {
       e,
       userMessage:
           'Nem sikerült lekérni az elérhető daltárakat. Próbáld újra később.',
-      technicalMessage: 'Nem sikerült lekérni az elérhető daltárakat: $e',
     );
   }
 
@@ -87,6 +86,8 @@ Future updateBanks(Dio dio) async {
       isEnabled: Value(isEnabled),
       isOfflineMode: Value(offlineMode),
       lastUpdated: Value.absent(),
+      failedSongUuids: Value.absent(),
+      totalSongsInBank: Value.absent(),
     );
 
     await db.into(db.banks).insertOnConflictUpdate(banksCompanion);
