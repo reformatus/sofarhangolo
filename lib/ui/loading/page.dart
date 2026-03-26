@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,7 +8,9 @@ import '../../config/config.dart';
 import '../../services/error/app_error.dart';
 import '../../services/bank/bank_updated.dart';
 import '../../services/preferences/preferences_parent.dart';
+import '../../services/songs/bank_song_update_task.dart';
 import '../../services/songs/update.dart';
+import '../../services/task/task_queue.dart';
 import '../common/error/card.dart';
 import 'banner.dart';
 
@@ -19,16 +23,61 @@ class LoadingPage extends ConsumerStatefulWidget {
 
 class _LoadingPageState extends ConsumerState<LoadingPage> {
   bool _hasNavigated = false;
+  bool _hasRequestedInitialRefresh = false;
   late final Future preferenceLoader = loadAllPreferences(ref);
+
+  void _requestInitialRefresh() {
+    if (_hasRequestedInitialRefresh) return;
+
+    _hasRequestedInitialRefresh = true;
+    unawaited(
+      ref
+          .read(bankSongUpdateSchedulerProvider.notifier)
+          .refreshAllEnabledBanks(),
+    );
+  }
+
+  Widget _buildTaskStatus(BankSongUpdateTask task) {
+    if (task.isCompleted) {
+      return Icon(Icons.check);
+    }
+    if (task.isFailed) {
+      return Icon(Icons.error_outline);
+    }
+    if (task.isRunning) {
+      return SizedBox.square(
+        dimension: 25,
+        child: CircularProgressIndicator(value: task.progress),
+      );
+    }
+    return Icon(Icons.schedule);
+  }
 
   void _checkAndNavigateIfReady() async {
     if (_hasNavigated) return;
 
     final hasEverUpdated = ref.read(hasEverUpdatedAnythingProvider);
-    final bankStates = ref.read(updateAllBanksSongsProvider);
+    if (!hasEverUpdated.hasValue) return;
 
-    if (hasEverUpdated.value == true ||
-        (bankStates.hasValue && bankStates.value!.values.every(isDone))) {
+    if (hasEverUpdated.value == true) {
+      _hasNavigated = true;
+
+      await preferenceLoader;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          context.replace('/home');
+        }
+      });
+      return;
+    }
+
+    if (!_hasRequestedInitialRefresh) return;
+
+    final schedulerState = ref.read(bankSongUpdateSchedulerProvider);
+    final allTasksSettled = ref.read(allBankSongUpdateTasksSettledProvider);
+
+    if (schedulerState.hasValue && allTasksSettled) {
       _hasNavigated = true;
 
       await preferenceLoader;
@@ -47,6 +96,11 @@ class _LoadingPageState extends ConsumerState<LoadingPage> {
   void initState() {
     super.initState();
 
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _requestInitialRefresh();
+    });
+
     // Listen for hasEverUpdated changes and show banner
     ref.listenManual(hasEverUpdatedAnythingProvider, (previous, next) {
       _checkAndNavigateIfReady();
@@ -59,8 +113,11 @@ class _LoadingPageState extends ConsumerState<LoadingPage> {
       });
     });
 
-    // Listen for bank states and navigate when done
-    ref.listenManual(updateAllBanksSongsProvider, (previous, next) {
+    ref.listenManual(bankSongUpdateSchedulerProvider, (previous, next) {
+      _checkAndNavigateIfReady();
+    });
+
+    ref.listenManual(backgroundTaskQueueProvider, (previous, next) {
       _checkAndNavigateIfReady();
     });
   }
@@ -68,7 +125,9 @@ class _LoadingPageState extends ConsumerState<LoadingPage> {
   @override
   Widget build(BuildContext context) {
     final hasEverUpdatedProvider = ref.watch(hasEverUpdatedAnythingProvider);
-    final bankStates = ref.watch(updateAllBanksSongsProvider);
+    final schedulerState = ref.watch(bankSongUpdateSchedulerProvider);
+    final bankTasks = ref.watch(bankSongUpdateTasksProvider);
+    final overallProgress = ref.watch(bankSongUpdateOverallProgressProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -103,33 +162,39 @@ class _LoadingPageState extends ConsumerState<LoadingPage> {
           // Continue with normal UI flow
           return Center(
             child: hasEverUpdatedProvider.value == false
-                ? switch (bankStates) {
-                    AsyncError(:final error, :final stackTrace) => () {
-                      final appError = AppError.from(
-                        error,
-                        stackTrace: stackTrace,
-                      );
-
-                      if (appError.category == AppErrorCategory.frontend) {
-                        return LErrorCard(
-                          type: LErrorType.error,
-                          title: 'Hiba a tárak frissítése közben',
-                          message: error.toString(),
-                          stack: stackTrace.toString(),
-                          icon: Icons.error,
-                          onRetry: () =>
-                              ref.invalidate(updateAllBanksSongsProvider),
+                ? switch (schedulerState) {
+                    AsyncError(:final error, :final stackTrace)
+                        when bankTasks.isEmpty =>
+                      () {
+                        final appError = AppError.from(
+                          error,
+                          stackTrace: stackTrace,
                         );
-                      }
 
-                      return LErrorCard.fromAppError(
-                        error: appError,
-                        onRetry: () =>
-                            ref.invalidate(updateAllBanksSongsProvider),
-                      );
-                    }(),
-                    AsyncValue(:final value) =>
-                      value == null
+                        if (appError.category == AppErrorCategory.frontend) {
+                          return LErrorCard(
+                            type: LErrorType.error,
+                            title: 'Hiba a tárak frissítése közben',
+                            message: error.toString(),
+                            stack: stackTrace.toString(),
+                            icon: Icons.error,
+                            onRetry: () {
+                              _hasRequestedInitialRefresh = false;
+                              _requestInitialRefresh();
+                            },
+                          );
+                        }
+
+                        return LErrorCard.fromAppError(
+                          error: appError,
+                          onRetry: () {
+                            _hasRequestedInitialRefresh = false;
+                            _requestInitialRefresh();
+                          },
+                        );
+                      }(),
+                    _ =>
+                      schedulerState.isLoading && bankTasks.isEmpty
                           ? Center(child: CircularProgressIndicator())
                           : ConstrainedBox(
                               constraints: BoxConstraints(maxWidth: 600),
@@ -161,53 +226,32 @@ class _LoadingPageState extends ConsumerState<LoadingPage> {
                                             ),
                                           ),
                                           LinearProgressIndicator(
-                                            value: () {
-                                              if (!bankStates.hasValue) {
-                                                return null;
-                                              }
-                                              int stateCount = value.length;
-                                              if (stateCount == 0) return null;
-
-                                              int doneCount = value.values
-                                                  .where((e) => isDone(e))
-                                                  .length;
-
-                                              return doneCount / stateCount;
-                                            }(),
+                                            value: overallProgress,
                                           ),
                                         ],
                                       ),
                                     ),
-                                    if (bankStates.hasValue)
-                                      ...value.entries.map(
-                                        (e) => Padding(
-                                          padding: EdgeInsets.only(left: 20),
-                                          child: ListTile(
-                                            leading: isDone(e.value)
-                                                ? Icon(Icons.check)
-                                                : SizedBox.square(
-                                                    dimension: 25,
-                                                    child:
-                                                        CircularProgressIndicator(
-                                                          value: getProgress(
-                                                            e.value,
-                                                          ),
-                                                        ),
-                                                  ),
-                                            title: Text(
-                                              e.key.name,
-                                              style: TextStyle(
-                                                fontWeight: FontWeight.w500,
-                                              ),
-                                            ),
-                                            subtitle: Text(
-                                              e.value != null
-                                                  ? "${e.value!.updatedCount} (${e.value!.songsWithErrors} hiba) / ${e.value!.toUpdateCount} frissítve"
-                                                  : "",
+                                    ...bankTasks.map(
+                                      (task) => Padding(
+                                        padding: EdgeInsets.only(left: 20),
+                                        child: ListTile(
+                                          leading: SizedBox.square(
+                                            dimension: 32,
+                                            child: task.logo != null
+                                                ? Image.memory(task.logo!)
+                                                : Icon(Icons.library_music),
+                                          ),
+                                          title: Text(
+                                            task.title,
+                                            style: TextStyle(
+                                              fontWeight: FontWeight.w500,
                                             ),
                                           ),
+                                          subtitle: Text(task.subtitle),
+                                          trailing: _buildTaskStatus(task),
                                         ),
                                       ),
+                                    ),
                                   ],
                                 ),
                               ),

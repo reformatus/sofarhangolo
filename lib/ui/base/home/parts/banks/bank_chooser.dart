@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -44,7 +46,11 @@ class BankChooser extends ConsumerWidget {
                 icon: Icon(Icons.cloud_sync_outlined),
                 tooltip: 'Frissítés most',
                 onPressed: () {
-                  ref.invalidate(updateAllBanksSongsProvider);
+                  unawaited(
+                    ref
+                        .read(bankSongUpdateSchedulerProvider.notifier)
+                        .refreshAllEnabledBanks(),
+                  );
                   showOnlineBanksUpdatingBanner();
                 },
               ),

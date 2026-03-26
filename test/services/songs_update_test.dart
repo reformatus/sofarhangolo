@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sofar/data/bank/bank.dart';
 import 'package:sofar/data/database.dart';
 import 'package:sofar/data/song/song.dart';
-import 'package:sofar/services/songs/update.dart';
+import 'package:sofar/services/songs/bank_song_update_task.dart';
 
 import '../harness/test_harness.dart';
 
@@ -86,7 +86,8 @@ void main() {
         },
       );
 
-      await updateBankSongs(bank, dio).drain<void>();
+      final task = BankSongUpdateTask(bank: bank, dio: dio);
+      await task.run();
 
       final assets = await db.select(db.assets).get();
       expect(assets, isEmpty);
@@ -163,7 +164,8 @@ void main() {
         },
       );
 
-      await updateBankSongs(bank, dio).drain<void>();
+      final task = BankSongUpdateTask(bank: bank, dio: dio);
+      await task.run();
 
       final assets = await db.select(db.assets).get();
       expect(assets, hasLength(1));
@@ -218,7 +220,8 @@ void main() {
         },
       );
 
-      await updateBankSongs(bank, dio).drain<void>();
+      final task = BankSongUpdateTask(bank: bank, dio: dio);
+      await task.run();
 
       final assets = await db.select(db.assets).get();
       expect(assets, isEmpty);
@@ -244,7 +247,8 @@ void main() {
         },
       );
 
-      await updateBankSongs(bank, dio).drain<void>();
+      final task = BankSongUpdateTask(bank: bank, dio: dio);
+      await task.run();
 
       final bankAfterFirstRun =
           await (db.banks.select()..where((b) => b.uuid.equals(bank.uuid)))
@@ -269,7 +273,8 @@ void main() {
       );
       dio.httpClientAdapter = adapter;
 
-      await updateBankSongs(bankAfterFirstRun, dio).drain<void>();
+      final retryTask = BankSongUpdateTask(bank: bankAfterFirstRun, dio: dio);
+      await retryTask.run();
 
       expect(
         adapter.requests.any((r) => r.path.contains('/song/song-1')),
@@ -312,12 +317,50 @@ void main() {
         },
       );
 
-      await updateBankSongs(bank, dio).drain<void>();
+      final task = BankSongUpdateTask(bank: bank, dio: dio);
+      await task.run();
 
       final updatedBank =
           await (db.banks.select()..where((b) => b.uuid.equals(bank.uuid)))
               .getSingle();
       expect(updatedBank.totalSongsInBank, 2);
+    });
+
+    test('tracks progress and errors through task fields', () async {
+      final bank = await insertBank();
+
+      dio.httpClientAdapter = RecordingHttpAdapter(
+        responseBuilder: (options) {
+          if (options.path.contains('/songs')) {
+            return ResponseBody.fromString(
+              '[{"uuid":"song-1","title":"Song 1"},{"uuid":"song-2","title":"Song 2"}]',
+              200,
+            );
+          }
+
+          if (options.path.contains('/song/song-1')) {
+            return ResponseBody.fromString(
+              '[{"uuid":"song-1","title":"Song 1","lyrics":"Line","lyricsFormat":"opensong"}]',
+              200,
+            );
+          }
+
+          if (options.path.contains('/song/song-2')) {
+            return ResponseBody.fromString('server error', 500);
+          }
+
+          return ResponseBody.fromString('[]', 200);
+        },
+      );
+
+      final task = BankSongUpdateTask(bank: bank, dio: dio);
+      await task.run();
+
+      expect(task.totalCount, 2);
+      expect(task.doneCount, 1);
+      expect(task.errorCount, 1);
+      expect(task.progress, 1);
+      expect(task.isCompleted, isTrue);
     });
   });
 }
