@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import '../../../config/config.dart';
 import 'drawer_button.dart';
+
+enum _AdaptivePageViewport { mobile, tablet, desktop }
 
 class AdaptivePage extends StatefulWidget {
   const AdaptivePage({
@@ -40,10 +43,19 @@ class AdaptivePage extends StatefulWidget {
 
 class _AdaptivePageState extends State<AdaptivePage>
     with TickerProviderStateMixin {
+  static const Duration _mobileIntroDelay = Duration(seconds: 1);
+
   late final AnimationController leftDrawerController;
   late final Animation<double> leftDrawerAnimation;
   late final AnimationController rightDrawerController;
   late final Animation<double> rightDrawerAnimation;
+  late final AnimationStatusListener leftDrawerStatusListener;
+
+  _AdaptivePageViewport? activeViewport;
+  _AdaptivePageViewport? scheduledViewport;
+  Timer? mobileIntroTimer;
+  bool showMobileLeftPreview = false;
+  bool hasHandledInitialMobileViewport = false;
 
   @override
   void initState() {
@@ -71,41 +83,196 @@ class _AdaptivePageState extends State<AdaptivePage>
       reverseCurve: Curves.easeInOutCubicEmphasized.flipped,
     );
 
+    leftDrawerStatusListener = (status) {
+      if (!mounted || status != AnimationStatus.dismissed) {
+        return;
+      }
+      if (activeViewport != _AdaptivePageViewport.mobile ||
+          !showMobileLeftPreview) {
+        return;
+      }
+
+      setState(() {
+        showMobileLeftPreview = false;
+      });
+    };
+    leftDrawerController.addStatusListener(leftDrawerStatusListener);
+
     super.initState();
   }
 
-  int previousAnimation = 0;
+  @override
+  void didUpdateWidget(covariant AdaptivePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.leftDrawer == oldWidget.leftDrawer &&
+        widget.rightDrawer == oldWidget.rightDrawer) {
+      return;
+    }
+
+    final viewport = activeViewport;
+    if (viewport == null) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || activeViewport != viewport) {
+        return;
+      }
+
+      applyViewport(viewport);
+    });
+  }
+
+  _AdaptivePageViewport viewportForWidth(double width) {
+    if (width > appConfig.breakpoints.desktopFromWidth) {
+      return _AdaptivePageViewport.desktop;
+    }
+    if (width > appConfig.breakpoints.tabletFromWidth) {
+      return _AdaptivePageViewport.tablet;
+    }
+    return _AdaptivePageViewport.mobile;
+  }
+
+  double drawerWidthFor(BoxConstraints constraints) {
+    return max(constraints.maxWidth / 5, 250);
+  }
+
+  void scheduleViewportSync(_AdaptivePageViewport viewport) {
+    if (scheduledViewport == viewport) {
+      return;
+    }
+
+    scheduledViewport = viewport;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || scheduledViewport != viewport) {
+        return;
+      }
+
+      scheduledViewport = null;
+      applyViewport(viewport);
+    });
+  }
+
+  void applyViewport(_AdaptivePageViewport viewport, {bool initial = false}) {
+    if (!initial && activeViewport == viewport) {
+      return;
+    }
+
+    cancelMobileIntro();
+    activeViewport = viewport;
+
+    switch (viewport) {
+      case _AdaptivePageViewport.mobile:
+        applyMobileViewport(initial: initial);
+      case _AdaptivePageViewport.tablet:
+        showMobileLeftPreview = false;
+        setDrawerOpen(
+          leftDrawerController,
+          open: widget.leftDrawer != null,
+          animate: !initial,
+        );
+        setDrawerOpen(rightDrawerController, open: false, animate: !initial);
+      case _AdaptivePageViewport.desktop:
+        showMobileLeftPreview = false;
+        setDrawerOpen(
+          leftDrawerController,
+          open: widget.leftDrawer != null,
+          animate: !initial,
+        );
+        setDrawerOpen(
+          rightDrawerController,
+          open: widget.rightDrawer != null,
+          animate: !initial,
+        );
+    }
+
+    if (!initial && mounted) {
+      setState(() {});
+    }
+  }
+
+  void applyMobileViewport({required bool initial}) {
+    final shouldShowIntro =
+        initial &&
+        !hasHandledInitialMobileViewport &&
+        widget.leftDrawer != null;
+    hasHandledInitialMobileViewport =
+        hasHandledInitialMobileViewport || initial;
+
+    if (shouldShowIntro) {
+      showMobileLeftPreview = true;
+      setDrawerOpen(leftDrawerController, open: true, animate: false);
+      setDrawerOpen(rightDrawerController, open: false, animate: false);
+      mobileIntroTimer = Timer(_mobileIntroDelay, () {
+        if (!mounted ||
+            activeViewport != _AdaptivePageViewport.mobile ||
+            !showMobileLeftPreview) {
+          return;
+        }
+
+        setDrawerOpen(leftDrawerController, open: false, animate: true);
+      });
+      return;
+    }
+
+    showMobileLeftPreview = false;
+    setDrawerOpen(leftDrawerController, open: false, animate: false);
+    setDrawerOpen(rightDrawerController, open: false, animate: false);
+  }
+
+  void cancelMobileIntro() {
+    mobileIntroTimer?.cancel();
+    mobileIntroTimer = null;
+  }
+
+  void setDrawerOpen(
+    AnimationController controller, {
+    required bool open,
+    required bool animate,
+  }) {
+    const epsilon = 0.001;
+
+    if (open) {
+      if (controller.status == AnimationStatus.forward ||
+          controller.value >= 1 - epsilon) {
+        return;
+      }
+
+      if (animate) {
+        controller.forward();
+      } else {
+        controller.value = 1;
+      }
+      return;
+    }
+
+    if (controller.status == AnimationStatus.reverse ||
+        controller.value <= epsilon) {
+      return;
+    }
+
+    if (animate) {
+      controller.reverse();
+    } else {
+      controller.value = 0;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        bool tabletOrBigger =
-            constraints.maxWidth > appConfig.breakpoints.tabletFromWidth;
-        bool desktopOrBigger =
-            constraints.maxWidth > appConfig.breakpoints.desktopFromWidth;
+        final viewport = viewportForWidth(constraints.maxWidth);
+        final tabletOrBigger = viewport != _AdaptivePageViewport.mobile;
+        final drawerWidth = drawerWidthFor(constraints);
 
-        if (!tabletOrBigger && previousAnimation != 1) {
-          leftDrawerController.reverse(from: previousAnimation != 0 ? null : 1);
-          rightDrawerController.reverse(
-            from: previousAnimation != 0 ? null : 0,
-          );
-          previousAnimation = 1;
-        } else if (tabletOrBigger &&
-            !desktopOrBigger &&
-            previousAnimation != 2) {
-          leftDrawerController.forward(from: previousAnimation != 0 ? null : 0);
-          rightDrawerController.reverse(
-            from: previousAnimation != 0 ? null : 1,
-          );
-          previousAnimation = 2;
-        } else if (desktopOrBigger && previousAnimation != 3) {
-          leftDrawerController.forward(from: previousAnimation != 0 ? null : 0);
-          rightDrawerController.forward(
-            from: previousAnimation != 0 ? null : 0,
-          );
-          previousAnimation = 3;
+        if (activeViewport == null) {
+          applyViewport(viewport, initial: true);
+        } else if (activeViewport != viewport) {
+          scheduleViewportSync(viewport);
         }
+
         return ClipRect(
           child: Scaffold(
             appBar: AppBar(
@@ -159,8 +326,7 @@ class _AdaptivePageState extends State<AdaptivePage>
                               builder: (context, _) {
                                 return SizedBox(
                                   width:
-                                      max(constraints.maxWidth / 5, 250) *
-                                      leftDrawerAnimation.value,
+                                      drawerWidth * leftDrawerAnimation.value,
                                 );
                               },
                             ),
@@ -225,14 +391,14 @@ class _AdaptivePageState extends State<AdaptivePage>
                               builder: (context, _) {
                                 return SizedBox(
                                   width:
-                                      max(constraints.maxWidth / 5, 250) *
-                                      rightDrawerAnimation.value,
+                                      drawerWidth * rightDrawerAnimation.value,
                                 );
                               },
                             ),
                         ],
                       ),
-                      if (widget.leftDrawer != null)
+                      if (widget.leftDrawer != null &&
+                          (tabletOrBigger || showMobileLeftPreview))
                         Align(
                           alignment: Alignment.centerLeft,
                           child: AnimatedBuilder(
@@ -244,7 +410,7 @@ class _AdaptivePageState extends State<AdaptivePage>
                                   end: Offset.zero,
                                 ).animate(leftDrawerAnimation).value,
                                 child: SizedBox(
-                                  width: max(constraints.maxWidth / 5, 250),
+                                  width: drawerWidth,
                                   child: Drawer(
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.only(
@@ -258,7 +424,7 @@ class _AdaptivePageState extends State<AdaptivePage>
                             },
                           ),
                         ),
-                      if (widget.rightDrawer != null)
+                      if (widget.rightDrawer != null && tabletOrBigger)
                         Align(
                           alignment: Alignment.centerRight,
                           child: AnimatedBuilder(
@@ -270,7 +436,7 @@ class _AdaptivePageState extends State<AdaptivePage>
                                   end: Offset.zero,
                                 ).animate(rightDrawerAnimation).value,
                                 child: SizedBox(
-                                  width: max(constraints.maxWidth / 5, 250),
+                                  width: drawerWidth,
                                   child: Drawer(
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.only(
@@ -305,6 +471,8 @@ class _AdaptivePageState extends State<AdaptivePage>
 
   @override
   void dispose() {
+    cancelMobileIntro();
+    leftDrawerController.removeStatusListener(leftDrawerStatusListener);
     leftDrawerController.dispose();
     rightDrawerController.dispose();
     super.dispose();
