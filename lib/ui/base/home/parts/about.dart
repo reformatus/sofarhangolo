@@ -12,7 +12,14 @@ void showLyricAboutDialog(BuildContext context) async {
     context: context,
     applicationName: appConfig.appName,
     applicationVersion: '${packageInfo.version}+${packageInfo.buildNumber}',
-    applicationIcon: Icon(Icons.music_note), // todo replace with app icon
+    applicationIcon: ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: Image.asset(
+        'assets/icon/sofar_dalapp_rounded_512.png',
+        width: 48,
+        height: 48,
+      ),
+    ),
     children: [
       Text('Telepítés forrása: ${packageInfo.installerStore ?? 'ismeretlen'}'),
       Divider(),
