@@ -7,6 +7,7 @@ import '../../../data/cue/slide.dart';
 import '../../../data/song/song.dart';
 import '../../cue/session/session_provider.dart';
 import '../../../services/key/get_transposed.dart';
+import '../../common/key_text.dart';
 import 'state.dart';
 
 class TransposeResetButton extends ConsumerWidget {
@@ -341,11 +342,13 @@ class TransposeCard extends ConsumerWidget {
                   child: Row(
                     children: [
                       Text(
-                        song.keyField != null
-                            ? getTransposedKey(
-                                song.keyField!,
-                                transpose.semitones,
-                              ).toString()
+                        song.primaryKeyField != null
+                            ? displayKeyField(
+                                getTransposedKey(
+                                  song.primaryKeyField!,
+                                  transpose.semitones,
+                                ),
+                              )
                             : 'Hangnem',
                         style: Theme.of(context).textTheme.bodyLarge,
                       ),
@@ -365,7 +368,7 @@ class TransposeCard extends ConsumerWidget {
       );
     }
 
-    SongTranspose transpose = ref.watch(transposeStateForProvider(song));
+    final transpose = ref.watch(transposeStateForProvider(song));
     final viewTypeAsync = ref.watch(viewTypeForProvider(song, songSlide));
 
     if (viewTypeAsync.value != SongViewType.chords) {
@@ -385,11 +388,13 @@ class TransposeCard extends ConsumerWidget {
                 child: Row(
                   children: [
                     Text(
-                      song.keyField != null
-                          ? getTransposedKey(
-                              song.keyField!,
-                              transpose.semitones,
-                            ).toString()
+                      song.primaryKeyField != null
+                          ? displayKeyField(
+                              getTransposedKey(
+                                song.primaryKeyField!,
+                                transpose.semitones,
+                              ),
+                            )
                           : 'Hangnem',
                       style: Theme.of(context).textTheme.bodyLarge,
                     ),

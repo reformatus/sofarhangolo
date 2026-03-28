@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sofar/data/song/song.dart';
 import 'package:sofar/services/songs/filter.dart';
 import 'package:sofar/ui/base/songs/widgets/filter/types/field_type.dart';
+import 'package:sofar/ui/base/songs/widgets/filter/types/key/state.dart';
 
 void main() {
   group('existingFilterableFields', () {
@@ -47,5 +48,49 @@ void main() {
         expect(fields['key']?.count, equals(2));
       },
     );
+  });
+
+  group('matchesKeyFilters', () {
+    Song buildSong(String key) {
+      return Song.fromBankApiJson({
+        'uuid': 'song-$key',
+        'title': 'Song $key',
+        'lyrics': '<song><lyrics>Song</lyrics></song>',
+        'key': key,
+      });
+    }
+
+    test('matches a complete key even when pitch and mode filters differ', () {
+      final song = buildSong('A-dur');
+      final keyFilters = (
+        pitches: {'H'},
+        modes: {'moll'},
+        keys: {KeyField('A', 'dur')},
+      );
+
+      expect(matchesKeyFilters(song, keyFilters), isTrue);
+    });
+
+    test('requires both pitch and mode when partial key filters are used', () {
+      final pitchOnlySong = buildSong('A-moll');
+      final modeOnlySong = buildSong('H-dur');
+      final matchingSong = buildSong('A-dur');
+      final KeyFilters keyFilters = (pitches: {'A'}, modes: {'dur'}, keys: {});
+
+      expect(matchesKeyFilters(pitchOnlySong, keyFilters), isFalse);
+      expect(matchesKeyFilters(modeOnlySong, keyFilters), isFalse);
+      expect(matchesKeyFilters(matchingSong, keyFilters), isTrue);
+    });
+
+    test('ORs complete keys with partial key filters', () {
+      final song = buildSong('H-moll');
+      final keyFilters = (
+        pitches: {'A'},
+        modes: {'dur'},
+        keys: {KeyField('H', 'moll')},
+      );
+
+      expect(matchesKeyFilters(song, keyFilters), isTrue);
+    });
   });
 }

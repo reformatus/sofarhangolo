@@ -734,9 +734,155 @@ i1.GeneratedColumn<int> _column_35(String aliasedName) =>
       type: i1.DriftSqlType.int,
       $customConstraints: 'NULL',
     );
+
+final class Schema4 extends i0.VersionedSchema {
+  Schema4({required super.database}) : super(version: 4);
+  @override
+  late final List<i1.DatabaseSchemaEntity> entities = [
+    banks,
+    songs,
+    songsUuid,
+    preferenceStorage,
+    cues,
+    cuesUuid,
+    assets,
+    assetSourceUrl,
+    songsFts,
+    songsAi,
+    songsAd,
+    songsAu,
+  ];
+  late final Shape6 banks = Shape6(
+    source: i0.VersionedTable(
+      entityName: 'banks',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_1,
+        _column_2,
+        _column_3,
+        _column_4,
+        _column_5,
+        _column_6,
+        _column_7,
+        _column_8,
+        _column_9,
+        _column_10,
+        _column_11,
+        _column_12,
+        _column_13,
+        _column_14,
+        _column_15,
+        _column_16,
+        _column_34,
+        _column_35,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape1 songs = Shape1(
+    source: i0.VersionedTable(
+      entityName: 'songs',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_1,
+        _column_17,
+        _column_18,
+        _column_19,
+        _column_20,
+        _column_21,
+        _column_22,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  final i1.Index songsUuid = i1.Index(
+    'songs_uuid',
+    'CREATE UNIQUE INDEX songs_uuid ON songs (uuid)',
+  );
+  late final Shape2 preferenceStorage = Shape2(
+    source: i0.VersionedTable(
+      entityName: 'preference_storage',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: ['PRIMARY KEY("key")'],
+      columns: [_column_23, _column_24],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape3 cues = Shape3(
+    source: i0.VersionedTable(
+      entityName: 'cues',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_1,
+        _column_19,
+        _column_25,
+        _column_26,
+        _column_27,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  final i1.Index cuesUuid = i1.Index(
+    'cues_uuid',
+    'CREATE UNIQUE INDEX cues_uuid ON cues (uuid)',
+  );
+  late final Shape4 assets = Shape4(
+    source: i0.VersionedTable(
+      entityName: 'assets',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [_column_0, _column_28, _column_29, _column_30, _column_31],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  final i1.Index assetSourceUrl = i1.Index(
+    'asset_source_url',
+    'CREATE UNIQUE INDEX asset_source_url ON assets (source_url)',
+  );
+  late final Shape5 songsFts = Shape5(
+    source: i0.VersionedVirtualTable(
+      entityName: 'songs_fts',
+      moduleAndArgs:
+          'fts5(title, lyrics, content=\'songs\', content_rowid=\'id\', tokenize=\'trigram remove_diacritics 1\')',
+      columns: [_column_32, _column_33],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  final i1.Trigger songsAi = i1.Trigger(
+    'CREATE TRIGGER songs_ai AFTER INSERT ON songs BEGIN INSERT INTO songs_fts ("rowid", title, lyrics) VALUES (new.id, new.title, new.lyrics);END',
+    'songs_ai',
+  );
+  final i1.Trigger songsAd = i1.Trigger(
+    'CREATE TRIGGER songs_ad AFTER DELETE ON songs BEGIN INSERT INTO songs_fts (songs_fts, "rowid", title, lyrics) VALUES (\'delete\', "rowid", old.title, old.lyrics);END',
+    'songs_ad',
+  );
+  final i1.Trigger songsAu = i1.Trigger(
+    'CREATE TRIGGER songs_au AFTER UPDATE ON songs BEGIN INSERT INTO songs_fts (songs_fts, "rowid", title, lyrics) VALUES (\'delete\', "rowid", old.title, old.lyrics);INSERT INTO songs_fts ("rowid", title, lyrics) VALUES (new.id, new.title, new.lyrics);END',
+    'songs_au',
+  );
+}
+
 i0.MigrationStepWithVersion migrationSteps({
   required Future<void> Function(i1.Migrator m, Schema2 schema) from1To2,
   required Future<void> Function(i1.Migrator m, Schema3 schema) from2To3,
+  required Future<void> Function(i1.Migrator m, Schema4 schema) from3To4,
 }) {
   return (currentVersion, database) async {
     switch (currentVersion) {
@@ -750,6 +896,11 @@ i0.MigrationStepWithVersion migrationSteps({
         final migrator = i1.Migrator(database, schema);
         await from2To3(migrator, schema);
         return 3;
+      case 3:
+        final schema = Schema4(database: database);
+        final migrator = i1.Migrator(database, schema);
+        await from3To4(migrator, schema);
+        return 4;
       default:
         throw ArgumentError.value('Unknown migration from $currentVersion');
     }
@@ -759,6 +910,11 @@ i0.MigrationStepWithVersion migrationSteps({
 i1.OnUpgrade stepByStep({
   required Future<void> Function(i1.Migrator m, Schema2 schema) from1To2,
   required Future<void> Function(i1.Migrator m, Schema3 schema) from2To3,
+  required Future<void> Function(i1.Migrator m, Schema4 schema) from3To4,
 }) => i0.VersionedSchema.stepByStepHelper(
-  step: migrationSteps(from1To2: from1To2, from2To3: from2To3),
+  step: migrationSteps(
+    from1To2: from1To2,
+    from2To3: from2To3,
+    from3To4: from3To4,
+  ),
 );

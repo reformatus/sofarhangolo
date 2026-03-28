@@ -8,6 +8,7 @@ import '../../../../data/song/extensions.dart';
 import '../../../../data/song/song.dart';
 import '../../../../services/connectivity/provider.dart';
 import '../../../../services/songs/filter.dart';
+import '../../../common/key_text.dart';
 
 class LSongResultTile extends ConsumerWidget {
   const LSongResultTile(this.songResult, this.bank, {this.onTap, super.key});
@@ -82,9 +83,9 @@ class LSongResultTile extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: 70),
+            constraints: BoxConstraints(maxWidth: 100),
             child: Text(
-              song.keyField?.toString() ?? '',
+              displayKeyFields(song.keyField),
               textAlign: TextAlign.right,
               maxLines: 3,
               overflow: TextOverflow.clip,

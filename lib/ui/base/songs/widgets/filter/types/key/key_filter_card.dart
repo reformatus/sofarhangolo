@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../../../services/key/filter.dart';
 import '../../../../../../common/error/card.dart';
+import '../../../../../../common/key_text.dart';
 import '../../common/filter_chip.dart';
 import 'state.dart';
 
@@ -104,7 +105,7 @@ class _KeyFilterCardState extends ConsumerState<KeyFilterCard> {
                       children: state.keys
                           .map(
                             (e) => LFilterChip(
-                              label: e.toString(),
+                              label: displayKeyField(e),
                               onSelected: (v) => ref
                                   .read(keyFilterStateProvider.notifier)
                                   .setKeyTo(e, v),
@@ -158,7 +159,11 @@ class _KeyFilterCardState extends ConsumerState<KeyFilterCard> {
                   shrinkWrap: true,
                   scrollDirection: Axis.horizontal,
                   itemBuilder: (context, i) => LFilterChip(
-                    label: value[i].label,
+                    label: value[i].addingKey
+                        ? displayKeyString(value[i].label)
+                        : (modes
+                            ? displayKeyMode(value[i].label)
+                            : displayKeyPitch(value[i].label)),
                     selected: value[i].selected,
                     onSelected: value[i].onSelected,
                     special: value[i].addingKey,

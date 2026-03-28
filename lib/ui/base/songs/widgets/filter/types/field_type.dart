@@ -82,6 +82,12 @@ const Map<String, Map<String, dynamic>> songFieldsMap = {
     'type': 'filterable_multiselect_tags',
     'icon': Icons.calendar_month,
   },
+  // TODO implement
+  /*'dynamics': {
+    'title_hu': 'Dinamika',
+    'type': 'dynamics',
+    'icon': Icons.volume_down,
+  }*/
 };
 
 enum FieldType {

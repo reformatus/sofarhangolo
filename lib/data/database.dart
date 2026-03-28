@@ -31,7 +31,6 @@ late final Directory dataDir;
   include: {
     'song/song.drift',
     '../services/songs/filter.drift',
-    '../services/key/select_distinct.drift',
   },
 )
 class LyricDatabase extends _$LyricDatabase {
@@ -40,7 +39,7 @@ class LyricDatabase extends _$LyricDatabase {
     : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration {
@@ -71,12 +70,15 @@ class LyricDatabase extends _$LyricDatabase {
           await customStatement(
             "INSERT INTO songs_fts(songs_fts) VALUES('rebuild')",
           );
-
-          // set bank updated to old date (to trigger in background refresh) - or make good way to do this
         },
         from2To3: (m, schema) async {
           await m.addColumn(schema.banks, schema.banks.failedSongUuids);
           await m.addColumn(schema.banks, schema.banks.totalSongsInBank);
+        },
+        from3To4: (m, schema) async {
+          await customStatement(
+            "UPDATE banks SET last_updated = '1900-01-01T00:00:00'",
+          );
         },
       ),
     );

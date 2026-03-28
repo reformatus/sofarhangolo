@@ -7,6 +7,8 @@ import 'generated/schema.dart';
 
 import 'generated/schema_v1.dart' as v1;
 import 'generated/schema_v2.dart' as v2;
+import 'generated/schema_v3.dart' as v3;
+import 'generated/schema_v4.dart' as v4;
 
 import 'package:sofar/data/database.dart';
 
@@ -101,6 +103,126 @@ void main() {
       newVersion: 2,
       createOld: v1.DatabaseAtV1.new,
       createNew: v2.DatabaseAtV2.new,
+      openTestedDatabase: LyricDatabase.new,
+      createItems: (batch, oldDb) {
+        batch.insertAll(oldDb.banks, oldBanksData);
+        batch.insertAll(oldDb.songs, oldSongsData);
+        batch.insertAll(oldDb.assets, oldAssetsData);
+        batch.insertAll(oldDb.cues, oldCuesData);
+        batch.insertAll(oldDb.preferenceStorage, oldPreferenceStorageData);
+        batch.insertAll(oldDb.songsFts, oldSongsFtsData);
+      },
+      validateItems: (newDb) async {
+        expect(expectedNewBanksData, await newDb.select(newDb.banks).get());
+        expect(expectedNewSongsData, await newDb.select(newDb.songs).get());
+        expect(expectedNewAssetsData, await newDb.select(newDb.assets).get());
+        expect(expectedNewCuesData, await newDb.select(newDb.cues).get());
+        expect(
+          expectedNewPreferenceStorageData,
+          await newDb.select(newDb.preferenceStorage).get(),
+        );
+        expect(
+          expectedNewSongsFtsData,
+          await newDb.select(newDb.songsFts).get(),
+        );
+      },
+    );
+  });
+
+  test('migration from v3 to v4 sets bank lastUpdated sentinel', () async {
+    final oldBanksData = <v3.BanksData>[
+      const v3.BanksData(
+        id: 1,
+        uuid: 'bank-1',
+        logo: null,
+        tinyLogo: null,
+        name: 'Migration Bank',
+        description: null,
+        legal: null,
+        aboutLink: null,
+        contactEmail: null,
+        baseUrl: 'https://example.com',
+        parallelUpdateJobs: 1,
+        amountOfSongsInRequest: 10,
+        noCms: 0,
+        songFields: '{}',
+        isEnabled: 1,
+        isOfflineMode: 0,
+        lastUpdated: '2025-03-01T12:00:00',
+        failedSongUuids: null,
+        totalSongsInBank: 1,
+      ),
+    ];
+    final expectedNewBanksData = <v4.BanksData>[
+      const v4.BanksData(
+        id: 1,
+        uuid: 'bank-1',
+        logo: null,
+        tinyLogo: null,
+        name: 'Migration Bank',
+        description: null,
+        legal: null,
+        aboutLink: null,
+        contactEmail: null,
+        baseUrl: 'https://example.com',
+        parallelUpdateJobs: 1,
+        amountOfSongsInRequest: 10,
+        noCms: 0,
+        songFields: '{}',
+        isEnabled: 1,
+        isOfflineMode: 0,
+        lastUpdated: '1900-01-01T00:00:00',
+        failedSongUuids: null,
+        totalSongsInBank: 1,
+      ),
+    ];
+
+    final oldSongsData = <v3.SongsData>[
+      const v3.SongsData(
+        id: 1,
+        uuid: 'song-1',
+        sourceBank: 'bank-1',
+        contentMap: '{}',
+        title: 'Migration Song',
+        lyrics: '[V3]\n Első sor',
+        lyricsFormat: 'opensong',
+        keyField: 'C-dur',
+      ),
+    ];
+    final expectedNewSongsData = <v4.SongsData>[
+      const v4.SongsData(
+        id: 1,
+        uuid: 'song-1',
+        sourceBank: 'bank-1',
+        contentMap: '{}',
+        title: 'Migration Song',
+        lyrics: '[V3]\n Első sor',
+        lyricsFormat: 'opensong',
+        keyField: 'C-dur',
+      ),
+    ];
+
+    final oldAssetsData = <v3.AssetsData>[];
+    final expectedNewAssetsData = <v4.AssetsData>[];
+
+    final oldCuesData = <v3.CuesData>[];
+    final expectedNewCuesData = <v4.CuesData>[];
+
+    final oldPreferenceStorageData = <v3.PreferenceStorageData>[];
+    final expectedNewPreferenceStorageData = <v4.PreferenceStorageData>[];
+
+    final oldSongsFtsData = <v3.SongsFtsData>[
+      const v3.SongsFtsData(title: 'Migration Song', lyrics: '[V3]\n Első sor'),
+    ];
+    final expectedNewSongsFtsData = <v4.SongsFtsData>[
+      const v4.SongsFtsData(title: 'Migration Song', lyrics: '[V3]\n Első sor'),
+    ];
+
+    await verifier.testWithDataIntegrity(
+      oldVersion: 3,
+      newVersion: 4,
+      createOld: v3.DatabaseAtV3.new,
+      createNew: v4.DatabaseAtV4.new,
       openTestedDatabase: LyricDatabase.new,
       createItems: (batch, oldDb) {
         batch.insertAll(oldDb.banks, oldBanksData);

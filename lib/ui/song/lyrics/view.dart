@@ -234,7 +234,7 @@ class LyricsSegment extends ConsumerWidget {
 
     final chord = getTransposedChord(
       e.chord,
-      song.keyField?.pitch,
+      song.primaryKeyField?.pitch,
       transpose.finalTransposeBy,
     );
 

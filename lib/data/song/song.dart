@@ -13,7 +13,7 @@ class Song extends Insertable<Song> {
   final String title;
   final String lyrics;
   final LyricsFormat lyricsFormat;
-  final KeyField? keyField;
+  final List<KeyField> keyField;
 
   Map<String, String> contentMap;
 
@@ -59,7 +59,7 @@ class Song extends Insertable<Song> {
         title: json['title'],
         lyrics: lyricsContent,
         lyricsFormat: format,
-        keyField: KeyField.fromString(json['key']),
+        keyField: KeyField.fromStringList(json['key']),
         contentMap: contentMap,
         sourceBank: sourceBank?.uuid,
       );
@@ -84,7 +84,16 @@ class Song extends Insertable<Song> {
     return LyricsParser.forFormat(lyricsFormat).getFirstLine(lyrics);
   }
 
-  int get contentHash => Object.hash(jsonEncode(contentMap), sourceBank);
+  KeyField? get primaryKeyField {
+    if (keyField.isEmpty) return null;
+    return keyField.first;
+  }
+
+  int get contentHash => Object.hash(
+    jsonEncode(contentMap),
+    jsonEncode(keyField.map((e) => e.toString()).toList()),
+    sourceBank,
+  );
 
   @override
   bool operator ==(Object other) {
@@ -151,18 +160,17 @@ class SongContentConverter extends TypeConverter<Map<String, String>, String> {
   }
 }
 
-class KeyFieldConverter extends TypeConverter<KeyField?, String> {
+class KeyFieldConverter extends TypeConverter<List<KeyField>, String> {
   const KeyFieldConverter();
 
   @override
-  KeyField? fromSql(String fromDb) {
-    return KeyField.fromString(fromDb);
+  List<KeyField> fromSql(String fromDb) {
+    return KeyField.fromStringList(fromDb);
   }
 
   @override
-  String toSql(KeyField? value) {
-    if (value == null) return "";
-    return value.toString();
+  String toSql(List<KeyField> value) {
+    return value.map((e) => e.toString()).join(', ');
   }
 }
 
@@ -186,6 +194,16 @@ class KeyField {
       throw Exception('Invalid key field: $value');
     }
     return KeyField(parts[0], parts[1]);
+  }
+
+  static List<KeyField> fromStringList(String? value) {
+    if (value == null || value.isEmpty) return [];
+    return value
+        .split(',')
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .map((item) => KeyField.fromString(item)!)
+        .toList();
   }
 
   @override

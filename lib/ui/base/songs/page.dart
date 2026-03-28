@@ -5,6 +5,7 @@ import '../../../services/bank/banks.dart';
 import 'widgets/filter/types/bank/state.dart';
 import '../../../data/bank/bank.dart';
 import '../../common/centered_hint.dart';
+import '../../common/key_text.dart';
 
 import '../../../config/config.dart';
 import '../../../services/songs/filter.dart';
@@ -427,15 +428,15 @@ class FiltersTitle extends ConsumerWidget {
                         [
                           if (keyFilterState.keys.isNotEmpty)
                             keyFilterState.keys
-                                .map((e) => e.toString())
+                                .map(displayKeyField)
                                 .join(' vagy '),
                           if (keyFilterState.pitches.isNotEmpty ||
                               keyFilterState.modes.isNotEmpty)
                             [
                               if (keyFilterState.pitches.isNotEmpty)
-                                'alaphangja ${keyFilterState.pitches.join(' vagy ')}',
+                                'alaphangja ${keyFilterState.pitches.map(displayKeyPitch).join(' vagy ')}',
                               if (keyFilterState.modes.isNotEmpty)
-                                'hangsora ${keyFilterState.modes.join(' vagy ')}',
+                                'hangsora ${keyFilterState.modes.map(displayKeyMode).join(' vagy ')}',
                             ].join(' és '),
                         ].join(', vagy '),
                       if (filterState.isNotEmpty)

@@ -34,7 +34,7 @@ Map<String, ({FieldType type, int count})> buildExistingFilterableFields(
   int keyFieldCount = 0;
 
   for (var song in songs) {
-    if (song.keyField != null) {
+    if (song.keyField.isNotEmpty) {
       keyFieldCount++;
     }
 
@@ -61,7 +61,7 @@ Map<String, ({FieldType type, int count})> buildExistingFilterableFields(
     }
   }
 
-  // Build static filters
+  // Add static field filters
   if (keyFieldCount > 0) {
     fields['key'] = (type: FieldType.key, count: keyFieldCount);
   }
@@ -101,6 +101,29 @@ Stream<List<Song>> allSongs(Ref ref) {
 
 const snippetTags = (start: '<?', end: '?>');
 
+bool matchesKeyFilters(Song song, KeyFilters keyFilters) {
+  if (keyFilters.isEmpty) return true;
+
+  final matchesCompleteKey =
+      keyFilters.keys.isNotEmpty &&
+      song.keyField.any((key) => keyFilters.keys.contains(key));
+
+  final matchesPitchGroup =
+      keyFilters.pitches.isEmpty ||
+      song.keyField.any((key) => keyFilters.pitches.contains(key.pitch));
+
+  final matchesModeGroup =
+      keyFilters.modes.isEmpty ||
+      song.keyField.any((key) => keyFilters.modes.contains(key.mode));
+
+  final matchesPartialKeyGroup =
+      (keyFilters.pitches.isNotEmpty || keyFilters.modes.isNotEmpty) &&
+      matchesPitchGroup &&
+      matchesModeGroup;
+
+  return matchesCompleteKey || matchesPartialKeyGroup;
+}
+
 @Riverpod(keepAlive: true)
 Stream<List<SongResult>> filteredSongs(Ref ref) {
   final String searchString = sanitize(ref.watch(searchStringStateProvider));
@@ -125,27 +148,6 @@ Stream<List<SongResult>> filteredSongs(Ref ref) {
             );
           })
           .followedBy([
-            Expression.or([
-              if (keyFilters.pitches.isNotEmpty || keyFilters.modes.isNotEmpty)
-                Expression.and([
-                  if (keyFilters.pitches.isNotEmpty)
-                    Expression.or(
-                      keyFilters.pitches.map(
-                        (e) => songs.keyField.like('$e-%'),
-                      ),
-                    ),
-                  if (keyFilters.modes.isNotEmpty)
-                    Expression.or(
-                      keyFilters.modes.map((e) => songs.keyField.like('%-$e')),
-                    ),
-                ]),
-              if (keyFilters.keys.isNotEmpty)
-                Expression.or(
-                  keyFilters.keys.map(
-                    (e) => songs.keyField.equals(e.toString()),
-                  ),
-                ),
-            ], ifEmpty: Constant(true)),
             if (bankFilters.isNotEmpty)
               Expression.or(bankFilters.map((b) => songs.sourceBank.equals(b))),
           ]),
@@ -172,6 +174,7 @@ Stream<List<SongResult>> filteredSongs(Ref ref) {
                       [],
                 ),
               )
+              .where((result) => matchesKeyFilters(result.song, keyFilters))
               .toList(),
         );
   } else {
@@ -191,6 +194,7 @@ Stream<List<SongResult>> filteredSongs(Ref ref) {
                   downloadedAssets: result.assets?.split(',') ?? [],
                 ),
               )
+              .where((result) => matchesKeyFilters(result.song, keyFilters))
               .toList(),
         );
   }
