@@ -16,10 +16,17 @@ import '../../common/error/card.dart';
 import '../transpose/state.dart';
 
 class LyricsView extends ConsumerWidget {
-  LyricsView(this.song, {this.songSlide, super.key});
+  LyricsView(
+    this.song, {
+    this.songSlide,
+    this.forceSingleColumnLayout = false,
+    super.key,
+  });
 
   final Song song;
   final SongSlide? songSlide;
+  // TODO this is a stopgap for in-cue scroll consistency. We have to redesign lyrics view so that it scrolls vertically, or cues to scroll vertically.
+  final bool forceSingleColumnLayout;
 
   final ChordTransposer transposer = ChordTransposer(
     notation: NoteNotation.germanWithAccidentals, // TODO configurable
@@ -46,9 +53,10 @@ class LyricsView extends ConsumerWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           //! Calculate layout
-          int crossAxisCount =
-              (constraints.maxWidth ~/ lyricsViewStyle.verseCardColumnWidth)
-                  .clamp(1, 9999);
+          int crossAxisCount = forceSingleColumnLayout
+              ? 1
+              : (constraints.maxWidth ~/ lyricsViewStyle.verseCardColumnWidth)
+                    .clamp(1, 9999);
           double cardWidth = (constraints.maxWidth / crossAxisCount);
 
           // When scrolling sideways, make sure a bit of the next column is visible

@@ -75,21 +75,15 @@ class CueSongFixture {
 }
 
 class CueWidgetHarness {
-  CueWidgetHarness({
-    required this.testHarness,
-    required this.controllerCreationCount,
-  });
+  CueWidgetHarness({required this.testHarness});
 
   final TestHarness testHarness;
-  final ValueNotifier<int> controllerCreationCount;
 
   ProviderContainer get container => testHarness.container;
 
   CueSession get session => container.read(activeCueSessionProvider).value!;
 
   SongSlide get currentSongSlide => session.currentSlide! as SongSlide;
-
-  int get createdControllerCount => controllerCreationCount.value;
 
   void navigate(int offset) {
     container.read(activeCueSessionProvider.notifier).navigate(offset);
@@ -213,8 +207,6 @@ Future<CueWidgetHarness> pumpCueWidgetHarness(
   required String cueUuid,
   String? initialSlideUuid,
 }) async {
-  final controllerCreationCount = ValueNotifier<int>(0);
-
   await testHarness.container
       .read(activeCueSessionProvider.notifier)
       .load(cueUuid, initialSlideUuid: initialSlideUuid);
@@ -233,13 +225,7 @@ Future<CueWidgetHarness> pumpCueWidgetHarness(
                     children: [
                       const _CueHarnessCurrentSlideLabel(),
                       const Divider(height: 1),
-                      Expanded(
-                        child: SlideView(
-                          onTabControllerCreated: () {
-                            controllerCreationCount.value += 1;
-                          },
-                        ),
-                      ),
+                      Expanded(child: SlideView()),
                     ],
                   ),
                 ),
@@ -257,10 +243,7 @@ Future<CueWidgetHarness> pumpCueWidgetHarness(
 
   await tester.pumpAndSettle();
 
-  return CueWidgetHarness(
-    testHarness: testHarness,
-    controllerCreationCount: controllerCreationCount,
-  );
+  return CueWidgetHarness(testHarness: testHarness);
 }
 
 class _CueHarnessCurrentSlideLabel extends ConsumerWidget {

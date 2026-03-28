@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../data/song/song.dart';
 import '../../../services/key/get_transposed.dart';
+import '../../common/key_text.dart';
 
 class TransposeOverlayButton extends StatefulWidget {
   const TransposeOverlayButton({
@@ -28,11 +29,13 @@ class _TransposeOverlayButtonState extends State<TransposeOverlayButton> {
         setState(() {});
       },
       label: Text(
-        widget.song.keyField != null
-            ? getTransposedKey(
-                widget.song.keyField!,
-                widget.transpose.semitones,
-              ).toString()
+        widget.song.primaryKeyField != null
+            ? displayKeyField(
+                getTransposedKey(
+                  widget.song.primaryKeyField!,
+                  widget.transpose.semitones,
+                ),
+              )
             : 'Transzponálás',
       ),
       icon: Icon(widget.overlayVisible.value ? Icons.close : Icons.unfold_more),

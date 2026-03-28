@@ -71,6 +71,7 @@ class SongSlideView extends ConsumerWidget {
       SongViewType.lyrics || SongViewType.chords => LyricsView(
         currentSlide.song,
         songSlide: currentSlide,
+        forceSingleColumnLayout: true,
       ),
     };
   }

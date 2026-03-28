@@ -101,10 +101,12 @@ class SheetView extends ConsumerWidget {
               );
           }
         } else {
-          return _AssetLoadingIndicator(progress: assetResult.progress);
+          return Center(
+            child: CircularProgressIndicator(value: assetResult.progress),
+          );
         }
       default:
-        return const _AssetLoadingIndicator();
+        return Center(child: const CircularProgressIndicator());
     }
   }
 }
@@ -201,33 +203,4 @@ double _calculatePdfInitialZoom(
   double coverZoom,
 ) {
   return fitZoom;
-}
-
-class _AssetLoadingIndicator extends StatelessWidget {
-  const _AssetLoadingIndicator({this.progress});
-
-  final double? progress;
-
-  @override
-  Widget build(BuildContext context) {
-    final percent = progress == null ? null : (progress! * 100).round();
-
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox.square(
-            dimension: 48,
-            child: CircularProgressIndicator(value: progress),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            percent == null
-                ? 'Kottakép betöltése...'
-                : 'Kottakép betöltése... $percent%',
-          ),
-        ],
-      ),
-    );
-  }
 }
