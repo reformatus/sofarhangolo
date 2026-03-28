@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -91,19 +93,11 @@ class SheetView extends ConsumerWidget {
                 ),
               );
             case SongViewType.pdf || _:
-              return PdfViewer.data(
-                assetResult.data!,
+              return _PdfSheetAssetView(
                 sourceName: song.uuid,
-                params: PdfViewerParams(
-                  backgroundColor: Theme.of(context).canvasColor,
-                  loadingBannerBuilder: (_, _, _) =>
-                      Center(child: CircularProgressIndicator()),
-                  pageDropShadow: BoxShadow(
-                    color: Theme.of(context).shadowColor.withAlpha(30),
-                    blurRadius: 30,
-                  ),
-                  scrollByMouseWheel: null,
-                ),
+                data: assetResult.data!,
+                backgroundColor: Theme.of(context).canvasColor,
+                shadowColor: Theme.of(context).shadowColor.withAlpha(30),
               );
           }
         } else {
@@ -113,6 +107,100 @@ class SheetView extends ConsumerWidget {
         return const _AssetLoadingIndicator();
     }
   }
+}
+
+class _PdfSheetAssetView extends StatefulWidget {
+  const _PdfSheetAssetView({
+    required this.sourceName,
+    required this.data,
+    required this.backgroundColor,
+    required this.shadowColor,
+  });
+
+  final String sourceName;
+  final Uint8List data;
+  final Color backgroundColor;
+  final Color shadowColor;
+
+  @override
+  State<_PdfSheetAssetView> createState() => _PdfSheetAssetViewState();
+}
+
+class _PdfSheetAssetViewState extends State<_PdfSheetAssetView> {
+  late final PdfViewerController _controller;
+  late PdfDocumentRefData _documentRef;
+  late PdfViewerParams _viewerParams;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = PdfViewerController();
+    _documentRef = _createDocumentRef();
+    _viewerParams = _createViewerParams();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PdfSheetAssetView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.sourceName != oldWidget.sourceName ||
+        !identical(widget.data, oldWidget.data)) {
+      _documentRef = _createDocumentRef();
+    }
+
+    if (widget.backgroundColor != oldWidget.backgroundColor ||
+        widget.shadowColor != oldWidget.shadowColor) {
+      _viewerParams = _createViewerParams();
+    }
+  }
+
+  PdfDocumentRefData _createDocumentRef() {
+    final key = PdfDocumentRefKey(widget.sourceName, [
+      identityHashCode(widget.data),
+    ]);
+
+    return PdfDocumentRefData(
+      widget.data,
+      sourceName: widget.sourceName,
+      key: key,
+    );
+  }
+
+  PdfViewerParams _createViewerParams() {
+    return PdfViewerParams(
+      backgroundColor: widget.backgroundColor,
+      calculateInitialZoom: _calculatePdfInitialZoom,
+      loadingBannerBuilder: _buildPdfLoadingBanner,
+      pageDropShadow: BoxShadow(color: widget.shadowColor, blurRadius: 30),
+      scrollByMouseWheel: null,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PdfViewer(
+      _documentRef,
+      controller: _controller,
+      params: _viewerParams,
+    );
+  }
+}
+
+Widget _buildPdfLoadingBanner(
+  BuildContext context,
+  int bytesDownloaded,
+  int? totalBytes,
+) {
+  return const Center(child: CircularProgressIndicator());
+}
+
+double _calculatePdfInitialZoom(
+  PdfDocument document,
+  PdfViewerController controller,
+  double fitZoom,
+  double coverZoom,
+) {
+  return fitZoom;
 }
 
 class _AssetLoadingIndicator extends StatelessWidget {
