@@ -100,29 +100,33 @@ Future<Cue> _importCueJson(Map json, {String? initialSlideUuid}) async {
     return await insertCueFromJson(json: json);
   } else {
     // Existing cue - ask user if they want to overwrite
-    final NavigatorState? navigator = appNavigatorKey.currentState;
-    final ProviderContainer? container = navigator == null
-        ? null
-        : ProviderScope.containerOf(navigator.context, listen: false);
+    final BuildContext? context = appNavigatorKey.currentContext;
+    if (context == null) {
+      return existingCue;
+    }
+    if (!context.mounted) {
+      return existingCue;
+    }
 
+    final ProviderContainer container = ProviderScope.containerOf(
+      context,
+      listen: false,
+    );
     Cue cue = existingCue;
 
-    if (navigator != null) {
-      await showConfirmDialog(
-        // ignore: use_build_context_synchronously
-        navigator.context,
-        title: 'A linkben megnyitott lista már létezik. Felülírod?',
-        actionLabel: 'Felülírás',
-        actionIcon: Icons.edit_note,
-        actionOnPressed: () async {
-          cue = await updateCueFromJson(
-            json: json,
-            container: container,
-            initialSlideUuid: initialSlideUuid,
-          );
-        },
-      );
-    }
+    await showConfirmDialog(
+      context,
+      title: 'A linkben megnyitott lista már létezik. Felülírod?',
+      actionLabel: 'Felülírás',
+      actionIcon: Icons.edit_note,
+      actionOnPressed: () async {
+        cue = await updateCueFromJson(
+          json: json,
+          container: container,
+          initialSlideUuid: initialSlideUuid,
+        );
+      },
+    );
 
     return cue;
   }
