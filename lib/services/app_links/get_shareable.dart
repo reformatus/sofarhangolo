@@ -1,6 +1,6 @@
 import '../../data/cue/cue.dart';
 import '../../data/song/song.dart';
-import 'navigation.dart';
+import 'share_links.dart';
 
 Uri getShareableLinkFor<T>(T item) {
   if (item is Song) {

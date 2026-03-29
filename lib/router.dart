@@ -7,18 +7,13 @@ final GlobalKey<NavigatorState> baseNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'base',
 );
 
-GoRouter createAppRouter({required String initialLocation}) {
+GoRouter createAppRouter({String? initialLocation}) {
   return GoRouter(
     navigatorKey: appNavigatorKey,
     initialLocation: initialLocation,
-    overridePlatformDefaultLocation: true,
+    overridePlatformDefaultLocation: initialLocation != null,
     routes: [
       GoRoute(path: '/', redirect: (context, state) => '/home'),
-      GoRoute(
-        path: '/launch/song/:uuid',
-        redirect: (context, state) =>
-            songRoutePath(state.pathParameters['uuid']!),
-      ),
       GoRoute(
         path: '/launch/cueData',
         pageBuilder: (context, state) =>

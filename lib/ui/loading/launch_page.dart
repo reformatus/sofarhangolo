@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../services/app_links/navigation.dart';
-import '../../services/cue/import_from_link.dart';
+import '../../services/app_links/launch_resolution.dart';
 import '../common/error/card.dart';
 
 class LaunchPage extends StatefulWidget {
@@ -30,7 +29,7 @@ class _LaunchPageState extends State<LaunchPage> {
     _handled = true;
 
     try {
-      final destination = await _resolveLaunchDestination(widget.launchUri);
+      final destination = await resolveLaunchRoute(widget.launchUri);
       if (!mounted) return;
       context.go(destination);
     } catch (error, stackTrace) {
@@ -39,33 +38,6 @@ class _LaunchPageState extends State<LaunchPage> {
         _error = error;
         _stackTrace = stackTrace;
       });
-    }
-  }
-
-  Future<String> _resolveLaunchDestination(Uri launchUri) async {
-    switch (launchUri.path) {
-      case '/launch/cueData':
-        final encodedData = launchUri.queryParameters['data'];
-        if (encodedData == null) {
-          throw Exception('Hiányzik a lista adata a linkből.');
-        }
-        final result = await importCueFromCompressedData(
-          encodedData,
-          launchUri.queryParameters,
-        );
-        return result.getNavigationPath();
-      case '/launch/cueJson':
-        final jsonString = launchUri.queryParameters['data'];
-        if (jsonString == null) {
-          throw Exception('Hiányzik a lista adata a linkből.');
-        }
-        final result = await importCueFromJson(
-          jsonString,
-          launchUri.queryParameters,
-        );
-        return result.getNavigationPath();
-      default:
-        return initialRouteFromAppUri(launchUri);
     }
   }
 

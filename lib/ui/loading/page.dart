@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../services/app_links/navigation.dart';
 import '../../services/bank/bank_updated.dart';
 import '../../services/error/app_error.dart';
 import '../../services/preferences/preferences_parent.dart';
@@ -14,14 +13,9 @@ import '../common/error/card.dart';
 import 'banner.dart';
 
 class LoadingPage extends ConsumerStatefulWidget {
-  const LoadingPage({
-    required this.initialAppUri,
-    required this.onReady,
-    super.key,
-  });
+  const LoadingPage({required this.onReady, super.key});
 
-  final Uri? initialAppUri;
-  final ValueChanged<String> onReady;
+  final VoidCallback onReady;
 
   @override
   ConsumerState<LoadingPage> createState() => _LoadingPageState();
@@ -88,7 +82,7 @@ class _LoadingPageState extends ConsumerState<LoadingPage> {
 
     if (!mounted) return;
 
-    widget.onReady(initialRouteFromAppUri(widget.initialAppUri));
+    widget.onReady();
   }
 
   @override

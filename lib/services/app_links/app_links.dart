@@ -1,12 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:app_links/app_links.dart';
 import '../../config/config.dart';
-import '../cue/import_from_link.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../data/log/logger.dart';
-import 'navigation.dart';
-import 'web_initial_uri.dart';
+import 'launch_resolution.dart';
 
 part 'app_links.g.dart';
 
@@ -18,11 +16,9 @@ Future<Uri?> captureInitialAppUri() async {
     return _initialAppUri;
   }
 
-  if (kIsWeb) {
-    _initialAppUri = takeStoredWebInitialUri() ?? Uri.base;
-  } else {
-    _initialAppUri = await appLinksSingleton.getInitialLink();
-  }
+  if (kIsWeb) return null;
+
+  _initialAppUri = await appLinksSingleton.getInitialLink();
 
   return _initialAppUri;
 }
@@ -52,30 +48,9 @@ Stream<String> shouldNavigate(Ref ref) async* {
         continue;
       }
 
-      final route = appRouteFromUri(uri);
+      final route = await resolveIncomingAppRoute(uri);
       if (route == null) continue;
-
-      final routeUri = Uri.parse(route);
-      switch (routeUri.path) {
-        case '/launch/cueData':
-          final encodedData = routeUri.queryParameters['data'];
-          if (encodedData == null) continue;
-          final result = await importCueFromCompressedData(
-            encodedData,
-            routeUri.queryParameters,
-          );
-          yield result.getNavigationPath();
-        case '/launch/cueJson':
-          final jsonString = routeUri.queryParameters['data'];
-          if (jsonString == null) continue;
-          final result = await importCueFromJson(
-            jsonString,
-            routeUri.queryParameters,
-          );
-          yield result.getNavigationPath();
-        default:
-          yield route;
-      }
+      yield route;
     } catch (e, s) {
       log.severe('Hiba egy link megnyitása közben', e, s);
     }

@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:xml/xml.dart';
@@ -93,10 +92,6 @@ class HomepageButtonItem {
 */
 @Riverpod(keepAlive: true)
 Future<List<HomepageNewsItem>> getNews(Ref ref) async {
-  if (kIsWeb) {
-    return [];
-  }
-
   Response<String> response;
   try {
     final dio = ref.read(dioProvider);
@@ -132,10 +127,6 @@ Future<List<HomepageNewsItem>> getNews(Ref ref) async {
 
 @Riverpod(keepAlive: true)
 Future<List<HomepageButtonItem>> getButtons(Ref ref) async {
-  if (kIsWeb) {
-    return [];
-  }
-
   Response<String> response;
   try {
     final dio = ref.read(dioProvider);

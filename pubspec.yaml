@@ -70,6 +70,7 @@ dependencies:
   font_awesome_flutter: 10.8.0
   xml: ^6.5.0
   connectivity_plus: ^7.0.0
+  web: ^1.1.1
   cached_network_image: ^3.4.1 # TODO Replace with our implementation, as this uses sqflite
   flutter_test:
     sdk: flutter

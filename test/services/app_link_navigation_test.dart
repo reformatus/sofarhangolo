@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sofar/data/cue/cue.dart';
 import 'package:sofar/data/song/song.dart';
 import 'package:sofar/services/app_links/navigation.dart';
+import 'package:sofar/services/app_links/share_links.dart';
 import 'package:sofar/ui/cue/cue_page_type.dart';
 
 import '../harness/test_config.dart';

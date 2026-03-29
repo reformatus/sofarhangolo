@@ -1,44 +1,21 @@
 import '../../config/app_config.dart';
 import '../../config/config.dart';
-import '../../data/cue/cue.dart';
-import '../../data/song/song.dart';
 import '../../ui/cue/cue_page_type.dart';
-import '../cue/compression.dart';
 
-String songRoutePath(String songUuid) => '/song/$songUuid';
-
-String songLaunchPath(String songUuid) => '/launch/song/$songUuid';
+String songRoutePath(String songUuid) =>
+    _routeString(pathSegments: ['song', songUuid]);
 
 String cueRoutePath(String cueUuid, CuePageType pageType, {String? slideUuid}) {
-  final routePath = switch (pageType) {
-    CuePageType.edit => '/cue/$cueUuid/edit',
-    CuePageType.musician => '/cue/$cueUuid/present/musician',
+  final pathSegments = switch (pageType) {
+    CuePageType.edit => ['cue', cueUuid, 'edit'],
+    CuePageType.musician => ['cue', cueUuid, 'present', 'musician'],
   };
 
   return _routeString(
-    routePath,
+    pathSegments: pathSegments,
     queryParameters: {
       if (slideUuid != null && slideUuid.isNotEmpty) 'slide': slideUuid,
     },
-  );
-}
-
-Uri getShareableSongLink(Song song, {AppConfig? config}) {
-  config ??= appConfig;
-  return _homepageUri(
-    config,
-    pathSegments: songLaunchPath(
-      song.uuid,
-    ).split('/').where((e) => e.isNotEmpty).toList(),
-  );
-}
-
-Uri getShareableCueLink(Cue cue, {AppConfig? config}) {
-  config ??= appConfig;
-  return _homepageUri(
-    config,
-    pathSegments: ['launch', 'cueData'],
-    queryParameters: {'data': compressCueForUrl(cue.toJson())},
   );
 }
 
@@ -70,21 +47,21 @@ String? appRouteFromUri(Uri? uri, {AppConfig? config}) {
   if (pathSegments[0] == 'launch') {
     if (pathSegments.length >= 3 && pathSegments[1] == 'song') {
       return _routeString(
-        songRoutePath(pathSegments[2]),
+        pathSegments: ['song', pathSegments[2]],
         query: query,
         fragment: fragment,
       );
     }
 
     return _routeString(
-      '/${pathSegments.join('/')}',
+      pathSegments: pathSegments,
       query: query,
       fragment: fragment,
     );
   }
 
   return _routeString(
-    '/${pathSegments.join('/')}',
+    pathSegments: pathSegments,
     query: query,
     fragment: fragment,
   );
@@ -133,24 +110,8 @@ bool _matchesPrefix(List<String> value, List<String> prefix) {
   return true;
 }
 
-Uri _homepageUri(
-  AppConfig config, {
+String _routeString({
   required List<String> pathSegments,
-  Map<String, String>? queryParameters,
-}) {
-  final baseUri = Uri.parse(config.homepageRoot);
-  final baseSegments = baseUri.pathSegments
-      .where((segment) => segment.isNotEmpty)
-      .toList();
-
-  return baseUri.replace(
-    pathSegments: [...baseSegments, ...pathSegments],
-    queryParameters: queryParameters,
-  );
-}
-
-String _routeString(
-  String path, {
   Map<String, String>? queryParameters,
   String? query,
   String? fragment,
@@ -165,7 +126,7 @@ String _routeString(
       : fragment;
 
   return Uri(
-    path: path,
+    path: '/${pathSegments.join('/')}',
     queryParameters: normalizedQueryParameters,
     query: normalizedQuery,
     fragment: normalizedFragment,

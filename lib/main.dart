@@ -6,6 +6,7 @@ import 'package:flutter_fullscreen/flutter_fullscreen.dart';
 import 'package:go_router/go_router.dart';
 import 'services/app_links/app_links.dart';
 import 'services/app_links/navigation.dart';
+import 'services/app_links/web_route_recovery.dart';
 import 'services/preferences/providers/general.dart';
 import 'ui/cue/cue_page_type.dart';
 
@@ -27,11 +28,13 @@ part 'router.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   GoRouter.optionURLReflectsImperativeAPIs = true;
-  if (!kIsWeb) {
+  if (kIsWeb) {
+    restoreStoredWebRouteIfAny();
+  } else {
     await FullScreen.ensureInitialized();
   }
   db = LyricDatabase();
-  final initialAppUri = await captureInitialAppUri();
+  final initialAppUri = kIsWeb ? null : await captureInitialAppUri();
 
   runApp(
     ProviderScope(
@@ -60,11 +63,15 @@ class _LyricAppState extends ConsumerState<LyricApp> {
     super.initState();
   }
 
-  void _finishStartup(String initialRoute) {
+  void _finishStartup() {
     if (_router != null) return;
 
     setState(() {
-      _router = createAppRouter(initialLocation: initialRoute);
+      _router = createAppRouter(
+        initialLocation: widget.initialAppUri == null
+            ? null
+            : initialRouteFromAppUri(widget.initialAppUri),
+      );
     });
   }
 
@@ -112,10 +119,7 @@ class _LyricAppState extends ConsumerState<LyricApp> {
         supportedLocales: commonArgs.supportedLocales,
         localizationsDelegates: commonArgs.localizationsDelegates,
         debugShowCheckedModeBanner: commonArgs.debugShowCheckedModeBanner,
-        home: LoadingPage(
-          initialAppUri: widget.initialAppUri,
-          onReady: _finishStartup,
-        ),
+        home: LoadingPage(onReady: _finishStartup),
       );
     }
 
