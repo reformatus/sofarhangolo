@@ -7,6 +7,7 @@ import '../../services/app_links/navigation.dart';
 import '../../services/bank/bank_updated.dart';
 import '../../services/error/app_error.dart';
 import '../../services/preferences/preferences_parent.dart';
+import '../../services/songs/bank_song_update_task.dart';
 import '../../services/songs/update.dart';
 import '../../services/task/task_queue.dart';
 import '../common/error/card.dart';
@@ -40,6 +41,22 @@ class _LoadingPageState extends ConsumerState<LoadingPage> {
           .read(bankSongUpdateSchedulerProvider.notifier)
           .refreshAllEnabledBanks(),
     );
+  }
+
+  Widget _buildTaskStatus(BankSongUpdateTask task) {
+    if (task.isCompleted) {
+      return const Icon(Icons.check);
+    }
+    if (task.isFailed) {
+      return const Icon(Icons.error_outline);
+    }
+    if (task.isRunning) {
+      return SizedBox.square(
+        dimension: 25,
+        child: CircularProgressIndicator(value: task.progress),
+      );
+    }
+    return const Icon(Icons.schedule);
   }
 
   void _checkAndNavigateIfReady() async {
@@ -108,6 +125,7 @@ class _LoadingPageState extends ConsumerState<LoadingPage> {
     final hasEverUpdatedProvider = ref.watch(hasEverUpdatedAnythingProvider);
     final schedulerState = ref.watch(bankSongUpdateSchedulerProvider);
     final bankTasks = ref.watch(bankSongUpdateTasksProvider);
+    final overallProgress = ref.watch(bankSongUpdateOverallProgressProvider);
 
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
@@ -152,6 +170,11 @@ class _LoadingPageState extends ConsumerState<LoadingPage> {
                           },
                         );
                       }(),
+                    _ when bankTasks.isNotEmpty => _BankDownloadProgress(
+                      bankTasks: bankTasks,
+                      overallProgress: overallProgress,
+                      buildTaskStatus: _buildTaskStatus,
+                    ),
                     _ => const _LoadingIndicator(),
                   }
                 : const _LoadingIndicator(),
@@ -181,6 +204,74 @@ class _LoadingIndicator extends StatelessWidget {
           child: CircularProgressIndicator(),
         ),
       ],
+    );
+  }
+}
+
+class _BankDownloadProgress extends StatelessWidget {
+  const _BankDownloadProgress({
+    required this.bankTasks,
+    required this.overallProgress,
+    required this.buildTaskStatus,
+  });
+
+  final List<BankSongUpdateTask> bankTasks;
+  final double? overallProgress;
+  final Widget Function(BankSongUpdateTask task) buildTaskStatus;
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 600),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Card(
+              margin: const EdgeInsets.only(bottom: 15),
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      top: 16,
+                      left: 16,
+                      bottom: 13,
+                    ),
+                    child: Text(
+                      'Online tárak frissítése...',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  LinearProgressIndicator(value: overallProgress),
+                ],
+              ),
+            ),
+            ...bankTasks.map(
+              (task) => Padding(
+                padding: const EdgeInsets.only(left: 20),
+                child: ListTile(
+                  leading: SizedBox.square(
+                    dimension: 32,
+                    child: task.logo != null
+                        ? Image.memory(task.logo!)
+                        : const Icon(Icons.library_music),
+                  ),
+                  title: Text(
+                    task.title,
+                    style: const TextStyle(fontWeight: FontWeight.w500),
+                  ),
+                  subtitle: Text(task.subtitle),
+                  trailing: buildTaskStatus(task),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
