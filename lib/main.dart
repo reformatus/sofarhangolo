@@ -78,10 +78,7 @@ class _LyricAppState extends ConsumerState<LyricApp> {
       _router = router;
     });
 
-    if (kIsWeb &&
-        startupRoute != null &&
-        startupRoute != '/home' &&
-        !startupRoute.startsWith('/launch/')) {
+    if (kIsWeb && startupRoute != null && startupRoute != '/home') {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || _router != router) return;
         syncWebBrowserUrlToAppRoute(startupRoute, config: appConfig);
