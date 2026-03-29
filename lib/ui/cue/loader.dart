@@ -8,7 +8,7 @@ import 'session/cue_session.dart';
 import 'session/session_provider.dart';
 
 /// Loader widget that initializes the cue and slide state before rendering any CuePage
-class CueLoaderPage extends ConsumerWidget {
+class CueLoaderPage extends ConsumerStatefulWidget {
   const CueLoaderPage(
     this.uuid,
     this.pageType, {
@@ -21,17 +21,47 @@ class CueLoaderPage extends ConsumerWidget {
   final String? initialSlideUuid;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final sessionAsync = ref.watch(activeCueSessionProvider);
+  ConsumerState<CueLoaderPage> createState() => _CueLoaderPageState();
+}
+
+class _CueLoaderPageState extends ConsumerState<CueLoaderPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadIfNeeded());
+  }
+
+  @override
+  void didUpdateWidget(covariant CueLoaderPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.uuid != widget.uuid ||
+        oldWidget.initialSlideUuid != widget.initialSlideUuid) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _loadIfNeeded());
+    }
+  }
+
+  void _loadIfNeeded() {
+    if (!mounted) return;
+
+    final sessionAsync = ref.read(activeCueSessionProvider);
     final currentUuid = sessionAsync.value?.cue.uuid;
 
-    if (currentUuid != uuid) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (currentUuid == widget.uuid) {
+      if (widget.initialSlideUuid != null) {
         ref
             .read(activeCueSessionProvider.notifier)
-            .load(uuid, initialSlideUuid: initialSlideUuid);
-      });
+            .load(widget.uuid, initialSlideUuid: widget.initialSlideUuid);
+      }
+      return;
     }
+    ref
+        .read(activeCueSessionProvider.notifier)
+        .load(widget.uuid, initialSlideUuid: widget.initialSlideUuid);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sessionAsync = ref.watch(activeCueSessionProvider);
 
     return sessionAsync.when(
       loading: () =>
@@ -59,7 +89,7 @@ class CueLoaderPage extends ConsumerWidget {
   }
 
   Widget buildPage(CueSession session) {
-    switch (pageType) {
+    switch (widget.pageType) {
       case CuePageType.edit:
         return CueEditPage(session);
       case CuePageType.musician:
