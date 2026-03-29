@@ -69,13 +69,24 @@ class _LyricAppState extends ConsumerState<LyricApp> {
   void _finishStartup() {
     if (_router != null) return;
 
+    final startupRoute = widget.initialAppUri == null
+        ? null
+        : initialRouteFromAppUri(widget.initialAppUri);
+    final router = createAppRouter(initialLocation: startupRoute);
+
     setState(() {
-      _router = createAppRouter(
-        initialLocation: widget.initialAppUri == null
-            ? null
-            : initialRouteFromAppUri(widget.initialAppUri),
-      );
+      _router = router;
     });
+
+    if (kIsWeb &&
+        startupRoute != null &&
+        startupRoute != '/home' &&
+        !startupRoute.startsWith('/launch/')) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _router != router) return;
+        syncWebBrowserUrlToAppRoute(startupRoute, config: appConfig);
+      });
+    }
   }
 
   @override

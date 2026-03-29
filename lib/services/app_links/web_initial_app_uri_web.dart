@@ -16,12 +16,18 @@ Uri? captureInitialWebAppUri({required AppConfig config}) {
 
   if (recoveredPath != null && recoveredPath.isNotEmpty) {
     web.window.sessionStorage.removeItem('originalWebPath');
-    if (initialUri.toString() != browserUri.toString()) {
-      web.window.history.replaceState(null, '', _relativeUri(initialUri));
-    }
   }
 
   return initialUri;
+}
+
+void syncWebBrowserUrlToAppRoute(String route, {required AppConfig config}) {
+  final targetUri = webAppUriFromRoute(route, config: config);
+  if (targetUri.toString() == web.window.location.href) {
+    return;
+  }
+
+  web.window.history.replaceState(null, '', _relativeUri(targetUri));
 }
 
 String _relativeUri(Uri uri) {

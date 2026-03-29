@@ -57,4 +57,18 @@ void main() {
       );
     });
   });
+
+  group('webAppUriFromRoute', () {
+    test('maps in-app routes to deployed /web URLs', () {
+      final uri = webAppUriFromRoute(
+        '/song/song-123?view=lyrics#verse-2',
+        config: _testConfig(enableRecovery: true),
+      );
+
+      expect(
+        uri.toString(),
+        'https://test.example.com/web/song/song-123?view=lyrics#verse-2',
+      );
+    });
+  });
 }
