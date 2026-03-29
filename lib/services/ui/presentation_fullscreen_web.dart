@@ -8,7 +8,7 @@ import 'presentation_fullscreen_shared.dart';
 class PlatformPresentationFullscreenController
     implements PresentationFullscreenController {
   PlatformPresentationFullscreenController() {
-    _fullscreenChangeListener = ((_) {
+    _fullscreenChangeListener = ((web.Event _) {
       _changes.add(isFullscreen);
     }).toJS;
 
