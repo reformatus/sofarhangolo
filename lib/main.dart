@@ -79,17 +79,33 @@ class _LyricAppState extends ConsumerState<LyricApp> {
     });
 
     if (kIsWeb && startupRoute != null && startupRoute != '/home') {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || _router != router) return;
-        final currentRoute = router.routeInformationProvider.value.uri
-            .toString();
-        if (currentRoute != startupRoute) {
-          router.go(startupRoute);
-          return;
-        }
-        syncWebBrowserUrlToAppRoute(startupRoute, config: appConfig);
-      });
+      _scheduleWebStartupRouteReconciliation(
+        router: router,
+        startupRoute: startupRoute,
+      );
     }
+  }
+
+  void _scheduleWebStartupRouteReconciliation({
+    required GoRouter router,
+    required String startupRoute,
+  }) {
+    void reconcile() {
+      if (!mounted || _router != router) return;
+
+      final currentRoute = router.routeInformationProvider.value.uri.toString();
+      if (currentRoute != startupRoute) {
+        router.go(startupRoute);
+        return;
+      }
+
+      syncWebBrowserUrlToAppRoute(startupRoute, config: appConfig);
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      reconcile();
+      Future<void>.delayed(const Duration(milliseconds: 300), reconcile);
+    });
   }
 
   @override
