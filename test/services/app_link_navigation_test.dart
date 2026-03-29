@@ -32,7 +32,7 @@ void main() {
     test('normalizes launch song links to the in-app song route', () {
       expect(
         initialRouteFromAppUri(
-          Uri.parse('https://test.example.com/web/launch/song/song-123'),
+          Uri.parse('https://test.example.com/launch/song/song-123'),
           config: testAppConfig,
         ),
         '/song/song-123',
@@ -43,7 +43,7 @@ void main() {
       expect(
         initialRouteFromAppUri(
           Uri.parse(
-            'https://test.example.com/web/launch/cueData?data=abc&slide=slide-1',
+            'https://test.example.com/launch/cueData?data=abc&slide=slide-1',
           ),
           config: testAppConfig,
         ),
@@ -94,7 +94,7 @@ void main() {
   });
 
   group('shareable links', () {
-    test('song links point to the deployed web app route', () {
+    test('song links point to the general launch route', () {
       final song = Song(
         uuid: 'song-123',
         title: 'Song',
@@ -105,16 +105,16 @@ void main() {
 
       expect(
         getShareableSongLink(song, config: testAppConfig).toString(),
-        'https://test.example.com/web/song/song-123',
+        'https://test.example.com/launch/song/song-123',
       );
     });
 
-    test('cue links point to the deployed web app launch route', () {
+    test('cue links point to the general launch route', () {
       final cue = Cue(1, 'cue-123', 'Cue', '', 1, const []);
 
       final link = getShareableCueLink(cue, config: testAppConfig).toString();
 
-      expect(link, startsWith('https://test.example.com/web/launch/cueData?'));
+      expect(link, startsWith('https://test.example.com/launch/cueData?'));
       expect(link, contains('data='));
     });
   });

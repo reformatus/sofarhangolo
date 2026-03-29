@@ -56,8 +56,11 @@ class _CuePresentMusicianPageState extends ConsumerState<CuePresentMusicianPage>
 
     _slideListener = ref.listenManual(
       currentSlideUuidProvider,
-      fireImmediately: true,
+      fireImmediately: false,
       (_, slideUuid) => _syncRoute(slideUuid),
+    );
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _syncRoute(ref.read(currentSlideUuidProvider)),
     );
   }
 
@@ -68,6 +71,16 @@ class _CuePresentMusicianPageState extends ConsumerState<CuePresentMusicianPage>
       FullScreen.setFullScreen(false);
     }
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant CuePresentMusicianPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.session.cue.uuid != widget.session.cue.uuid) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _syncRoute(ref.read(currentSlideUuidProvider)),
+      );
+    }
   }
 
   void _syncRoute(String? slideUuid) {

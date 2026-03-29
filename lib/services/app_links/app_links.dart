@@ -6,6 +6,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../data/log/logger.dart';
 import 'navigation.dart';
+import 'web_initial_uri.dart';
 
 part 'app_links.g.dart';
 
@@ -18,7 +19,7 @@ Future<Uri?> captureInitialAppUri() async {
   }
 
   if (kIsWeb) {
-    _initialAppUri = Uri.base;
+    _initialAppUri = takeStoredWebInitialUri() ?? Uri.base;
   } else {
     _initialAppUri = await appLinksSingleton.getInitialLink();
   }

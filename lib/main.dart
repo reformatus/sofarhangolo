@@ -26,6 +26,7 @@ part 'router.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  GoRouter.optionURLReflectsImperativeAPIs = true;
   if (!kIsWeb) {
     await FullScreen.ensureInitialized();
   }

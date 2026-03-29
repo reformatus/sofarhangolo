@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:wtf_sliding_sheet/wtf_sliding_sheet.dart';
 
 import '../../data/song/song.dart';
+import '../../services/app_links/navigation.dart';
 import '../../services/song/from_uuid.dart';
 import '../common/error/card.dart';
 import 'widgets/content.dart';
@@ -25,11 +27,30 @@ class _SongPageState extends ConsumerState<SongPage> {
     transposeOverlayVisible = ValueNotifier<bool>(false);
 
     super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _syncRoute());
   }
 
   late final ScrollController detailsSheetScrollController;
   late final ScrollController actionButtonsScrollController;
   late final ValueNotifier<bool> transposeOverlayVisible;
+
+  @override
+  void didUpdateWidget(covariant SongPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.songId != widget.songId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _syncRoute());
+    }
+  }
+
+  void _syncRoute() {
+    if (!mounted) return;
+
+    final targetRoute = songRoutePath(widget.songId);
+    final currentRoute = GoRouterState.of(context).uri.toString();
+    if (currentRoute == targetRoute) return;
+
+    GoRouter.of(context).replace(targetRoute);
+  }
 
   @override
   void dispose() {

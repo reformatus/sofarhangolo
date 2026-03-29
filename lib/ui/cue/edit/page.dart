@@ -30,8 +30,11 @@ class _CueEditPageState extends ConsumerState<CueEditPage> {
     super.initState();
     _slideListener = ref.listenManual(
       currentSlideUuidProvider,
-      fireImmediately: true,
+      fireImmediately: false,
       (_, slideUuid) => _syncRoute(slideUuid),
+    );
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _syncRoute(ref.read(currentSlideUuidProvider)),
     );
   }
 
@@ -53,6 +56,16 @@ class _CueEditPageState extends ConsumerState<CueEditPage> {
   void dispose() {
     _slideListener.close();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant CueEditPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.session.cue.uuid != widget.session.cue.uuid) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _syncRoute(ref.read(currentSlideUuidProvider)),
+      );
+    }
   }
 
   @override

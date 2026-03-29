@@ -7,6 +7,8 @@ import '../cue/compression.dart';
 
 String songRoutePath(String songUuid) => '/song/$songUuid';
 
+String songLaunchPath(String songUuid) => '/launch/song/$songUuid';
+
 String cueRoutePath(String cueUuid, CuePageType pageType, {String? slideUuid}) {
   final routePath = switch (pageType) {
     CuePageType.edit => '/cue/$cueUuid/edit',
@@ -23,12 +25,17 @@ String cueRoutePath(String cueUuid, CuePageType pageType, {String? slideUuid}) {
 
 Uri getShareableSongLink(Song song, {AppConfig? config}) {
   config ??= appConfig;
-  return _webAppUri(config, pathSegments: ['song', song.uuid]);
+  return _homepageUri(
+    config,
+    pathSegments: songLaunchPath(
+      song.uuid,
+    ).split('/').where((e) => e.isNotEmpty).toList(),
+  );
 }
 
 Uri getShareableCueLink(Cue cue, {AppConfig? config}) {
   config ??= appConfig;
-  return _webAppUri(
+  return _homepageUri(
     config,
     pathSegments: ['launch', 'cueData'],
     queryParameters: {'data': compressCueForUrl(cue.toJson())},
@@ -126,12 +133,12 @@ bool _matchesPrefix(List<String> value, List<String> prefix) {
   return true;
 }
 
-Uri _webAppUri(
+Uri _homepageUri(
   AppConfig config, {
   required List<String> pathSegments,
   Map<String, String>? queryParameters,
 }) {
-  final baseUri = Uri.parse(config.webappRoot);
+  final baseUri = Uri.parse(config.homepageRoot);
   final baseSegments = baseUri.pathSegments
       .where((segment) => segment.isNotEmpty)
       .toList();

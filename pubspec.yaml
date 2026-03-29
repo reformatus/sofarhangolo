@@ -87,6 +87,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icon/sofar_dalapp_rounded_512.png
 
 flutter_launcher_icons:
   #android: "launcher_icon"
