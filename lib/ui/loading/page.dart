@@ -2,9 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../config/config.dart';
+import '../../services/app_links/navigation.dart';
 import '../../services/error/app_error.dart';
 import '../../services/bank/bank_updated.dart';
 import '../../services/preferences/preferences_parent.dart';
@@ -15,7 +15,14 @@ import '../common/error/card.dart';
 import 'banner.dart';
 
 class LoadingPage extends ConsumerStatefulWidget {
-  const LoadingPage({super.key});
+  const LoadingPage({
+    required this.initialAppUri,
+    required this.onReady,
+    super.key,
+  });
+
+  final Uri? initialAppUri;
+  final ValueChanged<String> onReady;
 
   @override
   ConsumerState<LoadingPage> createState() => _LoadingPageState();
@@ -60,15 +67,7 @@ class _LoadingPageState extends ConsumerState<LoadingPage> {
     if (!hasEverUpdated.hasValue) return;
 
     if (hasEverUpdated.value == true) {
-      _hasNavigated = true;
-
-      await preferenceLoader;
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          context.replace('/home');
-        }
-      });
+      await _finishStartup();
       return;
     }
 
@@ -78,18 +77,19 @@ class _LoadingPageState extends ConsumerState<LoadingPage> {
     final allTasksSettled = ref.read(allBankSongUpdateTasksSettledProvider);
 
     if (schedulerState.hasValue && allTasksSettled) {
-      _hasNavigated = true;
-
-      await preferenceLoader;
-
-      // settings should have loaded
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          context.replace('/home');
-        }
-      });
+      await _finishStartup();
     }
+  }
+
+  Future<void> _finishStartup() async {
+    if (_hasNavigated) return;
+
+    _hasNavigated = true;
+    await preferenceLoader;
+
+    if (!mounted) return;
+
+    widget.onReady(initialRouteFromAppUri(widget.initialAppUri));
   }
 
   @override

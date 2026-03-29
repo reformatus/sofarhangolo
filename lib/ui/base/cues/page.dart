@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../data/cue/cue.dart';
+import '../../../services/app_links/navigation.dart';
 import '../../../services/cue/cues.dart';
 import '../../common/centered_hint.dart';
 import '../../common/error/card.dart';
+import '../../cue/cue_page_type.dart';
 import 'dialogs.dart';
 
 class SetsPage extends ConsumerStatefulWidget {
@@ -32,7 +34,7 @@ class _SetsPageState extends ConsumerState<SetsPage> {
               if (createdCue == null) return;
               createdCue as Cue;
               // ignore: use_build_context_synchronously
-              context.push('/cue/${createdCue.uuid}/edit');
+              context.push(cueRoutePath(createdCue.uuid, CuePageType.edit));
             }),
         label: Text('Új lista'),
         icon: Icon(Icons.add_box_outlined),
@@ -71,7 +73,7 @@ class CueTile extends StatelessWidget {
     return ListTile(
       title: Text(cue.title),
       subtitle: cue.description.isNotEmpty ? Text(cue.description) : null,
-      onTap: () => context.push('/cue/${cue.uuid}/edit'),
+      onTap: () => context.push(cueRoutePath(cue.uuid, CuePageType.edit)),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

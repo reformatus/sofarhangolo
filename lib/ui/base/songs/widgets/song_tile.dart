@@ -7,6 +7,7 @@ import '../../../../data/database.dart';
 import '../../../../data/song/extensions.dart';
 import '../../../../data/song/song.dart';
 import '../../../../services/connectivity/provider.dart';
+import '../../../../services/app_links/navigation.dart';
 import '../../../../services/songs/filter.dart';
 import '../../../common/key_text.dart';
 
@@ -28,7 +29,7 @@ class LSongResultTile extends ConsumerWidget {
       // far future todo dense on desktop (maybe even table?)
       onTap: () {
         onTap?.call();
-        context.push('/song/${song.uuid}');
+        context.push(songRoutePath(song.uuid));
       },
       title: RichText(
         text: TextSpan(

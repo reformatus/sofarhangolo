@@ -19,20 +19,174 @@
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Minden kotta, mindig veled">
+  <meta name="theme-color" content="#025462">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Sófár Hangoló">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" href="icons/Apple-touch-180.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <title>Sófár Hangoló</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --boot-surface: #f6f2e9;
+      --boot-surface-dark: #0e1719;
+      --boot-card: rgba(255, 255, 255, 0.88);
+      --boot-card-dark: rgba(8, 16, 18, 0.82);
+      --boot-accent: #025462;
+      --boot-accent-soft: rgba(2, 84, 98, 0.14);
+      --boot-text: #153337;
+      --boot-text-dark: #f2ede1;
+      --boot-muted: rgba(21, 51, 55, 0.72);
+      --boot-muted-dark: rgba(242, 237, 225, 0.72);
+    }
+
+    html,
+    body {
+      margin: 0;
+      min-height: 100%;
+      background:
+        radial-gradient(circle at top, rgba(195, 161, 64, 0.18), transparent 35%),
+        linear-gradient(180deg, var(--boot-surface), #efe6d5 100%);
+    }
+
+    body {
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      html,
+      body {
+        background:
+          radial-gradient(circle at top, rgba(195, 161, 64, 0.14), transparent 30%),
+          linear-gradient(180deg, #102124, var(--boot-surface-dark) 100%);
+      }
+    }
+
+    #boot-splash {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      transition: opacity 220ms ease, visibility 220ms ease;
+      z-index: 9999;
+    }
+
+    #boot-splash.is-hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+    .boot-card {
+      width: min(320px, calc(100vw - 48px));
+      padding: 28px 24px 22px;
+      border-radius: 28px;
+      background: var(--boot-card);
+      box-shadow: 0 20px 48px rgba(15, 30, 34, 0.12);
+      backdrop-filter: blur(16px);
+      text-align: center;
+    }
+
+    .boot-icon {
+      width: 88px;
+      height: 88px;
+      border-radius: 24px;
+      background: linear-gradient(180deg, rgba(195, 161, 64, 0.22), rgba(2, 84, 98, 0.1));
+      padding: 12px;
+      box-sizing: border-box;
+      box-shadow: inset 0 0 0 1px rgba(2, 84, 98, 0.08);
+    }
+
+    .boot-title {
+      margin: 18px 0 6px;
+      color: var(--boot-text);
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+    }
+
+    .boot-subtitle {
+      margin: 0 0 18px;
+      color: var(--boot-muted);
+      font-size: 15px;
+    }
+
+    .boot-progress {
+      height: 4px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: var(--boot-accent-soft);
+    }
+
+    .boot-progress::before {
+      content: "";
+      display: block;
+      height: 100%;
+      width: 40%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #c3a140, var(--boot-accent));
+      animation: boot-progress 1.2s ease-in-out infinite;
+    }
+
+    @keyframes boot-progress {
+      0% {
+        transform: translateX(-120%);
+      }
+      50% {
+        transform: translateX(80%);
+      }
+      100% {
+        transform: translateX(230%);
+      }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .boot-card {
+        background: var(--boot-card-dark);
+        box-shadow: 0 20px 48px rgba(0, 0, 0, 0.35);
+      }
+
+      .boot-title {
+        color: var(--boot-text-dark);
+      }
+
+      .boot-subtitle {
+        color: var(--boot-muted-dark);
+      }
+
+      .boot-icon {
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+      }
+    }
+  </style>
 </head>
 <body>
+  <div id="boot-splash" aria-live="polite">
+    <div class="boot-card">
+      <img class="boot-icon" src="icons/Icon-192.png" alt="Sófár Hangoló ikon">
+      <h1 class="boot-title">Sófár Hangoló</h1>
+      <p class="boot-subtitle">Minden kotta, mindig veled</p>
+      <div class="boot-progress" role="presentation"></div>
+    </div>
+  </div>
+  <script>
+    window.addEventListener("flutter-first-frame", function () {
+      const splash = document.getElementById("boot-splash");
+      splash?.classList.add("is-hidden");
+      window.setTimeout(function () {
+        splash?.remove();
+      }, 240);
+    });
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

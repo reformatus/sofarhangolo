@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../data/cue/slide.dart';
+import '../../../services/app_links/navigation.dart';
 import '../../common/error/card.dart';
 import '../session/session_provider.dart';
 import '../../song/transpose/widget.dart';
@@ -57,7 +58,8 @@ class _ActionsDrawerState extends ConsumerState<ActionsDrawer> {
                   ),
                   SizedBox(height: 8),
                   FilledButton.tonalIcon(
-                    onPressed: () => context.push('/song/${slide.song.uuid}'),
+                    onPressed: () =>
+                        context.push(songRoutePath(slide.song.uuid)),
                     label: Text('Ugrás a dalhoz'),
                     icon: Icon(Icons.redo),
                   ),

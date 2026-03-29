@@ -70,20 +70,17 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
             appConfig.breakpoints.desktopFromWidth;
       });
 
-      shouldNavigateListener = ref.listenManual(
-        shouldNavigateProvider,
-        fireImmediately: true,
-        (_, path) {
-          String? pathString = path.value;
-          if (pathString != null) {
-            context.go('/home');
-            Future(() {
-              if (!mounted) return;
-              context.push('/$pathString');
-            });
-          }
-        },
-      );
+      shouldNavigateListener = ref.listenManual(shouldNavigateProvider, (
+        _,
+        path,
+      ) {
+        final pathString = path.value;
+        if (pathString != null) {
+          final currentLocation = GoRouterState.of(context).uri.toString();
+          if (currentLocation == pathString) return;
+          GoRouter.of(context).go(pathString);
+        }
+      });
     });
   }
 

@@ -6,6 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_fullscreen/flutter_fullscreen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../services/app_links/navigation.dart';
+import '../../cue_page_type.dart';
 import '../../session/cue_session.dart';
 import '../../session/session_provider.dart';
 import '../../widgets/slide_view.dart';
@@ -24,6 +26,7 @@ class _CuePresentMusicianPageState extends ConsumerState<CuePresentMusicianPage>
     with TickerProviderStateMixin {
   late final AnimationController overlayController;
   late final Animation<double> overlayAnimation;
+  late final ProviderSubscription<String?> _slideListener;
 
   @override
   void initState() {
@@ -50,14 +53,35 @@ class _CuePresentMusicianPageState extends ConsumerState<CuePresentMusicianPage>
     if (!kIsWeb) {
       FullScreen.setFullScreen(true, systemUiMode: SystemUiMode.edgeToEdge);
     }
+
+    _slideListener = ref.listenManual(
+      currentSlideUuidProvider,
+      fireImmediately: true,
+      (_, slideUuid) => _syncRoute(slideUuid),
+    );
   }
 
   @override
   void dispose() {
+    _slideListener.close();
     if (!kIsWeb) {
       FullScreen.setFullScreen(false);
     }
     super.dispose();
+  }
+
+  void _syncRoute(String? slideUuid) {
+    if (!mounted) return;
+
+    final targetRoute = cueRoutePath(
+      widget.session.cue.uuid,
+      CuePageType.musician,
+      slideUuid: slideUuid,
+    );
+    final currentRoute = GoRouterState.of(context).uri.toString();
+    if (currentRoute == targetRoute) return;
+
+    GoRouter.of(context).replace(targetRoute);
   }
 
   Timer? overlayCloser;

@@ -15,6 +15,7 @@
 1. Run `dart run tool/prepare_web.dart` to generate Drift's web worker and copy `sqlite3.wasm`
 1. Run `flutter run -d chrome` for local web development
 1. Run `flutter build web --release --base-href /web/` to build the production bundle used by Pages
+1. Run `dart run tool/finalize_web_build.dart` to copy Drift's generated runtime files into `build/web`
 
 #### GitHub Pages deployment
 

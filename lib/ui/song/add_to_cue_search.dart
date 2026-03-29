@@ -6,11 +6,13 @@ import '../../data/cue/cue.dart';
 import '../../data/cue/slide.dart';
 import '../../data/song/song.dart';
 import '../../data/song/transpose.dart';
+import '../../services/app_links/navigation.dart';
 import '../../services/cue/cues.dart';
 import '../../services/cue/write_cue.dart';
 import '../../services/ui/messenger_service.dart';
 import '../base/cues/dialogs.dart';
 import '../common/error/card.dart';
+import '../cue/cue_page_type.dart';
 import 'state.dart';
 
 /// A reusable widget that provides search functionality for adding songs to cues
@@ -65,8 +67,13 @@ class _AddToCueSearchState extends ConsumerState<AddToCueSearch> {
           ),
           action: SnackBarAction(
             label: 'Ugrás',
-            onPressed: () =>
-                context.push('/cue/${cue.uuid}/edit?slide=${songSlide.uuid}'),
+            onPressed: () => context.push(
+              cueRoutePath(
+                cue.uuid,
+                CuePageType.edit,
+                slideUuid: songSlide.uuid,
+              ),
+            ),
           ),
           duration: const Duration(seconds: 5),
         ),

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../services/app_links/navigation.dart';
 import '../../../services/cue/write_cue.dart';
+import '../../cue/cue_page_type.dart';
 
 class EditCueDialog extends StatefulWidget {
   const EditCueDialog({super.key});
@@ -36,7 +38,7 @@ class EditCueDialogState extends State<EditCueDialog> {
           // ignore: use_build_context_synchronously
           context.pop();
           // ignore: use_build_context_synchronously
-          context.push('/cue/${cue.uuid}/edit');
+          context.push(cueRoutePath(cue.uuid, CuePageType.edit));
         });
       }
     }

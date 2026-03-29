@@ -38,6 +38,9 @@ jobs:
       - name: Build Flutter web bundle
         run: flutter build web --release --base-href /web/
 
+      - name: Finalize built web bundle
+        run: dart run tool/finalize_web_build.dart
+
       - name: Upload web bundle
         uses: actions/upload-artifact@v4
         with:

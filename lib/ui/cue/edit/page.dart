@@ -1,31 +1,70 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../common/adaptive_page/page.dart';
-import '../widgets/actions_drawer.dart';
 
 import '../../../services/app_links/get_shareable.dart';
+import '../../../services/app_links/navigation.dart';
+import '../../common/adaptive_page/page.dart';
 import '../../common/share/dialog.dart';
-import '../widgets/slide_list.dart';
-
+import '../cue_page_type.dart';
 import '../session/cue_session.dart';
 import '../session/session_provider.dart';
+import '../widgets/actions_drawer.dart';
+import '../widgets/slide_list.dart';
 import '../widgets/slide_view.dart';
 
-class CueEditPage extends ConsumerWidget {
+class CueEditPage extends ConsumerStatefulWidget {
   const CueEditPage(this.session, {super.key});
 
   final CueSession session;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CueEditPage> createState() => _CueEditPageState();
+}
+
+class _CueEditPageState extends ConsumerState<CueEditPage> {
+  late final ProviderSubscription<String?> _slideListener;
+
+  @override
+  void initState() {
+    super.initState();
+    _slideListener = ref.listenManual(
+      currentSlideUuidProvider,
+      fireImmediately: true,
+      (_, slideUuid) => _syncRoute(slideUuid),
+    );
+  }
+
+  void _syncRoute(String? slideUuid) {
+    if (!mounted) return;
+
+    final targetRoute = cueRoutePath(
+      widget.session.cue.uuid,
+      CuePageType.edit,
+      slideUuid: slideUuid,
+    );
+    final currentRoute = GoRouterState.of(context).uri.toString();
+    if (currentRoute == targetRoute) return;
+
+    GoRouter.of(context).replace(targetRoute);
+  }
+
+  @override
+  void dispose() {
+    _slideListener.close();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final slideIndex = ref.watch(slideIndexProvider);
     final canNavigatePrevious = ref.watch(canNavigatePreviousProvider);
     final canNavigateNext = ref.watch(canNavigateNextProvider);
+
     return AdaptivePage(
-      title: session.cue.title,
-      subtitle: session.cue.description.isNotEmpty
-          ? session.cue.description
+      title: widget.session.cue.title,
+      subtitle: widget.session.cue.description.isNotEmpty
+          ? widget.session.cue.description
           : null,
       body: const SlideView(),
       leftDrawer: const SlideList(),
@@ -64,26 +103,26 @@ class CueEditPage extends ConsumerWidget {
             title: 'Lista megosztása',
             description:
                 'Mutasd meg a kódot vagy küldd el a linket valakinek. A megosztott lista a listái közé kerül (vagy frissül, ha korábban már megnyitotta).',
-            sharedTitle: session.cue.title,
-            sharedDescription: session.cue.description.isEmpty
+            sharedTitle: widget.session.cue.title,
+            sharedDescription: widget.session.cue.description.isEmpty
                 ? null
-                : session.cue.description,
-            sharedLink: getShareableLinkFor(session.cue),
+                : widget.session.cue.description,
+            sharedLink: getShareableLinkFor(widget.session.cue),
             sharedIcon: Icons.list,
           ),
-          icon: Icon(Icons.share),
+          icon: const Icon(Icons.share),
           tooltip: 'Megosztási lehetőségek',
         ),
-        SizedBox(width: 8),
-        // far future todo: dropdown for different projection modes
+        const SizedBox(width: 8),
         IconButton.filled(
           tooltip: 'Teljes képernyő',
-          onPressed: () =>
-              context.push('/cue/${session.cue.uuid}/present/musician'),
-          icon: Icon(Icons.fullscreen),
+          onPressed: () => context.push(
+            cueRoutePath(widget.session.cue.uuid, CuePageType.musician),
+          ),
+          icon: const Icon(Icons.fullscreen),
           color: Theme.of(context).colorScheme.onPrimary,
         ),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
       ],
     );
   }
