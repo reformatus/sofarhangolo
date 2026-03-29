@@ -17,6 +17,7 @@ final AppConfig appConfig = AppConfig(
   newsRss: 'https://sofarhangolo.hu/category/app/aktualis/feed',
   buttonsRss: 'https://sofarhangolo.hu/category/app/linkek/feed',
   urlScheme: 'lyric',
+  enableStaticWebDeepLinkRecovery: true,
   androidStoreUrl:
       'https://play.google.com/store/apps/details?id=org.lyricapp.sofar',
   iosStoreUrl:

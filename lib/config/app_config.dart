@@ -30,6 +30,7 @@ class AppConfig {
   final String newsRss;
   final String buttonsRss;
   final String urlScheme;
+  final bool enableStaticWebDeepLinkRecovery;
   final String? androidStoreUrl;
   final String? iosStoreUrl;
   final AppBreakpoints breakpoints;
@@ -48,6 +49,7 @@ class AppConfig {
     required this.newsRss,
     required this.buttonsRss,
     required this.urlScheme,
+    this.enableStaticWebDeepLinkRecovery = false,
     required this.androidStoreUrl,
     required this.iosStoreUrl,
     required this.breakpoints,

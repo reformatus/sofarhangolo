@@ -7,7 +7,7 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:go_router/go_router.dart';
 import 'services/app_links/app_links.dart';
 import 'services/app_links/navigation.dart';
-import 'services/app_links/web_route_recovery.dart';
+import 'services/app_links/web_initial_app_uri.dart';
 import 'services/preferences/providers/general.dart';
 import 'ui/cue/cue_page_type.dart';
 
@@ -31,12 +31,13 @@ void main() async {
   GoRouter.optionURLReflectsImperativeAPIs = true;
   if (kIsWeb) {
     usePathUrlStrategy();
-    restoreStoredWebRouteIfAny();
   } else {
     await FullScreen.ensureInitialized();
   }
   db = LyricDatabase();
-  final initialAppUri = kIsWeb ? null : await captureInitialAppUri();
+  final initialAppUri = kIsWeb
+      ? captureInitialWebAppUri(config: appConfig)
+      : await captureInitialAppUri();
 
   runApp(
     ProviderScope(
