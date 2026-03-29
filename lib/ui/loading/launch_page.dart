@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../config/config.dart';
 import '../../services/app_links/launch_resolution.dart';
+import '../../services/app_links/web_initial_app_uri.dart';
 import '../common/error/card.dart';
 
 class LaunchPage extends StatefulWidget {
@@ -21,6 +23,7 @@ class _LaunchPageState extends State<LaunchPage> {
   @override
   void initState() {
     super.initState();
+    syncWebBrowserUrlToAppRoute(widget.launchUri.toString(), config: appConfig);
     _handleLaunch();
   }
 
