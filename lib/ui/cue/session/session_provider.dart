@@ -38,6 +38,21 @@ class ActiveCueSession extends AsyncNotifier<CueSession?> {
     _source?.dispose();
   }
 
+  Future<void> _teardownCurrentSession({
+    bool persistPendingWrites = true,
+  }) async {
+    if (persistPendingWrites) {
+      await flushWrites();
+    } else {
+      _writeDebounce?.cancel();
+    }
+
+    _externalChangesSubscription?.cancel();
+    _externalChangesSubscription = null;
+    _source?.dispose();
+    _source = null;
+  }
+
   /// Load a cue by UUID, optionally jumping to a specific slide.
   /// This is idempotent - calling with the same UUID returns early if already loaded.
   Future<void> load(
@@ -57,7 +72,7 @@ class ActiveCueSession extends AsyncNotifier<CueSession?> {
     }
 
     // Cancel any pending operations from previous session
-    _cleanup();
+    await _teardownCurrentSession(persistPendingWrites: !forceReload);
 
     // Set loading state
     state = const AsyncValue.loading();
@@ -96,8 +111,8 @@ class ActiveCueSession extends AsyncNotifier<CueSession?> {
   }
 
   /// Unload the current cue (e.g., when closing the cue view)
-  void unload() {
-    _cleanup();
+  Future<void> unload() async {
+    await _teardownCurrentSession();
     state = const AsyncValue.data(null);
   }
 

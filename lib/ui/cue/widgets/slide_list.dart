@@ -11,7 +11,9 @@ import '../slide_views/unknown.dart';
 /// A drawer or side panel that displays a list of slides for a cue
 /// Uses the current slide from state management instead of an index
 class SlideList extends ConsumerWidget {
-  const SlideList({super.key});
+  const SlideList({this.onSlideSelected, super.key});
+
+  final ValueChanged<Slide>? onSlideSelected;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -39,9 +41,7 @@ class SlideList extends ConsumerWidget {
             songSlide,
             index,
             key: ValueKey(songSlide.uuid),
-            selectCallback: () => ref
-                .read(activeCueSessionProvider.notifier)
-                .goToSlide(slide.uuid),
+            selectCallback: () => _handleSlideSelection(ref, slide),
             removeCallback: () => showConfirmDialog(
               context,
               title: '${songSlide.song.title} - biztos eltávolítod a listából?',
@@ -59,9 +59,7 @@ class SlideList extends ConsumerWidget {
             unknownSlide,
             index,
             key: ValueKey(unknownSlide.uuid),
-            selectCallback: () => ref
-                .read(activeCueSessionProvider.notifier)
-                .goToSlide(slide.uuid),
+            selectCallback: () => _handleSlideSelection(ref, slide),
             removeCallback: () => ref
                 .read(activeCueSessionProvider.notifier)
                 .removeSlide(slide.uuid),
@@ -70,5 +68,15 @@ class SlideList extends ConsumerWidget {
         };
       },
     );
+  }
+
+  void _handleSlideSelection(WidgetRef ref, Slide slide) {
+    final onSlideSelected = this.onSlideSelected;
+    if (onSlideSelected != null) {
+      onSlideSelected(slide);
+      return;
+    }
+
+    ref.read(activeCueSessionProvider.notifier).goToSlide(slide.uuid);
   }
 }

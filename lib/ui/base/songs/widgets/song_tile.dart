@@ -3,12 +3,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../data/bank/bank.dart';
+import '../../../../data/cue/slide.dart';
 import '../../../../data/database.dart';
 import '../../../../data/song/extensions.dart';
 import '../../../../data/song/song.dart';
 import '../../../../services/app_links/navigation.dart';
 import '../../../../services/connectivity/provider.dart';
 import '../../../../services/songs/filter.dart';
+import '../../../../services/ui/messenger_service.dart';
+import '../../../../config/config.dart';
+import '../../../cue/session/session_provider.dart';
+import '../../../song/state.dart';
 import '../../../common/key_text.dart';
 
 class LSongResultTile extends ConsumerWidget {
@@ -24,6 +29,14 @@ class LSongResultTile extends ConsumerWidget {
     final SongFulltextSearchResult? result = songResult.result;
     final List<String> downloadedAssets = songResult.downloadedAssets;
     final connection = ref.watch(connectionProvider);
+    final showActiveCueQuickAdd =
+        MediaQuery.sizeOf(context).width <
+            appConfig.breakpoints.desktopFromWidth &&
+        ref.watch(
+          activeCueSessionProvider.select(
+            (sessionAsync) => sessionAsync.value != null,
+          ),
+        );
 
     return ListTile(
       // far future todo dense on desktop (maybe even table?)
@@ -93,15 +106,19 @@ class LSongResultTile extends ConsumerWidget {
             ),
           ),
           SizedBox(width: 10),
-          if (downloadedAssets.isNotEmpty &&
-              connection == ConnectionType.offline) ...[
-            Tooltip(
-              message: 'Kottakép letöltve',
-              child: Icon(Icons.offline_pin, color: Colors.green[600]),
-            ),
-            SizedBox(width: 10),
+          if (showActiveCueQuickAdd)
+            ActiveCueQuickAddButton(song: song)
+          else ...[
+            if (downloadedAssets.isNotEmpty &&
+                connection == ConnectionType.offline) ...[
+              Tooltip(
+                message: 'Kottakép letöltve',
+                child: Icon(Icons.offline_pin, color: Colors.green[600]),
+              ),
+              SizedBox(width: 10),
+            ],
+            SongFeatures(song, downloadedAssets),
           ],
-          SongFeatures(song, downloadedAssets),
         ],
       ),
     );
@@ -134,6 +151,54 @@ class LSongResultTile extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class ActiveCueQuickAddButton extends ConsumerWidget {
+  const ActiveCueQuickAddButton({required this.song, super.key});
+
+  final Song song;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final session = ref.watch(
+      activeCueSessionProvider.select((sessionAsync) => sessionAsync.value),
+    );
+    final defaultViewType = ref.watch(
+      viewTypeForProvider(song, null).select((asyncValue) => asyncValue.value),
+    );
+
+    if (session == null) {
+      return const SizedBox.shrink();
+    }
+
+    return IconButton.filledTonal(
+      tooltip: '${session.cue.title} listához adás',
+      onPressed: defaultViewType == null
+          ? null
+          : () {
+              ref
+                  .read(activeCueSessionProvider.notifier)
+                  .addSlide(SongSlide.from(song, viewType: defaultViewType));
+
+              messengerService.showSnackBarReplacingCurrent(
+                SnackBar(
+                  showCloseIcon: true,
+                  content: Text(
+                    '${song.title} hozzáadva a listához: ${session.cue.title}',
+                  ),
+                  duration: const Duration(seconds: 4),
+                ),
+                forceHideAfter: const Duration(seconds: 4),
+              );
+            },
+      icon: defaultViewType == null
+          ? const SizedBox.square(
+              dimension: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.add),
     );
   }
 }
