@@ -886,15 +886,15 @@ final class Schema5 extends i0.VersionedSchema {
     banks,
     songs,
     songsFts,
+    songsAi,
+    songsAd,
+    songsAu,
+    songsUuid,
     preferenceStorage,
     cues,
     cuesUuid,
     assets,
     assetSourceUrl,
-    songsUuid,
-    songsAi,
-    songsAd,
-    songsAu,
   ];
   late final Shape6 banks = Shape6(
     source: i0.VersionedTable(
@@ -927,7 +927,7 @@ final class Schema5 extends i0.VersionedSchema {
     ),
     alias: null,
   );
-  late final Shape1 songs = Shape1(
+  late final Shape7 songs = Shape7(
     source: i0.VersionedTable(
       entityName: 'songs',
       withoutRowId: false,
@@ -941,7 +941,6 @@ final class Schema5 extends i0.VersionedSchema {
         _column_19,
         _column_20,
         _column_21,
-        _column_22,
       ],
       attachedDatabase: database,
     ),
@@ -956,6 +955,22 @@ final class Schema5 extends i0.VersionedSchema {
       attachedDatabase: database,
     ),
     alias: null,
+  );
+  final i1.Trigger songsAi = i1.Trigger(
+    'CREATE TRIGGER songs_ai AFTER INSERT ON songs BEGIN INSERT INTO songs_fts ("rowid", title, lyrics) VALUES (new.id, new.title, new.lyrics);END',
+    'songs_ai',
+  );
+  final i1.Trigger songsAd = i1.Trigger(
+    'CREATE TRIGGER songs_ad AFTER DELETE ON songs BEGIN INSERT INTO songs_fts (songs_fts, "rowid", title, lyrics) VALUES (\'delete\', old.id, old.title, old.lyrics);END',
+    'songs_ad',
+  );
+  final i1.Trigger songsAu = i1.Trigger(
+    'CREATE TRIGGER songs_au AFTER UPDATE ON songs BEGIN INSERT INTO songs_fts (songs_fts, "rowid", title, lyrics) VALUES (\'delete\', old.id, old.title, old.lyrics);INSERT INTO songs_fts ("rowid", title, lyrics) VALUES (new.id, new.title, new.lyrics);END',
+    'songs_au',
+  );
+  final i1.Index songsUuid = i1.Index(
+    'songs_uuid',
+    'CREATE UNIQUE INDEX songs_uuid ON songs (uuid)',
   );
   late final Shape2 preferenceStorage = Shape2(
     source: i0.VersionedTable(
@@ -1005,22 +1020,24 @@ final class Schema5 extends i0.VersionedSchema {
     'asset_source_url',
     'CREATE UNIQUE INDEX asset_source_url ON assets (source_url)',
   );
-  final i1.Index songsUuid = i1.Index(
-    'songs_uuid',
-    'CREATE UNIQUE INDEX songs_uuid ON songs (uuid)',
-  );
-  final i1.Trigger songsAi = i1.Trigger(
-    'CREATE TRIGGER songs_ai AFTER INSERT ON songs BEGIN INSERT INTO songs_fts ("rowid", title, lyrics) VALUES (new.id, new.title, new.lyrics);END',
-    'songs_ai',
-  );
-  final i1.Trigger songsAd = i1.Trigger(
-    'CREATE TRIGGER songs_ad AFTER DELETE ON songs BEGIN INSERT INTO songs_fts (songs_fts, "rowid", title, lyrics) VALUES (\'delete\', "rowid", old.title, old.lyrics);END',
-    'songs_ad',
-  );
-  final i1.Trigger songsAu = i1.Trigger(
-    'CREATE TRIGGER songs_au AFTER UPDATE ON songs BEGIN INSERT INTO songs_fts (songs_fts, "rowid", title, lyrics) VALUES (\'delete\', "rowid", old.title, old.lyrics);INSERT INTO songs_fts ("rowid", title, lyrics) VALUES (new.id, new.title, new.lyrics);END',
-    'songs_au',
-  );
+}
+
+class Shape7 extends i0.VersionedTable {
+  Shape7({required super.source, required super.alias}) : super.aliased();
+  i1.GeneratedColumn<int> get id =>
+      columnsByName['id']! as i1.GeneratedColumn<int>;
+  i1.GeneratedColumn<String> get uuid =>
+      columnsByName['uuid']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get sourceBank =>
+      columnsByName['source_bank']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get contentMap =>
+      columnsByName['content_map']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get title =>
+      columnsByName['title']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get lyrics =>
+      columnsByName['lyrics']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get lyricsFormat =>
+      columnsByName['lyrics_format']! as i1.GeneratedColumn<String>;
 }
 
 i0.MigrationStepWithVersion migrationSteps({

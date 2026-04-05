@@ -6,6 +6,7 @@ import '../../config/config.dart';
 import '../../data/bank/bank.dart';
 import '../../data/database.dart';
 import '../../data/log/logger.dart';
+import '../../ui/base/songs/widgets/filter/types/field_type.dart';
 import '../error/app_error.dart';
 import 'from_uuid.dart';
 
@@ -79,6 +80,12 @@ Future<Set<String>> updateBanks(Dio dio) async {
     }
 
     bool offlineMode = existingBank?.isOfflineMode ?? false;
+    final normalizedSongFields = {
+      for (final entry in SongFieldCatalog.parse(
+        details['songFields'],
+      ).fields.entries)
+        entry.key: entry.value.toJson(),
+    };
 
     BanksCompanion banksCompanion = BanksCompanion(
       id: Value.absentIfNull(existingBank?.id),
@@ -94,7 +101,7 @@ Future<Set<String>> updateBanks(Dio dio) async {
       parallelUpdateJobs: Value(details['parallelUpdateJobs']!),
       amountOfSongsInRequest: Value(details['amountOfSongsInRequest']!),
       noCms: Value(details['noCms'] ?? false),
-      songFields: Value(details['songFields']),
+      songFields: Value(normalizedSongFields),
       isEnabled: Value(isEnabled),
       isOfflineMode: Value(offlineMode),
       lastUpdated: Value.absent(),

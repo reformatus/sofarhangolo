@@ -100,7 +100,6 @@ void main() {
         uuid: 'song-123',
         title: 'Song',
         lyrics: 'Lyrics',
-        keyField: const [],
         contentMap: const {},
       );
 

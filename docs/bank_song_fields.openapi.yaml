@@ -1,0 +1,164 @@
+openapi: 3.1.0
+info:
+  title: Bank Song Field Configuration
+  version: 1.0.0
+  summary: Filter and search field contract for song banks
+  description: >
+    Banks can shape non-FTS search and filter behavior by returning `songFields`
+    from their `/about/` endpoint. Full-text search remains rigid in the app and
+    always targets `title` and `lyrics` through SQLite FTS5. The JSON described
+    here controls two dynamic features: SQLite `LIKE` search on bank-defined
+    searchable fields, and dynamic filter UIs backed by SQLite queries.
+servers:
+  - url: https://example-bank.invalid
+paths:
+  /about/:
+    get:
+      summary: Bank metadata
+      operationId: getAbout
+      responses:
+        '200':
+          description: Bank metadata and search/filter field definitions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AboutResponse'
+              examples:
+                default:
+                  value:
+                    uuid: sofar
+                    name: Sófár
+                    parallelUpdateJobs: 4
+                    amountOfSongsInRequest: 100
+                    noCms: false
+                    songFields:
+                      title:
+                        title_hu: Cím
+                        type: searchable
+                        icon: text_fields
+                      lyrics:
+                        title_hu: Dalszöveg
+                        type: searchable
+                        icon: text_snippet
+                      composer:
+                        title_hu: Dalszerző
+                        type: searchable
+                        icon: music_note
+                      genre:
+                        title_hu: Stílus / műfaj
+                        type: filterable_multiselect_tags
+                        icon: style
+                      language:
+                        title_hu: Eredeti nyelv
+                        type: filterable_multiselect_tags
+                        icon: language
+                      key:
+                        title_hu: Hangnem
+                        type: filterable_key
+                        icon: piano
+components:
+  schemas:
+    AboutResponse:
+      type: object
+      required:
+        - uuid
+        - name
+        - parallelUpdateJobs
+        - amountOfSongsInRequest
+        - songFields
+      properties:
+        uuid:
+          type: string
+        name:
+          type: string
+        parallelUpdateJobs:
+          type: integer
+          minimum: 1
+        amountOfSongsInRequest:
+          type: integer
+          minimum: 1
+        noCms:
+          type: boolean
+        songFields:
+          $ref: '#/components/schemas/SongFieldsConfig'
+    SongFieldsConfig:
+      type: object
+      description: >
+        Field definitions keyed by the exact song JSON property name.
+        `title` and `lyrics` should still be included here so the app can expose
+        them in the dynamic LIKE-search selector, but they are also always part
+        of the rigid SQLite FTS search path.
+      additionalProperties:
+        $ref: '#/components/schemas/SongFieldDefinition'
+      propertyNames:
+        type: string
+        minLength: 1
+      examples:
+        - title:
+            title_hu: Cím
+            type: searchable
+            icon: text_fields
+          lyrics:
+            title_hu: Dalszöveg
+            type: searchable
+            icon: text_snippet
+          composer:
+            title_hu: Dalszerző
+            type: searchable
+            icon: music_note
+          genre:
+            title_hu: Stílus / műfaj
+            type: filterable_multiselect_tags
+            icon: style
+          key:
+            title_hu: Hangnem
+            type: filterable_key
+            icon: piano
+    SongFieldDefinition:
+      type: object
+      additionalProperties: false
+      required:
+        - title_hu
+        - type
+        - icon
+      properties:
+        title_hu:
+          type: string
+          minLength: 1
+          description: Hungarian label shown in the app UI.
+        type:
+          $ref: '#/components/schemas/SongFieldType'
+        icon:
+          $ref: '#/components/schemas/SongFieldIcon'
+      description: >
+        `searchable` fields participate in SQLite `LIKE '%term%'` search.
+        `filterable_multiselect` fields are treated as a single exact value.
+        `filterable_multiselect_tags` and `filterable_key` are treated as
+        comma-separated values and are split inside SQLite before aggregation.
+    SongFieldType:
+      type: string
+      enum:
+        - searchable
+        - filterable_multiselect
+        - filterable_multiselect_tags
+        - filterable_key
+    SongFieldIcon:
+      type: string
+      enum:
+        - book
+        - calendar_month
+        - celebration
+        - edit
+        - height
+        - label_sharp
+        - language
+        - menu_book
+        - music_note
+        - piano
+        - short_text
+        - speed
+        - style
+        - text_fields
+        - text_snippet
+        - translate
+        - wrap_text

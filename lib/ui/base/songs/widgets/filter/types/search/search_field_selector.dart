@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../../../../services/songs/filter.dart';
-import '../field_type.dart';
 import 'state.dart';
 
 class SearchFieldSelectorColumn extends ConsumerWidget {
@@ -10,7 +8,8 @@ class SearchFieldSelectorColumn extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    var searchFieldsState = ref.watch(searchFieldsStateProvider);
+    final availableFields = ref.watch(availableSearchFieldsProvider);
+    final effectiveSearchFields = ref.watch(effectiveSearchFieldsProvider);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -25,30 +24,48 @@ class SearchFieldSelectorColumn extends ConsumerWidget {
             textAlign: TextAlign.center,
           ),
         ),
-        ...fullTextSearchFields.map((e) {
-          var field = songFieldsMap[e]!;
-          return CheckboxListTile(
-            title: Text(field['title_hu']),
-            secondary: Icon(field['icon']),
-            value: searchFieldsState.contains(e),
-            onChanged:
-                (searchFieldsState.length < 2 && searchFieldsState.contains(e))
-                // Make sure at least one column stays selected
-                ? null
-                : (value) {
-                    if (value == null) return;
-                    if (value) {
-                      ref
-                          .read(searchFieldsStateProvider.notifier)
-                          .addSearchField(e);
-                    } else {
-                      ref
-                          .read(searchFieldsStateProvider.notifier)
-                          .removeSearchField(e);
-                    }
-                  },
-          );
-        }),
+        switch (availableFields) {
+          AsyncError(:final error) => ListTile(title: Text('$error')),
+          AsyncValue(:final value?) => switch (effectiveSearchFields) {
+            AsyncError(:final error) => ListTile(title: Text('$error')),
+            AsyncValue(:final value?) => Column(
+              children: availableFields.requireValue
+                  .map((field) {
+                    final selected = value.contains(field.field);
+                    final disableUnselect = value.length < 2 && selected;
+
+                    return CheckboxListTile(
+                      title: Text(field.titleHu),
+                      secondary: Icon(field.icon),
+                      value: selected,
+                      onChanged: disableUnselect
+                          ? null
+                          : (newValue) {
+                              if (newValue == null) return;
+                              if (newValue) {
+                                ref
+                                    .read(searchFieldsStateProvider.notifier)
+                                    .addSearchField(field.field);
+                              } else {
+                                ref
+                                    .read(searchFieldsStateProvider.notifier)
+                                    .removeSearchField(field.field);
+                              }
+                            },
+                    );
+                  })
+                  .toList(growable: false),
+            ),
+            _ => const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+          },
+          _ => const Padding(
+            padding: EdgeInsets.all(16),
+            child: Center(child: CircularProgressIndicator()),
+          ),
+        },
       ],
     );
   }

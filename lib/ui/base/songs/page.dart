@@ -295,13 +295,6 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                                       ? const Center(
                                           child: CircularProgressIndicator(),
                                         )
-                                      : searchString.trim().isNotEmpty &&
-                                            searchString.trim().length < 3
-                                      ? CenteredHint(
-                                          'Írj be legalább három betűt a kereséshez.',
-                                          iconData: Icons.search,
-                                          alignment: Alignment.topCenter,
-                                        )
                                       : value.isEmpty
                                       ? CenteredHint(
                                           'Nincs találat :(',

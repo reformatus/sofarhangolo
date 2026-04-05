@@ -346,20 +346,6 @@
               "dart_expr": "const LyricsFormatConverter()",
               "dart_type_name": "LyricsFormat"
             }
-          },
-          {
-            "name": "key_field",
-            "getter_name": "keyField",
-            "moor_type": "string",
-            "nullable": false,
-            "customConstraints": null,
-            "default_dart": null,
-            "default_client_dart": null,
-            "dsl_features": [],
-            "type_converter": {
-              "dart_expr": "const KeyFieldConverter()",
-              "dart_type_name": "List<KeyField>"
-            }
           }
         ],
         "is_virtual": false,
@@ -406,6 +392,76 @@
     },
     {
       "id": 3,
+      "references": [
+        1,
+        2
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 1,
+        "references_in_body": [
+          1,
+          2
+        ],
+        "name": "songs_ai",
+        "sql": "CREATE TRIGGER songs_ai AFTER INSERT ON songs BEGIN\n  INSERT INTO songs_fts(rowid, title, lyrics)\n  VALUES (new.id, new.title, new.lyrics);\nEND;"
+      }
+    },
+    {
+      "id": 4,
+      "references": [
+        1,
+        2
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 1,
+        "references_in_body": [
+          1,
+          2
+        ],
+        "name": "songs_ad",
+        "sql": "CREATE TRIGGER songs_ad AFTER DELETE ON songs BEGIN\n  INSERT INTO songs_fts(songs_fts, rowid, title, lyrics)\n  VALUES ('delete', old.id, old.title, old.lyrics);\nEND;"
+      }
+    },
+    {
+      "id": 5,
+      "references": [
+        1,
+        2
+      ],
+      "type": "trigger",
+      "data": {
+        "on": 1,
+        "references_in_body": [
+          1,
+          2
+        ],
+        "name": "songs_au",
+        "sql": "CREATE TRIGGER songs_au AFTER UPDATE ON songs BEGIN\n  INSERT INTO songs_fts(songs_fts, rowid, title, lyrics)\n  VALUES ('delete', old.id, old.title, old.lyrics);\n  INSERT INTO songs_fts(rowid, title, lyrics)\n  VALUES (new.id, new.title, new.lyrics);\nEND;"
+      }
+    },
+    {
+      "id": 6,
+      "references": [
+        1
+      ],
+      "type": "index",
+      "data": {
+        "on": 1,
+        "name": "songs_uuid",
+        "sql": null,
+        "unique": true,
+        "columns": [
+          {
+            "column": "uuid",
+            "order_by": null
+          }
+        ]
+      }
+    },
+    {
+      "id": 7,
       "references": [],
       "type": "table",
       "data": {
@@ -446,7 +502,7 @@
       }
     },
     {
-      "id": 4,
+      "id": 8,
       "references": [],
       "type": "table",
       "data": {
@@ -530,13 +586,13 @@
       }
     },
     {
-      "id": 5,
+      "id": 9,
       "references": [
-        4
+        8
       ],
       "type": "index",
       "data": {
-        "on": 4,
+        "on": 8,
         "name": "cues_uuid",
         "sql": null,
         "unique": true,
@@ -549,7 +605,7 @@
       }
     },
     {
-      "id": 6,
+      "id": 10,
       "references": [],
       "type": "table",
       "data": {
@@ -619,13 +675,13 @@
       }
     },
     {
-      "id": 7,
+      "id": 11,
       "references": [
-        6
+        10
       ],
       "type": "index",
       "data": {
-        "on": 6,
+        "on": 10,
         "name": "asset_source_url",
         "sql": null,
         "unique": true,
@@ -635,76 +691,6 @@
             "order_by": null
           }
         ]
-      }
-    },
-    {
-      "id": 8,
-      "references": [
-        1
-      ],
-      "type": "index",
-      "data": {
-        "on": 1,
-        "name": "songs_uuid",
-        "sql": null,
-        "unique": true,
-        "columns": [
-          {
-            "column": "uuid",
-            "order_by": null
-          }
-        ]
-      }
-    },
-    {
-      "id": 9,
-      "references": [
-        1,
-        2
-      ],
-      "type": "trigger",
-      "data": {
-        "on": 1,
-        "references_in_body": [
-          1,
-          2
-        ],
-        "name": "songs_ai",
-        "sql": "CREATE TRIGGER songs_ai AFTER INSERT ON songs BEGIN\n  INSERT INTO songs_fts(rowid, title, lyrics)\n  VALUES (new.id, new.title, new.lyrics);\nEND;"
-      }
-    },
-    {
-      "id": 10,
-      "references": [
-        1,
-        2
-      ],
-      "type": "trigger",
-      "data": {
-        "on": 1,
-        "references_in_body": [
-          1,
-          2
-        ],
-        "name": "songs_ad",
-        "sql": "CREATE TRIGGER songs_ad AFTER DELETE ON songs BEGIN\n  INSERT INTO songs_fts(songs_fts, rowid, title, lyrics)\n  VALUES ('delete', rowid, old.title, old.lyrics);\nEND;"
-      }
-    },
-    {
-      "id": 11,
-      "references": [
-        1,
-        2
-      ],
-      "type": "trigger",
-      "data": {
-        "on": 1,
-        "references_in_body": [
-          1,
-          2
-        ],
-        "name": "songs_au",
-        "sql": "CREATE TRIGGER songs_au AFTER UPDATE ON songs BEGIN\n  INSERT INTO songs_fts(songs_fts, rowid, title, lyrics)\n  VALUES ('delete', rowid, old.title, old.lyrics);\n  INSERT INTO songs_fts(rowid, title, lyrics)\n  VALUES (new.id, new.title, new.lyrics);\nEND;"
       }
     }
   ],
@@ -723,7 +709,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TABLE IF NOT EXISTS \"songs\" (\"id\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \"uuid\" TEXT NOT NULL, \"source_bank\" TEXT NULL REFERENCES banks (uuid), \"content_map\" TEXT NOT NULL, \"title\" TEXT NOT NULL, \"lyrics\" TEXT NOT NULL, \"lyrics_format\" TEXT NOT NULL DEFAULT 'opensong', \"key_field\" TEXT NOT NULL);"
+          "sql": "CREATE TABLE IF NOT EXISTS \"songs\" (\"id\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \"uuid\" TEXT NOT NULL, \"source_bank\" TEXT NULL REFERENCES banks (uuid), \"content_map\" TEXT NOT NULL, \"title\" TEXT NOT NULL, \"lyrics\" TEXT NOT NULL, \"lyrics_format\" TEXT NOT NULL DEFAULT 'opensong');"
         }
       ]
     },
@@ -733,6 +719,42 @@
         {
           "dialect": "sqlite",
           "sql": "CREATE VIRTUAL TABLE IF NOT EXISTS \"songs_fts\" USING fts5(title, lyrics, content='songs', content_rowid='id', tokenize='trigram remove_diacritics 1');"
+        }
+      ]
+    },
+    {
+      "name": "songs_ai",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER songs_ai AFTER INSERT ON songs BEGIN INSERT INTO songs_fts (\"rowid\", title, lyrics) VALUES (new.id, new.title, new.lyrics);END"
+        }
+      ]
+    },
+    {
+      "name": "songs_ad",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER songs_ad AFTER DELETE ON songs BEGIN INSERT INTO songs_fts (songs_fts, \"rowid\", title, lyrics) VALUES ('delete', old.id, old.title, old.lyrics);END"
+        }
+      ]
+    },
+    {
+      "name": "songs_au",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TRIGGER songs_au AFTER UPDATE ON songs BEGIN INSERT INTO songs_fts (songs_fts, \"rowid\", title, lyrics) VALUES ('delete', old.id, old.title, old.lyrics);INSERT INTO songs_fts (\"rowid\", title, lyrics) VALUES (new.id, new.title, new.lyrics);END"
+        }
+      ]
+    },
+    {
+      "name": "songs_uuid",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE UNIQUE INDEX songs_uuid ON songs (uuid)"
         }
       ]
     },
@@ -778,42 +800,6 @@
         {
           "dialect": "sqlite",
           "sql": "CREATE UNIQUE INDEX asset_source_url ON assets (source_url)"
-        }
-      ]
-    },
-    {
-      "name": "songs_uuid",
-      "sql": [
-        {
-          "dialect": "sqlite",
-          "sql": "CREATE UNIQUE INDEX songs_uuid ON songs (uuid)"
-        }
-      ]
-    },
-    {
-      "name": "songs_ai",
-      "sql": [
-        {
-          "dialect": "sqlite",
-          "sql": "CREATE TRIGGER songs_ai AFTER INSERT ON songs BEGIN INSERT INTO songs_fts (\"rowid\", title, lyrics) VALUES (new.id, new.title, new.lyrics);END"
-        }
-      ]
-    },
-    {
-      "name": "songs_ad",
-      "sql": [
-        {
-          "dialect": "sqlite",
-          "sql": "CREATE TRIGGER songs_ad AFTER DELETE ON songs BEGIN INSERT INTO songs_fts (songs_fts, \"rowid\", title, lyrics) VALUES ('delete', \"rowid\", old.title, old.lyrics);END"
-        }
-      ]
-    },
-    {
-      "name": "songs_au",
-      "sql": [
-        {
-          "dialect": "sqlite",
-          "sql": "CREATE TRIGGER songs_au AFTER UPDATE ON songs BEGIN INSERT INTO songs_fts (songs_fts, \"rowid\", title, lyrics) VALUES ('delete', \"rowid\", old.title, old.lyrics);INSERT INTO songs_fts (\"rowid\", title, lyrics) VALUES (new.id, new.title, new.lyrics);END"
         }
       ]
     }
