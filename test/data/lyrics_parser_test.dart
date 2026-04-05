@@ -41,4 +41,38 @@ void main() {
       expect(parser.getFirstLine(lyrics), isEmpty);
     });
   });
+
+  group('ChordProParser', () {
+    const parser = ChordProParser();
+
+    test('returns first lyric line from inline chord lyrics', () {
+      const lyrics = '''
+{title: Sample}
+{start_of_verse: 1}
+[C]Amazing [G]grace
+{end_of_verse}
+''';
+
+      expect(parser.getFirstLine(lyrics), equals('Amazing grace'));
+      expect(parser.hasChords(lyrics), isTrue);
+      expect(parser.getText(lyrics), equals('Amazing grace'));
+    });
+
+    test('parses chorus recall and labels', () {
+      final verses = parser.parse('''
+{soc: Refrain}
+[F]Halle[G]lujah
+{eoc}
+{chorus: Refrain}
+''');
+
+      expect(verses, hasLength(2));
+      expect((verses.first.type, verses.first.label), equals(('C', 'Refrain')));
+      expect((verses.last.type, verses.last.label), equals(('C', 'Refrain')));
+      expect(
+        (verses.last.parts.single as ParsedVerseLine).lyrics,
+        equals('Hallelujah'),
+      );
+    });
+  });
 }

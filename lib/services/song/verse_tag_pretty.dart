@@ -1,4 +1,8 @@
-String getPrettyVerseTagFrom(String type, int? index) {
+String getPrettyVerseTagFrom(String type, int? index, {String? label}) {
+  if (label != null && label.trim().isNotEmpty) {
+    return label.trim();
+  }
+
   if (type.isEmpty) {
     if (index == null) {
       return '';

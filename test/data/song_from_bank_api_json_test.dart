@@ -40,19 +40,22 @@ void main() {
       );
     });
 
-    test('keeps escaped lyrics unchanged when caller does not normalize first', () {
-      final song = Song.fromBankApiJson({
-        'uuid': 'song-4',
-        'title': 'Rock &amp; Roll',
-        'lyrics': '[V1]\n Tom &amp; Jerry',
-        'lyrics_format': 'opensong',
-        'composer': 'A &amp; B',
-      });
+    test(
+      'keeps escaped lyrics unchanged when caller does not normalize first',
+      () {
+        final song = Song.fromBankApiJson({
+          'uuid': 'song-4',
+          'title': 'Rock &amp; Roll',
+          'lyrics': '[V1]\n Tom &amp; Jerry',
+          'lyrics_format': 'opensong',
+          'composer': 'A &amp; B',
+        });
 
-      expect(song.title, equals('Rock &amp; Roll'));
-      expect(song.lyrics, equals('[V1]\n Tom &amp; Jerry'));
-      expect(song.contentMap['composer'], equals('A &amp; B'));
-    });
+        expect(song.title, equals('Rock &amp; Roll'));
+        expect(song.lyrics, equals('[V1]\n Tom &amp; Jerry'));
+        expect(song.contentMap['composer'], equals('A &amp; B'));
+      },
+    );
 
     test('stores decoded metadata in contentMap when input is normalized', () {
       final song = Song.fromBankApiJson({
@@ -67,6 +70,18 @@ void main() {
       expect(song.lyrics, equals('[V1]\n Tom & Jerry'));
       expect(song.lyricsFormat, equals(LyricsFormat.opensong));
       expect(song.contentMap['composer'], equals('A & B'));
+    });
+
+    test('uses the supplied ChordPro lyrics format', () {
+      final song = Song.fromBankApiJson({
+        'uuid': 'song-4',
+        'title': 'Song 4',
+        'lyrics': '[C]Amazing grace',
+        'lyricsFormat': 'chordpro',
+      });
+
+      expect(song.lyrics, equals('[C]Amazing grace'));
+      expect(song.lyricsFormat, equals(LyricsFormat.chordpro));
     });
   });
 }

@@ -1,3 +1,4 @@
+import 'package:dart_chordpro/dart_chordpro.dart' as cp;
 import 'package:dart_opensong/dart_opensong.dart' as os;
 
 import 'format.dart';
@@ -19,6 +20,7 @@ sealed class LyricsParser {
   factory LyricsParser.forFormat(LyricsFormat format) {
     return switch (format) {
       LyricsFormat.opensong => const OpenSongParser(),
+      LyricsFormat.chordpro => const ChordProParser(),
     };
   }
 
@@ -28,17 +30,67 @@ sealed class LyricsParser {
   List<ParsedVerse> parse(String lyrics);
 
   /// Check if the lyrics content contains chord annotations.
-  bool hasChords(String lyrics);
+  bool hasChords(String lyrics) {
+    try {
+      return parse(lyrics).any(
+        (verse) => verse.parts.whereType<ParsedVerseLine>().any(
+          (line) => line.segments.any((segment) => segment.chord != null),
+        ),
+      );
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// Extract the first line of actual lyrics (not section headers or chords).
   ///
   /// Used for displaying a preview/subtitle of the song.
-  String getFirstLine(String lyrics);
+  String getFirstLine(String lyrics) {
+    try {
+      final verses = parse(lyrics);
+      if (verses.isEmpty) {
+        return '';
+      }
+
+      for (final part in verses.first.parts.whereType<ParsedVerseLine>()) {
+        final line = part.lyrics.trim();
+        if (line.isNotEmpty) {
+          return line;
+        }
+      }
+
+      return '';
+    } catch (_) {
+      return '';
+    }
+  }
 
   /// Get plain text content without chords or section markers.
   ///
   /// Used for text-only display or export.
-  String getText(String lyrics);
+  String getText(String lyrics) {
+    try {
+      final verseTexts = parse(lyrics)
+          .map(
+            (verse) => verse.parts
+                .map(
+                  (part) => switch (part) {
+                    ParsedVerseLine(:final lyrics) => lyrics.trimRight(),
+                    ParsedEmptyLine() => '',
+                    _ => null,
+                  },
+                )
+                .whereType<String>()
+                .join('\n')
+                .trimRight(),
+          )
+          .where((text) => text.isNotEmpty)
+          .toList();
+      return verseTexts.join('\n\n');
+    } catch (_) {
+      return '';
+    }
+  }
 }
 
 /// OpenSong format parser using the dart_opensong package.
@@ -54,84 +106,133 @@ class OpenSongParser extends LyricsParser {
   @override
   List<ParsedVerse> parse(String lyrics) {
     final osVerses = os.getVersesFromString(lyrics);
-    return osVerses.map((v) => OpenSongVerse(v)).toList();
-  }
-
-  @override
-  bool hasChords(String lyrics) {
-    // OpenSong chord lines start with a dot after newline
-    return RegExp(r'\n\.').hasMatch(lyrics);
-  }
-
-  @override
-  String getFirstLine(String lyrics) {
-    try {
-      final verses = os.getVersesFromString(lyrics);
-      if (verses.isEmpty) return '';
-
-      final firstVerse = verses.first;
-      for (final part in firstVerse.parts) {
-        if (part case os.VerseLine(:final segments)) {
-          return segments
-              .map((segment) => segment.lyrics)
-              .join()
-              .trim();
-        }
-      }
-
-      return '';
-    } catch (_) {
-      return '';
-    }
-  }
-
-  @override
-  String getText(String lyrics) {
-    // TODO: Implement proper plain text extraction
-    // Should strip chords, section markers, and formatting
-    throw UnimplementedError('OpenSongParser.getText() not yet implemented');
+    return osVerses.map(_mapOpenSongVerse).toList(growable: false);
   }
 }
 
-/// Abstract representation of a parsed verse.
+/// ChordPro format parser using the dart_chordpro package.
 ///
-/// Different format parsers may return different concrete implementations,
-/// but the UI should work with this common interface.
-sealed class ParsedVerse {
-  const ParsedVerse();
+/// Supported ChordPro subset:
+/// - inline chords like `[C]Amazing [G]grace`
+/// - verse / chorus / bridge blocks
+/// - chorus recall
+/// - comment directives
+/// - page and column breaks
+class ChordProParser extends LyricsParser {
+  const ChordProParser();
 
-  /// The verse tag/type (e.g., "V1", "C", "B2")
-  String get tag;
-
-  /// The verse type identifier (e.g., "V" for verse, "C" for chorus)
-  String get type;
-
-  /// The verse index number (e.g., 1 for V1, 2 for V2)
-  int? get index;
-
-  /// The parsed content parts of this verse.
-  /// The concrete type depends on the format parser.
-  List<dynamic> get parts;
+  @override
+  List<ParsedVerse> parse(String lyrics) {
+    final cpVerses = cp.getVersesFromString(lyrics);
+    return cpVerses.map(_mapChordProVerse).toList(growable: false);
+  }
 }
 
-/// Verse implementation wrapping dart_opensong's Verse type.
-class OpenSongVerse extends ParsedVerse {
-  final os.Verse _verse;
+class ParsedVerse {
+  const ParsedVerse({
+    required this.type,
+    required this.index,
+    required this.parts,
+    this.label,
+  });
 
-  const OpenSongVerse(this._verse);
+  final String type;
+  final int? index;
+  final String? label;
+  final List<ParsedVersePart> parts;
 
-  @override
-  String get tag => _verse.tag;
-
-  @override
-  String get type => _verse.type;
-
-  @override
-  int? get index => _verse.index;
-
-  @override
-  List<os.VersePart> get parts => _verse.parts;
-
-  /// Access the underlying opensong verse for format-specific operations.
-  os.Verse get raw => _verse;
+  String get tag => label ?? '$type${index ?? ''}';
 }
+
+sealed class ParsedVersePart {
+  const ParsedVersePart();
+}
+
+class ParsedVerseLine extends ParsedVersePart {
+  const ParsedVerseLine(this.segments);
+
+  final List<ParsedVerseLineSegment> segments;
+
+  String get lyrics => segments.map((segment) => segment.lyrics).join();
+}
+
+class ParsedCommentLine extends ParsedVersePart {
+  const ParsedCommentLine(this.comment);
+
+  final String comment;
+}
+
+class ParsedNewSlide extends ParsedVersePart {
+  const ParsedNewSlide();
+}
+
+class ParsedEmptyLine extends ParsedVersePart {
+  const ParsedEmptyLine();
+}
+
+class ParsedUnsupportedLine extends ParsedVersePart {
+  const ParsedUnsupportedLine(this.original);
+
+  final String original;
+}
+
+class ParsedVerseLineSegment {
+  const ParsedVerseLineSegment(
+    this.chord,
+    this.lyrics, {
+    this.hyphenAfter = false,
+  });
+
+  final String? chord;
+  final String lyrics;
+  final bool hyphenAfter;
+}
+
+ParsedVerse _mapOpenSongVerse(os.Verse verse) => ParsedVerse(
+  type: verse.type,
+  index: verse.index,
+  parts: verse.parts.map(_mapOpenSongPart).toList(growable: false),
+);
+
+ParsedVersePart _mapOpenSongPart(os.VersePart part) => switch (part) {
+  os.VerseLine(:final segments) => ParsedVerseLine(
+    segments
+        .map(
+          (segment) => ParsedVerseLineSegment(
+            segment.chord,
+            segment.lyrics,
+            hyphenAfter: segment.hyphenAfter,
+          ),
+        )
+        .toList(growable: false),
+  ),
+  os.CommentLine(:final comment) => ParsedCommentLine(comment),
+  os.NewSlide() => const ParsedNewSlide(),
+  os.EmptyLine() => const ParsedEmptyLine(),
+  os.UnsupportedLine(:final original) => ParsedUnsupportedLine(original),
+};
+
+ParsedVerse _mapChordProVerse(cp.Verse verse) => ParsedVerse(
+  type: verse.type,
+  index: verse.index,
+  label: verse.label,
+  parts: verse.parts.map(_mapChordProPart).toList(growable: false),
+);
+
+ParsedVersePart _mapChordProPart(cp.VersePart part) => switch (part) {
+  cp.VerseLine(:final segments) => ParsedVerseLine(
+    segments
+        .map(
+          (segment) => ParsedVerseLineSegment(
+            segment.chord,
+            segment.lyrics,
+            hyphenAfter: segment.hyphenAfter,
+          ),
+        )
+        .toList(growable: false),
+  ),
+  cp.CommentLine(:final comment) => ParsedCommentLine(comment),
+  cp.NewSlide() => const ParsedNewSlide(),
+  cp.EmptyLine() => const ParsedEmptyLine(),
+  cp.UnsupportedLine(:final original) => ParsedUnsupportedLine(original),
+};
