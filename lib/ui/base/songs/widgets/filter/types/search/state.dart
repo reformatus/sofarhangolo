@@ -1,6 +1,7 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../../../../../../services/songs/filter.dart';
+import '../../../../../../../services/songs/field_registry.dart';
+import '../field_type.dart';
 
 part 'state.g.dart';
 
@@ -8,7 +9,7 @@ part 'state.g.dart';
 class SearchFieldsState extends _$SearchFieldsState {
   @override
   List<String> build() {
-    return [...fullTextSearchFields];
+    return [];
   }
 
   void addSearchField(String field) {
@@ -25,6 +26,32 @@ class SearchFieldsState extends _$SearchFieldsState {
     state.remove(field);
     ref.notifyListeners();
   }
+}
+
+@Riverpod(keepAlive: true)
+Future<List<SongFieldDefinition>> availableSearchFields(Ref ref) async {
+  final catalog = await ref.watch(activeSongFieldCatalogProvider.future);
+  final fields = catalog.searchableFields.toList(growable: false);
+  fields.sort((a, b) => a.titleHu.compareTo(b.titleHu));
+  return fields;
+}
+
+@Riverpod(keepAlive: true)
+Future<List<String>> effectiveSearchFields(Ref ref) async {
+  final availableFields = await ref.watch(availableSearchFieldsProvider.future);
+  final selectedFields = ref.watch(searchFieldsStateProvider);
+  final availableFieldNames = availableFields
+      .map((field) => field.field)
+      .toSet();
+
+  final effectiveSelection = selectedFields
+      .where(availableFieldNames.contains)
+      .toList(growable: false);
+  if (effectiveSelection.isNotEmpty) {
+    return effectiveSelection;
+  }
+
+  return availableFields.map((field) => field.field).toList(growable: false);
 }
 
 @Riverpod(keepAlive: true)

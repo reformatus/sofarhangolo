@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../data/song/song.dart';
 import '../../../config/config.dart';
+import '../../../data/song/song.dart';
+import '../../../services/songs/field_registry.dart';
+import '../../base/songs/widgets/filter/types/field_type.dart';
 import '../../base/cue_shell_inset.dart';
 import 'app_bar.dart';
 import 'body.dart';
@@ -27,6 +29,10 @@ class SongPageContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final fieldCatalog =
+        ref.watch(activeSongFieldCatalogProvider).asData?.value ??
+        fallbackSongFieldCatalog;
+
     return LayoutBuilder(
       builder: (context, constraints) {
         final isDesktop =
@@ -38,8 +44,12 @@ class SongPageContent extends ConsumerWidget {
           context,
         );
 
-        final summaryContent = getDetailsSummaryContent(song, context);
-        final detailsContent = getDetailsContent(song, context);
+        final summaryContent = getDetailsSummaryContent(
+          song,
+          context,
+          fieldCatalog,
+        );
+        final detailsContent = getDetailsContent(song, context, fieldCatalog);
 
         return Scaffold(
           backgroundColor: Theme.of(context).colorScheme.surface,

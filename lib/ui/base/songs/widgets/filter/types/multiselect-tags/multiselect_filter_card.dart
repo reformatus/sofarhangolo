@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../../../services/songs/filter.dart';
+import '../../../../../../../services/songs/field_registry.dart';
 import '../../common/async_chip_row_handler.dart';
 import '../../common/base_filter_card.dart';
 import '../field_type.dart';
@@ -21,6 +22,7 @@ class MultiselectFilterCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final fieldCatalog = ref.watch(activeSongFieldCatalogProvider);
     final selectableValues = ref.watch(
       selectableValuesForFilterableFieldProvider(field, fieldType),
     );
@@ -30,10 +32,12 @@ class MultiselectFilterCard extends ConsumerWidget {
     );
 
     final isActive = filterState.containsKey(field);
+    final fieldDefinition =
+        fieldCatalog.asData?.value[field] ?? fallbackSongFieldCatalog[field];
 
     return BaseFilterCard(
-      icon: songFieldsMap[field]!['icon'] ?? Icons.filter_list,
-      title: songFieldsMap[field]!['title_hu'] ?? "[Szűrő neve hiányzik]",
+      icon: fieldDefinition?.icon ?? Icons.filter_list,
+      title: fieldDefinition?.titleHu ?? '[Szűrő neve hiányzik]',
       isActive: isActive,
       onResetPressed: () => filterStateNotifier.resetFilterField(field),
       trailing: Text(

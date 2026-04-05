@@ -26,7 +26,7 @@ late LyricDatabase db;
 
 @DriftDatabase(
   tables: [Songs, Banks, Assets, Cues, PreferenceStorage],
-  include: {'song/song.drift', '../services/songs/filter.drift'},
+  include: {'song/song.drift'},
 )
 class LyricDatabase extends _$LyricDatabase {
   // LyricDatabase() : super(_openConnection()); //used for debugging
@@ -78,6 +78,23 @@ class LyricDatabase extends _$LyricDatabase {
         from4To5: (m, schema) async {
           await customStatement(
             "UPDATE banks SET last_updated = '1900-01-01T00:00:00'",
+          );
+          await m.drop(schema.songsAd);
+          await m.drop(schema.songsAi);
+          await m.drop(schema.songsAu);
+          await customStatement('''
+            UPDATE songs
+            SET content_map = CASE
+              WHEN TRIM(key_field) = '' THEN content_map
+              ELSE json_set(content_map, '\$.key', key_field)
+            END
+          ''');
+          await m.dropColumn(schema.songs, 'key_field');
+          await m.createTrigger(schema.songsAd);
+          await m.createTrigger(schema.songsAi);
+          await m.createTrigger(schema.songsAu);
+          await customStatement(
+            "INSERT INTO songs_fts(songs_fts) VALUES('rebuild')",
           );
         },
       ),
