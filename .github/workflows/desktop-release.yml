@@ -1,0 +1,421 @@
+name: Desktop Release
+
+on:
+  release:
+    types: [published, prereleased]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing Git tag/release to attach desktop assets to
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-release-${{ github.event.release.tag_name || inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  release-context:
+    name: Resolve release context
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.meta.outputs.release_tag }}
+      build_name: ${{ steps.meta.outputs.build_name }}
+      build_number: ${{ steps.meta.outputs.build_number }}
+      release_date: ${{ steps.meta.outputs.release_date }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            release_tag="${{ inputs.release_tag }}"
+          else
+            release_tag="${{ github.event.release.tag_name }}"
+          fi
+
+          version_line="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
+          build_name="${version_line%%+*}"
+          build_number="${version_line##*+}"
+          release_date="$(date -u +%F)"
+
+          {
+            echo "release_tag=$release_tag"
+            echo "build_name=$build_name"
+            echo "build_number=$build_number"
+            echo "release_date=$release_date"
+          } >> "$GITHUB_OUTPUT"
+
+  verify:
+    name: Verify tests
+    runs-on: ubuntu-latest
+    needs: release-context
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install test dependencies
+        run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Run tests
+        run: flutter test test
+
+  build-linux:
+    name: Build Linux Flatpak
+    runs-on: ubuntu-latest
+    needs: [release-context, verify]
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stamp AppStream release metadata
+        shell: bash
+        run: |
+          perl -0pi -e 's#<release version="[^"]+" date="[^"]+" */>#<release version="${{ needs.release-context.outputs.build_name }}" date="${{ needs.release-context.outputs.release_date }}" />#' linux/packaging/org.lyricapp.sofar.metainfo.xml
+
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: sofar-hangolo-${{ needs.release-context.outputs.build_name }}-linux-x86_64.flatpak
+          manifest-path: packaging/linux/flatpak/org.lyricapp.sofar.yaml
+          cache-key: flatpak-builder-${{ github.sha }}
+          arch: x86_64
+          verbose: true
+
+  prepare-flathub-beta-pr:
+    name: Prepare Flathub beta PR
+    runs-on: ubuntu-latest
+    needs: [release-context, build-linux]
+    if: ${{ vars.FLATHUB_REPO != '' && vars.FLATHUB_REPO_URL != '' && secrets.FLATHUB_REPO_DEPLOY_KEY != '' && secrets.FLATHUB_REPO_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Render Flathub manifest
+        shell: bash
+        run: |
+          bash tool/render_flathub_manifest.sh \
+            packaging/linux/flatpak/org.lyricapp.sofar.flathub.yaml.in \
+            /tmp/org.lyricapp.sofar.yaml \
+            "${{ vars.FLATHUB_REPO_URL }}" \
+            "${{ needs.release-context.outputs.release_tag }}"
+
+      - name: Load Flathub deploy key
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.FLATHUB_REPO_DEPLOY_KEY }}
+
+      - name: Trust GitHub SSH host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Sync beta branch
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.FLATHUB_REPO_TOKEN }}
+        run: |
+          git clone "git@github.com:${{ vars.FLATHUB_REPO }}.git" /tmp/flathub-app
+          cd /tmp/flathub-app
+
+          if git ls-remote --exit-code --heads origin beta >/dev/null 2>&1; then
+            git checkout -b "automation/${{ needs.release-context.outputs.release_tag }}" origin/beta
+            base_branch="beta"
+          else
+            default_branch="$(gh repo view "${{ vars.FLATHUB_REPO }}" --json defaultBranchRef --jq .defaultBranchRef.name)"
+            git checkout -b "automation/${{ needs.release-context.outputs.release_tag }}" "origin/${default_branch}"
+            base_branch="${default_branch}"
+          fi
+
+          cp /tmp/org.lyricapp.sofar.yaml ./org.lyricapp.sofar.yaml
+          cp "${GITHUB_WORKSPACE}/packaging/linux/flatpak/flathub.json" ./flathub.json
+
+          if [[ -n "$(git status --short)" ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add org.lyricapp.sofar.yaml flathub.json
+            git commit -m "Update beta manifest for ${{ needs.release-context.outputs.release_tag }}"
+            git push origin "HEAD:automation/${{ needs.release-context.outputs.release_tag }}" --force
+
+            existing_pr="$(gh pr list \
+              --repo "${{ vars.FLATHUB_REPO }}" \
+              --base "$base_branch" \
+              --head "automation/${{ needs.release-context.outputs.release_tag }}" \
+              --json number \
+              --jq '.[0].number' || true)"
+
+            if [[ -n "$existing_pr" && "$existing_pr" != "null" ]]; then
+              echo "Flathub PR branch already exists."
+            else
+              gh pr create \
+                --repo "${{ vars.FLATHUB_REPO }}" \
+                --base "$base_branch" \
+                --head "automation/${{ needs.release-context.outputs.release_tag }}" \
+                --title "Update org.lyricapp.sofar for ${{ needs.release-context.outputs.release_tag }}" \
+                --body "Automated beta manifest refresh for ${{ needs.release-context.outputs.release_tag }}."
+            fi
+          else
+            echo "Flathub beta PR content already up to date."
+          fi
+
+  build-windows:
+    name: Build Windows installer and Store package
+    runs-on: windows-latest
+    needs: [release-context, verify]
+    env:
+      APP_VERSION: ${{ needs.release-context.outputs.build_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build Windows app
+        run: flutter build windows --release
+
+      - name: Build Microsoft Store MSIX
+        run: dart run msix:create --store --build-windows false --output-path build/windows/msix --output-name sofar-hangolo-${{ needs.release-context.outputs.build_name }}-windows-store
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build native Windows installer
+        shell: powershell
+        run: |
+          $env:APP_VERSION = "${{ needs.release-context.outputs.build_name }}"
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "packaging\windows\sofar-hangolo.iss"
+
+      - name: Upload Windows release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-assets
+          path: |
+            build/windows/msix/*.msix
+            build/windows/installer/*.exe
+          if-no-files-found: error
+
+      - name: Install Microsoft Store Developer CLI
+        if: ${{ vars.WINDOWS_STORE_APP_ID != '' && vars.WINDOWS_STORE_BETA_FLIGHT_ID != '' && secrets.WINDOWS_STORE_TENANT_ID != '' && secrets.WINDOWS_STORE_SELLER_ID != '' && secrets.WINDOWS_STORE_CLIENT_ID != '' && secrets.WINDOWS_STORE_CLIENT_SECRET != '' }}
+        shell: powershell
+        run: |
+          winget install Microsoft.DotNet.DesktopRuntime.9 --accept-package-agreements --accept-source-agreements --silent
+          winget install "Microsoft Store Developer CLI" --accept-package-agreements --accept-source-agreements --silent
+
+      - name: Publish Windows beta to Microsoft Store
+        if: ${{ vars.WINDOWS_STORE_APP_ID != '' && vars.WINDOWS_STORE_BETA_FLIGHT_ID != '' && secrets.WINDOWS_STORE_TENANT_ID != '' && secrets.WINDOWS_STORE_SELLER_ID != '' && secrets.WINDOWS_STORE_CLIENT_ID != '' && secrets.WINDOWS_STORE_CLIENT_SECRET != '' }}
+        shell: powershell
+        env:
+          WINDOWS_STORE_TENANT_ID: ${{ secrets.WINDOWS_STORE_TENANT_ID }}
+          WINDOWS_STORE_SELLER_ID: ${{ secrets.WINDOWS_STORE_SELLER_ID }}
+          WINDOWS_STORE_CLIENT_ID: ${{ secrets.WINDOWS_STORE_CLIENT_ID }}
+          WINDOWS_STORE_CLIENT_SECRET: ${{ secrets.WINDOWS_STORE_CLIENT_SECRET }}
+        run: |
+          $storePackage = Get-ChildItem build/windows/msix/*.msix | Select-Object -First 1
+          msstore reconfigure --tenantId "$env:WINDOWS_STORE_TENANT_ID" --sellerId "$env:WINDOWS_STORE_SELLER_ID" --clientId "$env:WINDOWS_STORE_CLIENT_ID" --clientSecret "$env:WINDOWS_STORE_CLIENT_SECRET"
+          msstore publish . --inputFile "$($storePackage.FullName)" --appId "${{ vars.WINDOWS_STORE_APP_ID }}" --flightId "${{ vars.WINDOWS_STORE_BETA_FLIGHT_ID }}"
+
+  build-macos:
+    name: Build macOS DMG and App Store package
+    runs-on: macos-latest
+    needs: [release-context, verify]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build unsigned macOS app
+        run: flutter build macos --release --no-codesign
+
+      - name: Import Developer ID certificate
+        if: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 != '' && secrets.MACOS_DEVELOPER_ID_P12_PASSWORD != '' && secrets.MACOS_DEVELOPER_ID_APPLICATION != '' }}
+        env:
+          DEV_ID_P12_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 }}
+          DEV_ID_P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/release.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> "$GITHUB_ENV"
+          echo "$DEV_ID_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/developer-id.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/developer-id.p12" -P "$DEV_ID_P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+      - name: Sign macOS app for direct distribution
+        if: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 != '' && secrets.MACOS_DEVELOPER_ID_P12_PASSWORD != '' && secrets.MACOS_DEVELOPER_ID_APPLICATION != '' }}
+        run: |
+          APP_PATH="$(find build/macos/Build/Products/Release -maxdepth 1 -name '*.app' -print -quit)"
+          codesign --deep --force --options runtime --sign "${{ secrets.MACOS_DEVELOPER_ID_APPLICATION }}" "$APP_PATH"
+
+      - name: Build DMG
+        run: |
+          APP_PATH="$(find build/macos/Build/Products/Release -maxdepth 1 -name '*.app' -print -quit)"
+          bash tool/build_macos_dmg.sh "$APP_PATH" "build/macos/Sofar-Hangolo-${{ needs.release-context.outputs.build_name }}-macos.dmg"
+
+      - name: Write notarization API key
+        if: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 != '' && secrets.MACOS_DEVELOPER_ID_P12_PASSWORD != '' && secrets.MACOS_DEVELOPER_ID_APPLICATION != '' && secrets.MACOS_NOTARY_API_KEY_ID != '' && secrets.MACOS_NOTARY_API_ISSUER_ID != '' && secrets.MACOS_NOTARY_API_KEY_BASE64 != '' }}
+        env:
+          NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_API_KEY_ID }}
+          NOTARY_KEY_BASE64: ${{ secrets.MACOS_NOTARY_API_KEY_BASE64 }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$NOTARY_KEY_BASE64" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_${NOTARY_KEY_ID}.p8"
+
+      - name: Notarize DMG
+        if: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 != '' && secrets.MACOS_DEVELOPER_ID_P12_PASSWORD != '' && secrets.MACOS_DEVELOPER_ID_APPLICATION != '' && secrets.MACOS_NOTARY_API_KEY_ID != '' && secrets.MACOS_NOTARY_API_ISSUER_ID != '' && secrets.MACOS_NOTARY_API_KEY_BASE64 != '' }}
+        env:
+          NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_API_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_API_ISSUER_ID }}
+        run: |
+          DMG_PATH="build/macos/Sofar-Hangolo-${{ needs.release-context.outputs.build_name }}-macos.dmg"
+          xcrun notarytool submit "$DMG_PATH" \
+            --key "$HOME/.appstoreconnect/private_keys/AuthKey_${NOTARY_KEY_ID}.p8" \
+            --key-id "$NOTARY_KEY_ID" \
+            --issuer "$NOTARY_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "$DMG_PATH"
+
+      - name: Upload macOS release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-release-assets
+          path: build/macos/*.dmg
+          if-no-files-found: error
+
+      - name: Import App Store certificates
+        if: ${{ vars.MACOS_APP_BUNDLE_ID != '' && vars.MACOS_APPLE_TEAM_ID != '' && vars.MACOS_APP_STORE_PROFILE_NAME != '' && secrets.MACOS_APP_STORE_CERTIFICATES_P12_BASE64 != '' && secrets.MACOS_APP_STORE_CERTIFICATES_P12_PASSWORD != '' && secrets.MACOS_APP_STORE_PROVISIONING_PROFILE_BASE64 != '' && secrets.MACOS_APP_STORE_API_KEY_ID != '' && secrets.MACOS_APP_STORE_API_ISSUER_ID != '' && secrets.MACOS_APP_STORE_API_KEY_BASE64 != '' }}
+        env:
+          APP_STORE_P12_BASE64: ${{ secrets.MACOS_APP_STORE_CERTIFICATES_P12_BASE64 }}
+          APP_STORE_P12_PASSWORD: ${{ secrets.MACOS_APP_STORE_CERTIFICATES_P12_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-store.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          echo "APP_STORE_KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          echo "APP_STORE_KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> "$GITHUB_ENV"
+          echo "$APP_STORE_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/app-store.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/app-store.p12" -P "$APP_STORE_P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+      - name: Install App Store provisioning profile
+        if: ${{ vars.MACOS_APP_BUNDLE_ID != '' && vars.MACOS_APPLE_TEAM_ID != '' && vars.MACOS_APP_STORE_PROFILE_NAME != '' && secrets.MACOS_APP_STORE_CERTIFICATES_P12_BASE64 != '' && secrets.MACOS_APP_STORE_CERTIFICATES_P12_PASSWORD != '' && secrets.MACOS_APP_STORE_PROVISIONING_PROFILE_BASE64 != '' && secrets.MACOS_APP_STORE_API_KEY_ID != '' && secrets.MACOS_APP_STORE_API_ISSUER_ID != '' && secrets.MACOS_APP_STORE_API_KEY_BASE64 != '' }}
+        env:
+          APP_STORE_PROFILE_BASE64: ${{ secrets.MACOS_APP_STORE_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "$APP_STORE_PROFILE_BASE64" | base64 --decode > "$HOME/Library/MobileDevice/Provisioning Profiles/${{ vars.MACOS_APP_BUNDLE_ID }}.provisionprofile"
+
+      - name: Write App Store Connect API key
+        if: ${{ vars.MACOS_APP_BUNDLE_ID != '' && vars.MACOS_APPLE_TEAM_ID != '' && vars.MACOS_APP_STORE_PROFILE_NAME != '' && secrets.MACOS_APP_STORE_CERTIFICATES_P12_BASE64 != '' && secrets.MACOS_APP_STORE_CERTIFICATES_P12_PASSWORD != '' && secrets.MACOS_APP_STORE_PROVISIONING_PROFILE_BASE64 != '' && secrets.MACOS_APP_STORE_API_KEY_ID != '' && secrets.MACOS_APP_STORE_API_ISSUER_ID != '' && secrets.MACOS_APP_STORE_API_KEY_BASE64 != '' }}
+        env:
+          APP_STORE_API_KEY_ID: ${{ secrets.MACOS_APP_STORE_API_KEY_ID }}
+          APP_STORE_API_KEY_BASE64: ${{ secrets.MACOS_APP_STORE_API_KEY_BASE64 }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$APP_STORE_API_KEY_BASE64" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_API_KEY_ID}.p8"
+
+      - name: Archive macOS App Store build
+        if: ${{ vars.MACOS_APP_BUNDLE_ID != '' && vars.MACOS_APPLE_TEAM_ID != '' && vars.MACOS_APP_STORE_PROFILE_NAME != '' && secrets.MACOS_APP_STORE_CERTIFICATES_P12_BASE64 != '' && secrets.MACOS_APP_STORE_CERTIFICATES_P12_PASSWORD != '' && secrets.MACOS_APP_STORE_PROVISIONING_PROFILE_BASE64 != '' && secrets.MACOS_APP_STORE_API_KEY_ID != '' && secrets.MACOS_APP_STORE_API_ISSUER_ID != '' && secrets.MACOS_APP_STORE_API_KEY_BASE64 != '' }}
+        run: |
+          flutter build macos --release --config-only
+          bash tool/render_macos_appstore_export_options.sh \
+            "$RUNNER_TEMP/exportOptions.plist" \
+            "${{ vars.MACOS_APPLE_TEAM_ID }}" \
+            "${{ vars.MACOS_APP_BUNDLE_ID }}" \
+            "${{ vars.MACOS_APP_STORE_PROFILE_NAME }}"
+          xcodebuild \
+            -workspace macos/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
+            archive \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="${{ vars.MACOS_APPLE_TEAM_ID }}" \
+            PRODUCT_BUNDLE_IDENTIFIER="${{ vars.MACOS_APP_BUNDLE_ID }}" \
+            PROVISIONING_PROFILE_SPECIFIER="${{ vars.MACOS_APP_STORE_PROFILE_NAME }}"
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/exportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/app-store"
+
+      - name: Upload App Store package artifact
+        if: ${{ vars.MACOS_APP_BUNDLE_ID != '' && vars.MACOS_APPLE_TEAM_ID != '' && vars.MACOS_APP_STORE_PROFILE_NAME != '' && secrets.MACOS_APP_STORE_CERTIFICATES_P12_BASE64 != '' && secrets.MACOS_APP_STORE_CERTIFICATES_P12_PASSWORD != '' && secrets.MACOS_APP_STORE_PROVISIONING_PROFILE_BASE64 != '' && secrets.MACOS_APP_STORE_API_KEY_ID != '' && secrets.MACOS_APP_STORE_API_ISSUER_ID != '' && secrets.MACOS_APP_STORE_API_KEY_BASE64 != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app-store-package
+          path: ${{ runner.temp }}/app-store/*.pkg
+          if-no-files-found: error
+
+      - name: Publish macOS beta to App Store Connect
+        if: ${{ vars.MACOS_APP_BUNDLE_ID != '' && vars.MACOS_APPLE_TEAM_ID != '' && vars.MACOS_APP_STORE_PROFILE_NAME != '' && secrets.MACOS_APP_STORE_CERTIFICATES_P12_BASE64 != '' && secrets.MACOS_APP_STORE_CERTIFICATES_P12_PASSWORD != '' && secrets.MACOS_APP_STORE_PROVISIONING_PROFILE_BASE64 != '' && secrets.MACOS_APP_STORE_API_KEY_ID != '' && secrets.MACOS_APP_STORE_API_ISSUER_ID != '' && secrets.MACOS_APP_STORE_API_KEY_BASE64 != '' }}
+        env:
+          APP_STORE_API_KEY_ID: ${{ secrets.MACOS_APP_STORE_API_KEY_ID }}
+          APP_STORE_API_ISSUER_ID: ${{ secrets.MACOS_APP_STORE_API_ISSUER_ID }}
+        run: |
+          PKG_PATH="$(find "$RUNNER_TEMP/app-store" -maxdepth 1 -name '*.pkg' -print -quit)"
+          xcrun altool --upload-app --file "$PKG_PATH" --type osx --apiKey "$APP_STORE_API_KEY_ID" --apiIssuer "$APP_STORE_API_ISSUER_ID"
+
+  upload-release-assets:
+    name: Upload assets to GitHub release
+    runs-on: ubuntu-latest
+    needs: [release-context, build-linux, build-windows, build-macos]
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Upload installers to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          tag="${{ needs.release-context.outputs.release_tag }}"
+          mapfile -t files < <(find dist -type f | sort)
+
+          if [[ "${#files[@]}" -eq 0 ]]; then
+            echo "No release assets were produced." >&2
+            exit 1
+          fi
+
+          gh release upload "$tag" "${files[@]}" --clobber

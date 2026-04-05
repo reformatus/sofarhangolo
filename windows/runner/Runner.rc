@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.example" "\0"
-            VALUE "FileDescription", "lyric" "\0"
+            VALUE "CompanyName", "RefLabs" "\0"
+            VALUE "FileDescription", "Sofar Hangolo" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "lyric" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2024 com.example. All rights reserved." "\0"
+            VALUE "InternalName", "sofarhangolo" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2025 Benedek Fodor. Released under the GPL-2.0." "\0"
             VALUE "OriginalFilename", "lyric.exe" "\0"
-            VALUE "ProductName", "lyric" "\0"
+            VALUE "ProductName", "Sofar Hangolo" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

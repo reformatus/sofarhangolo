@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>org.lyricapp.sofar</id>
+  <name>Sófár Hangoló</name>
+  <summary>Offline-first songbook and rehearsal companion</summary>
+  <developer id="hu.sofarkotta">
+    <name>RefLabs</name>
+  </developer>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-2.0-only</project_license>
+  <launchable type="desktop-id">org.lyricapp.sofar.desktop</launchable>
+  <url type="homepage">https://app.sofarkotta.hu/</url>
+  <url type="bugtracker">https://github.com/reformatus/lyric/issues</url>
+  <description>
+    <p>
+      Sófár Hangoló keeps lyrics, chords, cue sheets, and rehearsal utilities in one desktop app.
+      It supports offline access, cue imports, transposition helpers, and fast navigation for live use.
+    </p>
+  </description>
+  <categories>
+    <category>AudioVideo</category>
+    <category>Music</category>
+  </categories>
+  <content_rating type="oars-1.1"/>
+  <provides>
+    <binary>sofarhangolo</binary>
+  </provides>
+  <releases>
+    <release version="1.0.2" date="2026-04-05"/>
+  </releases>
+</component>

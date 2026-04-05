@@ -90,6 +90,7 @@ install(CODE "
 
 set(INSTALL_BUNDLE_DATA_DIR "${CMAKE_INSTALL_PREFIX}/data")
 set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib")
+set(INSTALL_BUNDLE_SHARE_DIR "${CMAKE_INSTALL_PREFIX}/share")
 
 install(TARGETS ${BINARY_NAME} RUNTIME DESTINATION "${CMAKE_INSTALL_PREFIX}"
   COMPONENT Runtime)
@@ -126,3 +127,33 @@ if(NOT CMAKE_BUILD_TYPE MATCHES "Debug")
   install(FILES "${AOT_LIBRARY}" DESTINATION "${INSTALL_BUNDLE_LIB_DIR}"
     COMPONENT Runtime)
 endif()
+
+install(FILES
+  "${CMAKE_CURRENT_SOURCE_DIR}/packaging/org.lyricapp.sofar.desktop"
+  DESTINATION "${INSTALL_BUNDLE_SHARE_DIR}/applications"
+  COMPONENT Runtime)
+
+install(FILES
+  "${CMAKE_CURRENT_SOURCE_DIR}/packaging/org.lyricapp.sofar.metainfo.xml"
+  DESTINATION "${INSTALL_BUNDLE_SHARE_DIR}/metainfo"
+  COMPONENT Runtime)
+
+install(FILES
+  "${CMAKE_CURRENT_SOURCE_DIR}/../packaging/linux/icons/hicolor/128x128/apps/org.lyricapp.sofar.png"
+  DESTINATION "${INSTALL_BUNDLE_SHARE_DIR}/icons/hicolor/128x128/apps"
+  COMPONENT Runtime)
+
+install(FILES
+  "${CMAKE_CURRENT_SOURCE_DIR}/../packaging/linux/icons/hicolor/256x256/apps/org.lyricapp.sofar.png"
+  DESTINATION "${INSTALL_BUNDLE_SHARE_DIR}/icons/hicolor/256x256/apps"
+  COMPONENT Runtime)
+
+install(FILES
+  "${CMAKE_CURRENT_SOURCE_DIR}/../packaging/linux/icons/hicolor/512x512/apps/org.lyricapp.sofar.png"
+  DESTINATION "${INSTALL_BUNDLE_SHARE_DIR}/icons/hicolor/512x512/apps"
+  COMPONENT Runtime)
+
+install(FILES
+  "${CMAKE_CURRENT_SOURCE_DIR}/../packaging/linux/icons/hicolor/scalable/apps/org.lyricapp.sofar.svg"
+  DESTINATION "${INSTALL_BUNDLE_SHARE_DIR}/icons/hicolor/scalable/apps"
+  COMPONENT Runtime)

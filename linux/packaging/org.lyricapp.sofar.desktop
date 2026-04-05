@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Sófár Hangoló
+GenericName=Songbook and tuning companion
+Comment=Minden kotta, mindig veled
+Exec=sofarhangolo
+Icon=org.lyricapp.sofar
+Terminal=false
+Categories=AudioVideo;Music;
+Keywords=lyrics;songbook;music;chords;
+StartupNotify=true
+StartupWMClass=sofarhangolo
