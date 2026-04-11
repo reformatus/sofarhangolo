@@ -12,6 +12,7 @@ This repository now contains GitHub Actions based release automation for:
 
 Use `.github/workflows/release.yml` for desktop and web release work.
 Use `.github/workflows/release-mobile-assets.yml` for mobile sidecar artifact pickup from Codemagic.
+Use `.github/workflows/update-product-page-downloads.yml` to publish the static downloads JSON consumed by `app.sofarkotta.hu/web`.
 
 Primary trigger:
 

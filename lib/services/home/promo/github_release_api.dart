@@ -15,6 +15,8 @@ enum GithubReleaseAssetKind {
   windowsStore,
   macosDmg,
   linuxFlatpak,
+  androidApk,
+  iosIpa,
 }
 
 class GithubReleaseAsset {
@@ -37,6 +39,8 @@ class GithubReleaseAsset {
     GithubReleaseAssetKind.windowsStore => 'Windows Store csomag',
     GithubReleaseAssetKind.macosDmg => 'macOS DMG',
     GithubReleaseAssetKind.linuxFlatpak => 'Linux Flatpak',
+    GithubReleaseAssetKind.androidApk => 'Android APK',
+    GithubReleaseAssetKind.iosIpa => 'iOS IPA',
   };
 }
 
@@ -65,33 +69,23 @@ final githubReleaseTracksProvider = FutureProvider<GithubReleaseTracks?>((
   ref,
 ) async {
   try {
-    final repoPath = _repoPathFromApiRoot(appConfig.gitHubApiRoot);
-    final response = await github_api.fetchGithubReleasesJson(repoPath);
-    final releases = jsonDecode(response);
-    if (releases is! List) {
-      throw const FormatException('GitHub releases payload is not a list.');
+    final response = await github_api.fetchGithubReleasesJson(
+      '${appConfig.webappRoot}/downloads/releases.json',
+    );
+    final payload = jsonDecode(response);
+    if (payload is! Map) {
+      throw const FormatException('Release summary payload is not an object.');
     }
 
-    GithubReleaseInfo? stable;
-    GithubReleaseInfo? prerelease;
-
-    for (final release in releases.whereType<Map>()) {
-      final parsed = _parseRelease(Map<String, dynamic>.from(release));
-      if (parsed == null) {
-        continue;
-      }
-
-      if (parsed.track == GithubReleaseTrack.stable && stable == null) {
-        stable = parsed;
-      }
-      if (parsed.track == GithubReleaseTrack.prerelease && prerelease == null) {
-        prerelease = parsed;
-      }
-
-      if (stable != null && prerelease != null) {
-        break;
-      }
-    }
+    final json = Map<String, dynamic>.from(payload);
+    final stable = _parseReleaseSummary(
+      json['stable'],
+      fallbackTrack: GithubReleaseTrack.stable,
+    );
+    final prerelease = _parseReleaseSummary(
+      json['prerelease'],
+      fallbackTrack: GithubReleaseTrack.prerelease,
+    );
 
     if (stable == null) {
       return null;
@@ -108,14 +102,18 @@ final githubReleaseTracksProvider = FutureProvider<GithubReleaseTracks?>((
   }
 });
 
-GithubReleaseInfo? _parseRelease(Map<String, dynamic> release) {
-  if (release['draft'] == true) {
+GithubReleaseInfo? _parseReleaseSummary(
+  Object? release, {
+  required GithubReleaseTrack fallbackTrack,
+}) {
+  if (release is! Map) {
     return null;
   }
 
-  final tagName = release['tag_name'];
-  final htmlUrl = release['html_url'];
-  final assetsJson = release['assets'];
+  final json = Map<String, dynamic>.from(release);
+  final tagName = json['tagName'];
+  final htmlUrl = json['htmlUrl'];
+  final assetsJson = json['assets'];
   if (tagName is! String || htmlUrl is! String || assetsJson is! List) {
     return null;
   }
@@ -127,9 +125,11 @@ GithubReleaseInfo? _parseRelease(Map<String, dynamic> release) {
       .toList();
 
   return GithubReleaseInfo(
-    track: release['prerelease'] == true
-        ? GithubReleaseTrack.prerelease
-        : GithubReleaseTrack.stable,
+    track: switch (json['track']) {
+      'stable' => GithubReleaseTrack.stable,
+      'prerelease' => GithubReleaseTrack.prerelease,
+      _ => fallbackTrack,
+    },
     tagName: tagName,
     htmlUrl: Uri.parse(htmlUrl),
     assets: assets,
@@ -157,6 +157,8 @@ GithubReleaseAsset? _parseAsset(Map<String, dynamic> asset) {
     _ when lowerName.endsWith('.dmg') => GithubReleaseAssetKind.macosDmg,
     _ when lowerName.endsWith('.flatpak') =>
       GithubReleaseAssetKind.linuxFlatpak,
+    _ when lowerName.endsWith('.apk') => GithubReleaseAssetKind.androidApk,
+    _ when lowerName.endsWith('.ipa') => GithubReleaseAssetKind.iosIpa,
     _ => null,
   };
 
@@ -171,13 +173,4 @@ GithubReleaseAsset? _parseAsset(Map<String, dynamic> asset) {
     downloadCount: downloadCount,
     sizeBytes: sizeBytes,
   );
-}
-
-String _repoPathFromApiRoot(String apiRoot) {
-  const marker = '/repos/';
-  final markerIndex = apiRoot.indexOf(marker);
-  if (markerIndex == -1) {
-    throw FormatException('Invalid GitHub API root: $apiRoot');
-  }
-  return apiRoot.substring(markerIndex + marker.length);
 }

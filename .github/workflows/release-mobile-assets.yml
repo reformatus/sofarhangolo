@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: release-mobile-${{ github.ref_name || inputs.release_tag }}
@@ -23,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_tag: ${{ steps.meta.outputs.release_tag }}
+      release_sha: ${{ steps.meta.outputs.release_sha }}
       prerelease: ${{ steps.meta.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
@@ -43,6 +45,7 @@ jobs:
           fi
 
           git rev-parse "refs/tags/${release_tag}" >/dev/null
+          release_sha="$(git rev-list -n 1 "${release_tag}")"
 
           prerelease=false
           if [[ "${release_tag%%+*}" == *-* ]]; then
@@ -51,6 +54,7 @@ jobs:
 
           {
             echo "release_tag=$release_tag"
+            echo "release_sha=$release_sha"
             echo "prerelease=$prerelease"
           } >> "$GITHUB_OUTPUT"
 
@@ -197,3 +201,70 @@ jobs:
           fi
 
           gh release upload "$RELEASE_TAG" "${files[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+
+  trigger-product-page-downloads:
+    name: Trigger product page downloads update
+    runs-on: ubuntu-latest
+    needs: [release-context, fetch-mobile-release-assets, upload-mobile-release-assets]
+    if: >-
+      ${{
+        always() &&
+        github.event_name == 'push' &&
+        needs.release-context.result == 'success' &&
+        (needs.fetch-mobile-release-assets.result == 'success' || needs.fetch-mobile-release-assets.result == 'skipped') &&
+        (needs.upload-mobile-release-assets.result == 'success' || needs.upload-mobile-release-assets.result == 'skipped')
+      }}
+    steps:
+      - name: Wait for main release workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release-context.outputs.release_tag }}
+          RELEASE_SHA: ${{ needs.release-context.outputs.release_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          deadline=$(( $(date +%s) + 1800 ))
+          run_ok=false
+
+          while [[ $(date +%s) -lt $deadline ]]; do
+            release_runs="$(gh run list \
+              --repo "$GITHUB_REPOSITORY" \
+              --workflow "Release" \
+              --json databaseId,headBranch,headSha,status,conclusion \
+              --limit 20)"
+
+            match="$(jq -r --arg tag "$RELEASE_TAG" --arg sha "$RELEASE_SHA" '.[] | select(.headBranch == $tag or .headSha == $sha) | @base64' <<<"$release_runs" | head -n 1)"
+            if [[ -z "$match" ]]; then
+              sleep 20
+              continue
+            fi
+
+            status="$(printf '%s' "$match" | base64 --decode | jq -r '.status')"
+            conclusion="$(printf '%s' "$match" | base64 --decode | jq -r '.conclusion')"
+            if [[ "$status" == "completed" && "$conclusion" == "success" ]]; then
+              run_ok=true
+              break
+            fi
+            if [[ "$status" == "completed" && "$conclusion" != "success" ]]; then
+              echo "Main release workflow completed with conclusion: $conclusion"
+              exit 1
+            fi
+
+            sleep 20
+          done
+
+          if [[ "$run_ok" != "true" ]]; then
+            echo "Timed out waiting for main release workflow for tag ${RELEASE_TAG}."
+            exit 1
+          fi
+
+      - name: Trigger product page downloads workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release-context.outputs.release_tag }}
+        run: |
+          gh workflow run update-product-page-downloads.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref "$RELEASE_TAG" \
+            -f release_tag="$RELEASE_TAG"

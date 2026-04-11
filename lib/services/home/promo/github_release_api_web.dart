@@ -5,9 +5,9 @@ import 'dart:js_interop_unsafe';
 external JSObject get globalContext;
 
 Future<String> fetchGithubReleasesJson(String repoPath) async {
-  final fetchFn = globalContext.getProperty('sofarFetchGithubReleases'.toJS);
+  final fetchFn = globalContext.getProperty('sofarFetchReleaseSummaryJson'.toJS);
   if (fetchFn == null || fetchFn.isUndefinedOrNull) {
-    throw StateError('sofarFetchGithubReleases is not available.');
+    throw StateError('sofarFetchReleaseSummaryJson is not available.');
   }
 
   final promise = (fetchFn as JSFunction).callAsFunction(
