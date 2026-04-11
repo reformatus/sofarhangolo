@@ -1,10 +1,10 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sofar/data/cue/cue.dart';
-import 'package:sofar/data/database.dart';
-import 'package:sofar/data/song/song.dart';
-import 'package:sofar/services/cue/write_cue.dart';
-import 'package:sofar/ui/cue/session/session_provider.dart';
+import 'package:sofarhangolo/data/cue/cue.dart';
+import 'package:sofarhangolo/data/database.dart';
+import 'package:sofarhangolo/data/song/song.dart';
+import 'package:sofarhangolo/services/cue/write_cue.dart';
+import 'package:sofarhangolo/ui/cue/session/session_provider.dart';
 
 import '../../harness/test_harness.dart';
 

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sofar/data/database.dart';
+import 'package:sofarhangolo/data/database.dart';
 
 import '../harness/test_harness.dart';
 

@@ -1,6 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sofar/services/http/dio_provider.dart';
+import 'package:sofarhangolo/services/http/dio_provider.dart';
 
 import '../harness/test_harness.dart';
 

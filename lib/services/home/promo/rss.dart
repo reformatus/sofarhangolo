@@ -2,8 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:xml/xml.dart';
 
-import '../../../data/log/logger.dart';
 import '../../../config/config.dart';
+import '../../../data/log/logger.dart';
 import '../../http/dio_provider.dart';
 
 part 'rss.g.dart';

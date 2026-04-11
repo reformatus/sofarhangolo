@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sofar/config/app_config.dart';
-import 'package:sofar/services/app_links/web_initial_app_uri_shared.dart';
+import 'package:sofarhangolo/config/app_config.dart';
+import 'package:sofarhangolo/services/app_links/web_initial_app_uri_shared.dart';
 
 AppConfig _testConfig({required bool enableRecovery}) {
   return AppConfig(

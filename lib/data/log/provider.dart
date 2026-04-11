@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:logging/logging.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'level_style.dart';
 import '../../main.dart';
 import '../../services/ui/messenger_service.dart';
 import '../../ui/common/log/dialog.dart';
+import 'level_style.dart';
 
 part 'provider.g.dart';
 

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sofar/data/cue/cue.dart';
-import 'package:sofar/services/cue/import_from_link.dart';
+import 'package:sofarhangolo/data/cue/cue.dart';
+import 'package:sofarhangolo/services/cue/import_from_link.dart';
 
 void main() {
   group('CueImportResult.getNavigationPath', () {

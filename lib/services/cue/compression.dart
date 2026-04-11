@@ -89,9 +89,6 @@ String compressCueForUrl(Map<String, dynamic> cueJson) {
 
   // Step 4: Gzip compression
   final compressed = GZipEncoder().encode(packed);
-  if (compressed == null) {
-    throw Exception('A lista tömörítése sikertelen.');
-  }
 
   // Step 5: Base64URL encoding
   return base64Url.encode(compressed);

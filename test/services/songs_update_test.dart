@@ -1,10 +1,10 @@
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sofar/data/bank/bank.dart';
-import 'package:sofar/data/database.dart';
-import 'package:sofar/data/song/song.dart';
-import 'package:sofar/services/songs/bank_song_update_task.dart';
+import 'package:sofarhangolo/data/bank/bank.dart';
+import 'package:sofarhangolo/data/database.dart';
+import 'package:sofarhangolo/data/song/song.dart';
+import 'package:sofarhangolo/services/songs/bank_song_update_task.dart';
 
 import '../harness/test_harness.dart';
 

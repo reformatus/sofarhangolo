@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-
-import '../preferences_parent.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../data/log/logger.dart';
 import '../../ui/messenger_service.dart';
+import '../preferences_parent.dart';
 
 part 'lyrics_view_style.g.dart';
 

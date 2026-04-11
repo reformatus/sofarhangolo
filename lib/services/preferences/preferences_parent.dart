@@ -2,17 +2,16 @@ import 'package:drift/drift.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../ui/song/state.dart';
-import '../../data/log/logger.dart';
-import '../ui/messenger_service.dart';
-
 import '../../data/database.dart';
+import '../../data/log/logger.dart';
+import '../../ui/song/state.dart';
+import '../ui/messenger_service.dart';
 import 'providers/general.dart';
 import 'providers/lyrics_view_style.dart';
 import 'providers/song_view_order.dart';
 
-part 'classes/lyrics_view_style.dart';
 part 'classes/general.dart';
+part 'classes/lyrics_view_style.dart';
 part 'classes/song_view_order.dart';
 
 sealed class PreferencesParentClass<T extends PreferencesParentClass<T>> {

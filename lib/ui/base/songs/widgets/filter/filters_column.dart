@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'types/bank/bank_filter_card.dart';
 
 import '../../../../../services/songs/filter.dart';
 import '../../../../common/error/card.dart';
+import 'types/bank/bank_filter_card.dart';
 import 'types/field_type.dart';
 import 'types/key/key_filter_card.dart';
 import 'types/multiselect-tags/multiselect_filter_card.dart';

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sofar/services/ui/browser_title.dart';
+import 'package:sofarhangolo/services/ui/browser_title.dart';
 
 void main() {
   group('formatBrowserTabTitle', () {

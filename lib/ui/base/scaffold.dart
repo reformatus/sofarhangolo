@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/log/provider.dart';
 import '../../config/config.dart';
+import '../../data/log/provider.dart';
 import '../../services/app_links/app_links.dart';
 import '../../services/app_version/check_new_version.dart';
 import '../../services/connectivity/provider.dart';

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../common/centered_hint.dart';
-import '../../common/confirm_dialog.dart';
-import '../slide_views/unknown.dart';
 
 import '../../../data/cue/slide.dart';
-import '../slide_views/song.dart';
+import '../../common/centered_hint.dart';
+import '../../common/confirm_dialog.dart';
 import '../session/session_provider.dart';
+import '../slide_views/song.dart';
+import '../slide_views/unknown.dart';
 
 /// A drawer or side panel that displays a list of slides for a cue
 /// Uses the current slide from state management instead of an index

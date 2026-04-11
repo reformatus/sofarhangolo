@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:sofar/config/app_config.dart';
+import 'package:sofarhangolo/config/app_config.dart';
 
 /// Test configuration with predictable values for assertions.
 /// Use this in unit tests instead of the production appConfig.

@@ -9,8 +9,8 @@ import '../../services/app_links/navigation.dart';
 import '../../ui/common/confirm_dialog.dart';
 import '../../ui/cue/cue_page_type.dart';
 import '../cue/from_uuid.dart';
-import '../song/from_uuid.dart';
 import '../cue/write_cue.dart';
+import '../song/from_uuid.dart';
 import 'compression.dart';
 
 /// Result of importing a cue from a deep link

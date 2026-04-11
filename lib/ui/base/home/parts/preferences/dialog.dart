@@ -2,14 +2,14 @@ import 'package:fading_edge_scrollview/fading_edge_scrollview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../../services/preferences/providers/lyrics_view_style.dart';
-import '../../../../../services/preferences/providers/song_view_order.dart';
-import '../about.dart';
-import '../../../../song/state.dart';
-import '../../../../../services/preferences/preferences_parent.dart';
 
 import '../../../../../config/config.dart';
+import '../../../../../services/preferences/preferences_parent.dart';
 import '../../../../../services/preferences/providers/general.dart';
+import '../../../../../services/preferences/providers/lyrics_view_style.dart';
+import '../../../../../services/preferences/providers/song_view_order.dart';
+import '../../../../song/state.dart';
+import '../about.dart';
 
 class PreferencesDialog extends ConsumerStatefulWidget {
   const PreferencesDialog({super.key});

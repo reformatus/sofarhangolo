@@ -10,7 +10,7 @@ import 'generated/schema_v2.dart' as v2;
 import 'generated/schema_v3.dart' as v3;
 import 'generated/schema_v4.dart' as v4;
 
-import 'package:sofar/data/database.dart';
+import 'package:sofarhangolo/data/database.dart';
 
 /// Migration tests are tagged so they can be excluded until migrations are implemented.
 /// Run with: flutter test --exclude-tags=migration

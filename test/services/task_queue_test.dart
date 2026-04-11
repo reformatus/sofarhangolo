@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:logging/logging.dart';
-import 'package:sofar/data/log/logger.dart';
-import 'package:sofar/services/task/background_task.dart';
-import 'package:sofar/services/task/task_queue.dart';
+import 'package:sofarhangolo/data/log/logger.dart';
+import 'package:sofarhangolo/services/task/background_task.dart';
+import 'package:sofarhangolo/services/task/task_queue.dart';
 
 class _FakeTask extends BackgroundTask {
   _FakeTask({

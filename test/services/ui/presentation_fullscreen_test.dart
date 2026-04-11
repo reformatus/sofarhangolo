@@ -1,7 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sofar/services/ui/presentation_fullscreen_shared.dart';
-import 'package:sofar/services/ui/presentation_fullscreen_stub.dart';
+import 'package:sofarhangolo/services/ui/presentation_fullscreen_shared.dart';
+import 'package:sofarhangolo/services/ui/presentation_fullscreen_stub.dart';
 
 class _RecordingNativeFullscreenDriver implements NativeFullscreenDriver {
   final calls = <({bool enabled, SystemUiMode? systemUiMode})>[];

@@ -1,8 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:sofar/services/http/dio_provider.dart';
-import 'package:sofar/services/platform/platform_provider.dart';
-import 'package:sofar/services/ui/messenger_service.dart';
+import 'package:sofarhangolo/services/http/dio_provider.dart';
+import 'package:sofarhangolo/services/platform/platform_provider.dart';
+import 'package:sofarhangolo/services/ui/messenger_service.dart';
 
 import 'fake_messenger.dart';
 import 'fake_platform.dart';

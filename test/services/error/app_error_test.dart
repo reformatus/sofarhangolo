@@ -2,8 +2,8 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sofar/services/error/app_error.dart';
-import 'package:sofar/services/error/network_error.dart';
+import 'package:sofarhangolo/services/error/app_error.dart';
+import 'package:sofarhangolo/services/error/network_error.dart';
 
 void main() {
   group('AppError.from', () {

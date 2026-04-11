@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sofar/services/ui/messenger_service.dart';
+import 'package:sofarhangolo/services/ui/messenger_service.dart';
 
 Future<MessengerService> _pumpApp(WidgetTester tester) async {
   final messenger = MessengerService();

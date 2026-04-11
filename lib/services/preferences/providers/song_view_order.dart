@@ -1,7 +1,7 @@
-import '../preferences_parent.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../../data/log/logger.dart';
+import '../preferences_parent.dart';
 
 part 'song_view_order.g.dart';
 

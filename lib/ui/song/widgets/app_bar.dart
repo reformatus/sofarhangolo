@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../services/app_links/get_shareable.dart';
-import '../../common/share/dialog.dart';
 
 import '../../../data/song/song.dart';
+import '../../../services/app_links/get_shareable.dart';
+import '../../common/share/dialog.dart';
 import '../view_chooser.dart';
 import 'details_button.dart';
 

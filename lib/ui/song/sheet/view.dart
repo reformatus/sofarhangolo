@@ -5,8 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:pdfrx/pdfrx.dart';
 
-import '../../../data/song/song.dart';
 import '../../../config/config.dart';
+import '../../../data/song/song.dart';
 import '../../../services/assets/get_song_asset.dart';
 import '../../../services/preferences/providers/general.dart';
 import '../../common/error/card.dart';

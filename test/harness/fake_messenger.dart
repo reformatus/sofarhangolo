@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:sofar/services/ui/messenger_service.dart';
+import 'package:sofarhangolo/services/ui/messenger_service.dart';
 
 /// A fake [MessengerService] that records calls for test assertions.
 ///

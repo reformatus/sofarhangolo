@@ -13,8 +13,8 @@ void main() {
     final router = GoRouter(
       initialLocation: '/',
       routes: [
-        GoRoute(path: '/', builder: (_, __) => const SizedBox()),
-        GoRoute(path: '/song/:uuid', builder: (_, __) => const SizedBox()),
+        GoRoute(path: '/', builder: (_, _) => const SizedBox()),
+        GoRoute(path: '/song/:uuid', builder: (_, _) => const SizedBox()),
       ],
     );
 
@@ -33,8 +33,8 @@ void main() {
     final reflectingRouter = GoRouter(
       initialLocation: '/',
       routes: [
-        GoRoute(path: '/', builder: (_, __) => const SizedBox()),
-        GoRoute(path: '/song/:uuid', builder: (_, __) => const SizedBox()),
+        GoRoute(path: '/', builder: (_, _) => const SizedBox()),
+        GoRoute(path: '/song/:uuid', builder: (_, _) => const SizedBox()),
       ],
     );
 

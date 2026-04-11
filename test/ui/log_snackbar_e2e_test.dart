@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:logging/logging.dart';
-import 'package:sofar/data/log/provider.dart';
-import 'package:sofar/services/ui/messenger_service.dart';
+import 'package:sofarhangolo/data/log/provider.dart';
+import 'package:sofarhangolo/services/ui/messenger_service.dart';
 
 class _UiTestHarness {
   _UiTestHarness({required this.container, required this.messenger});

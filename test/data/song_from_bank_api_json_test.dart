@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sofar/data/song/lyrics/format.dart';
-import 'package:sofar/data/song/song.dart';
+import 'package:sofarhangolo/data/song/lyrics/format.dart';
+import 'package:sofarhangolo/data/song/song.dart';
 
 void main() {
   group('Song.fromBankApiJson', () {

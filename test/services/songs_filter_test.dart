@@ -1,8 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sofar/data/song/song.dart';
-import 'package:sofar/services/songs/filter.dart';
-import 'package:sofar/ui/base/songs/widgets/filter/types/field_type.dart';
-import 'package:sofar/ui/base/songs/widgets/filter/types/key/state.dart';
+import 'package:sofarhangolo/data/song/song.dart';
+import 'package:sofarhangolo/services/songs/filter.dart';
+import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/field_type.dart';
+import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/key/state.dart';
 
 void main() {
   group('existingFilterableFields', () {

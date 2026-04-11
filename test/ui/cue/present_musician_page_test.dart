@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:sofar/data/cue/cue.dart';
-import 'package:sofar/data/database.dart';
-import 'package:sofar/services/ui/presentation_fullscreen_shared.dart';
-import 'package:sofar/ui/cue/present/musician/page.dart';
-import 'package:sofar/ui/cue/session/session_provider.dart';
+import 'package:sofarhangolo/data/cue/cue.dart';
+import 'package:sofarhangolo/data/database.dart';
+import 'package:sofarhangolo/services/ui/presentation_fullscreen_shared.dart';
+import 'package:sofarhangolo/ui/cue/present/musician/page.dart';
+import 'package:sofarhangolo/ui/cue/session/session_provider.dart';
 
 import '../../harness/test_harness.dart';
 

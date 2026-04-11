@@ -2,7 +2,7 @@ import 'package:drift/drift.dart';
 // ignore: experimental_member_use
 import 'package:drift/extensions/json1.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
-import 'package:sofar/ui/base/songs/widgets/filter/types/key/state.dart';
+import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/key/state.dart';
 
 import '../../data/database.dart';
 import '../../data/song/song.dart';

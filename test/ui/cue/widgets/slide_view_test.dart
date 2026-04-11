@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sofar/data/database.dart';
-import 'package:sofar/ui/cue/widgets/slide_view.dart';
-import 'package:sofar/ui/song/state.dart';
+import 'package:sofarhangolo/data/database.dart';
+import 'package:sofarhangolo/ui/cue/widgets/slide_view.dart';
+import 'package:sofarhangolo/ui/song/state.dart';
 
 import '../../../harness/cue_widget_harness.dart';
 import '../../../harness/test_harness.dart';

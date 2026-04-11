@@ -1,8 +1,8 @@
-import 'package:flutter/foundation.dart';
 import 'package:app_links/app_links.dart';
-import '../../config/config.dart';
+import 'package:flutter/foundation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../config/config.dart';
 import '../../data/log/logger.dart';
 import 'launch_resolution.dart';
 

@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sofar/data/song/lyrics/parser.dart';
+import 'package:sofarhangolo/data/song/lyrics/parser.dart';
 
 void main() {
   group('OpenSongParser.getFirstLine', () {

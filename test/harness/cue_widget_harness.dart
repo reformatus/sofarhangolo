@@ -6,17 +6,17 @@ import 'package:drift/drift.dart' show InsertMode, Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sofar/data/bank/bank.dart';
-import 'package:sofar/data/cue/cue.dart';
-import 'package:sofar/data/cue/slide.dart';
-import 'package:sofar/data/database.dart';
-import 'package:sofar/data/song/song.dart';
-import 'package:sofar/data/song/transpose.dart';
-import 'package:sofar/ui/cue/session/cue_session.dart';
-import 'package:sofar/ui/cue/session/session_provider.dart';
-import 'package:sofar/ui/cue/widgets/actions_drawer.dart';
-import 'package:sofar/ui/cue/widgets/slide_view.dart';
-import 'package:sofar/ui/song/state.dart';
+import 'package:sofarhangolo/data/bank/bank.dart';
+import 'package:sofarhangolo/data/cue/cue.dart';
+import 'package:sofarhangolo/data/cue/slide.dart';
+import 'package:sofarhangolo/data/database.dart';
+import 'package:sofarhangolo/data/song/song.dart';
+import 'package:sofarhangolo/data/song/transpose.dart';
+import 'package:sofarhangolo/ui/cue/session/cue_session.dart';
+import 'package:sofarhangolo/ui/cue/session/session_provider.dart';
+import 'package:sofarhangolo/ui/cue/widgets/actions_drawer.dart';
+import 'package:sofarhangolo/ui/cue/widgets/slide_view.dart';
+import 'package:sofarhangolo/ui/song/state.dart';
 
 import 'test_harness.dart';
 

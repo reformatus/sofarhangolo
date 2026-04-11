@@ -1,13 +1,13 @@
-import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
+
 import '../../config/config.dart';
+import '../../data/bank/bank.dart';
 import '../../data/database.dart';
 import '../../data/log/logger.dart';
 import '../error/app_error.dart';
 import 'from_uuid.dart';
-
-import '../../data/bank/bank.dart';
 
 Future<Set<String>> updateBanks(Dio dio) async {
   late List protoBanks;

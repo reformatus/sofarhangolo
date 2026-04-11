@@ -1,8 +1,8 @@
 import 'package:mailto/mailto.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../data/song/song.dart';
 import '../../data/bank/bank.dart';
+import '../../data/song/song.dart';
 
 extension SongReport on Bank {
   Future<bool> sendReportEmail(Song song) async {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sofar/ui/common/adaptive_page/page.dart';
+import 'package:sofarhangolo/ui/common/adaptive_page/page.dart';
 
 Future<void> pumpAdaptivePage(WidgetTester tester, Size size) async {
   tester.view.devicePixelRatio = 1;

@@ -1,10 +1,9 @@
 import 'package:uuid/uuid.dart';
 
-import '../song/transpose.dart';
-
 import '../../services/song/from_uuid.dart';
 import '../../ui/song/state.dart';
 import '../song/song.dart';
+import '../song/transpose.dart';
 import 'cue.dart';
 
 part 'slide_types/song_slide.dart';

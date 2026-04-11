@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:sofar/data/cue/cue.dart';
-import 'package:sofar/data/cue/slide.dart';
-import 'package:sofar/ui/cue/session/cue_session.dart';
+import 'package:sofarhangolo/data/cue/cue.dart';
+import 'package:sofarhangolo/data/cue/slide.dart';
+import 'package:sofarhangolo/ui/cue/session/cue_session.dart';
 
 void main() {
   group('CueSession', () {

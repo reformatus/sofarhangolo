@@ -1,5 +1,5 @@
 import 'package:drift/native.dart';
-import 'package:sofar/data/database.dart';
+import 'package:sofarhangolo/data/database.dart';
 
 /// Creates an in-memory database for testing.
 ///

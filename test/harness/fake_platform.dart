@@ -1,4 +1,4 @@
-import 'package:sofar/services/platform/platform_provider.dart';
+import 'package:sofarhangolo/services/platform/platform_provider.dart';
 
 /// Creates a [PlatformInfo] with overridable values for testing.
 ///
