@@ -81,7 +81,10 @@ TRACK_META = {
 
 
 def run_gh_api(path: str) -> object:
-    output = subprocess.check_output(["gh", "api", path], text=True)
+    output = subprocess.check_output(
+        ["gh", "api", "-H", "Accept: application/vnd.github.html+json", path],
+        text=True,
+    )
     return json.loads(output)
 
 
@@ -123,7 +126,10 @@ def build_platforms(track_id: str, release: dict) -> dict:
             {
                 "url": asset["browser_download_url"],
                 "name": label,
-                "statsLabel": f'{asset["download_count"]} letöltés',
+                "fileName": asset["name"],
+                "downloadCount": asset["download_count"],
+                "downloadCountLabel": f'{asset["download_count"]} letöltés',
+                "sizeBytes": asset["size"],
                 "sizeLabel": format_size(asset["size"]),
             }
         )
@@ -139,9 +145,13 @@ def simplify_release(release: dict) -> dict | None:
     return {
         "id": track_id,
         "title": TRACK_META[track_id]["title"],
-        "description": TRACK_META[track_id]["description"],
         "version": release["tag_name"],
-        "releaseUrl": release["html_url"],
+        "release": {
+            "title": release.get("name") or release["tag_name"],
+            "tag": release["tag_name"],
+            "descriptionHtml": release.get("body_html") or "",
+            "url": release["html_url"],
+        },
         "platforms": build_platforms(track_id, release),
     }
 
