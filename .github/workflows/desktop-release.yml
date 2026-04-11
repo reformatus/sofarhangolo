@@ -114,9 +114,6 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Install macOS CocoaPods dependencies
-        run: cd macos && pod install
-
       - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
 
@@ -269,6 +266,9 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Install macOS CocoaPods dependencies
+        run: cd macos && pod install
 
       - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
@@ -609,4 +609,4 @@ jobs:
             exit 1
           fi
 
-          gh release upload "$tag" "${files[@]}" --clobber
+          gh release upload "$tag" "${files[@]}" --clobber --repo "$GITHUB_REPOSITORY"
