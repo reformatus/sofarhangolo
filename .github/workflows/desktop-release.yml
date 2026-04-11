@@ -573,7 +573,7 @@ jobs:
     name: Fetch mobile release assets from Codemagic
     runs-on: ubuntu-latest
     needs: [release-context]
-    if: ${{ vars.CODEMAGIC_APP_ID != '' && vars.CODEMAGIC_MOBILE_WORKFLOW_ID != '' && secrets.CODEMAGIC_API_TOKEN != '' }}
+    if: ${{ vars.CODEMAGIC_APP_ID != '' && vars.CODEMAGIC_MOBILE_WORKFLOW_ID != '' }}
     outputs:
       has_mobile_assets: ${{ steps.collect-mobile-assets.outputs.has_mobile_assets }}
     steps:
@@ -586,6 +586,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          if [[ -z "${CODEMAGIC_API_TOKEN}" ]]; then
+            echo "CODEMAGIC_API_TOKEN is not configured."
+            exit 1
+          fi
 
           deadline=$(( $(date +%s) + 3600 ))
           build_json=""
