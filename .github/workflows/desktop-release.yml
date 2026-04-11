@@ -98,98 +98,98 @@ jobs:
           arch: x86_64
           verbose: true
 
-  prepare-flathub-beta-pr:
-    name: Prepare Flathub beta PR
-    runs-on: ubuntu-latest
-    needs: [release-context, build-linux]
-    if: ${{ vars.FLATHUB_REPO != '' && vars.FLATHUB_REPO_URL != '' }}
-    steps:
-      - uses: actions/checkout@v4
+  # prepare-flathub-beta-pr:
+  #   name: Prepare Flathub beta PR
+  #   runs-on: ubuntu-latest
+  #   needs: [release-context, build-linux]
+  #   if: ${{ vars.FLATHUB_REPO != '' && vars.FLATHUB_REPO_URL != '' }}
+  #   steps:
+  #     - uses: actions/checkout@v4
 
-      - id: flathub-ready
-        name: Check Flathub credentials
-        env:
-          FLATHUB_REPO_DEPLOY_KEY: ${{ secrets.FLATHUB_REPO_DEPLOY_KEY }}
-          FLATHUB_REPO_TOKEN: ${{ secrets.FLATHUB_REPO_TOKEN }}
-        shell: bash
-        run: |
-          if [[ -n "$FLATHUB_REPO_DEPLOY_KEY" && -n "$FLATHUB_REPO_TOKEN" ]]; then
-            echo "ready=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "Skipping Flathub PR prep because credentials are missing."
-          fi
+  #     - id: flathub-ready
+  #       name: Check Flathub credentials
+  #       env:
+  #         FLATHUB_REPO_DEPLOY_KEY: ${{ secrets.FLATHUB_REPO_DEPLOY_KEY }}
+  #         FLATHUB_REPO_TOKEN: ${{ secrets.FLATHUB_REPO_TOKEN }}
+  #       shell: bash
+  #       run: |
+  #         if [[ -n "$FLATHUB_REPO_DEPLOY_KEY" && -n "$FLATHUB_REPO_TOKEN" ]]; then
+  #           echo "ready=true" >> "$GITHUB_OUTPUT"
+  #         else
+  #           echo "ready=false" >> "$GITHUB_OUTPUT"
+  #           echo "Skipping Flathub PR prep because credentials are missing."
+  #         fi
 
-      - name: Render Flathub manifest
-        if: ${{ steps.flathub-ready.outputs.ready == 'true' }}
-        shell: bash
-        run: |
-          bash tool/render_flathub_manifest.sh \
-            packaging/linux/flatpak/org.lyricapp.sofar.flathub.yaml.in \
-            /tmp/org.lyricapp.sofar.yaml \
-            "${{ vars.FLATHUB_REPO_URL }}" \
-            "${{ needs.release-context.outputs.release_tag }}"
+  #     - name: Render Flathub manifest
+  #       if: ${{ steps.flathub-ready.outputs.ready == 'true' }}
+  #       shell: bash
+  #       run: |
+  #         bash tool/render_flathub_manifest.sh \
+  #           packaging/linux/flatpak/org.lyricapp.sofar.flathub.yaml.in \
+  #           /tmp/org.lyricapp.sofar.yaml \
+  #           "${{ vars.FLATHUB_REPO_URL }}" \
+  #           "${{ needs.release-context.outputs.release_tag }}"
 
-      - name: Load Flathub deploy key
-        if: ${{ steps.flathub-ready.outputs.ready == 'true' }}
-        uses: webfactory/ssh-agent@v0.9.1
-        with:
-          ssh-private-key: ${{ secrets.FLATHUB_REPO_DEPLOY_KEY }}
+  #     - name: Load Flathub deploy key
+  #       if: ${{ steps.flathub-ready.outputs.ready == 'true' }}
+  #       uses: webfactory/ssh-agent@v0.9.1
+  #       with:
+  #         ssh-private-key: ${{ secrets.FLATHUB_REPO_DEPLOY_KEY }}
 
-      - name: Trust GitHub SSH host key
-        if: ${{ steps.flathub-ready.outputs.ready == 'true' }}
-        run: |
-          mkdir -p ~/.ssh
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
+  #     - name: Trust GitHub SSH host key
+  #       if: ${{ steps.flathub-ready.outputs.ready == 'true' }}
+  #       run: |
+  #         mkdir -p ~/.ssh
+  #         ssh-keyscan github.com >> ~/.ssh/known_hosts
 
-      - name: Sync beta branch
-        if: ${{ steps.flathub-ready.outputs.ready == 'true' }}
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.FLATHUB_REPO_TOKEN }}
-        run: |
-          git clone "git@github.com:${{ vars.FLATHUB_REPO }}.git" /tmp/flathub-app
-          cd /tmp/flathub-app
+  #     - name: Sync beta branch
+  #       if: ${{ steps.flathub-ready.outputs.ready == 'true' }}
+  #       shell: bash
+  #       env:
+  #         GH_TOKEN: ${{ secrets.FLATHUB_REPO_TOKEN }}
+  #       run: |
+  #         git clone "git@github.com:${{ vars.FLATHUB_REPO }}.git" /tmp/flathub-app
+  #         cd /tmp/flathub-app
 
-          if git ls-remote --exit-code --heads origin beta >/dev/null 2>&1; then
-            git checkout -b "automation/${{ needs.release-context.outputs.release_tag }}" origin/beta
-            base_branch="beta"
-          else
-            default_branch="$(gh repo view "${{ vars.FLATHUB_REPO }}" --json defaultBranchRef --jq .defaultBranchRef.name)"
-            git checkout -b "automation/${{ needs.release-context.outputs.release_tag }}" "origin/${default_branch}"
-            base_branch="${default_branch}"
-          fi
+  #         if git ls-remote --exit-code --heads origin beta >/dev/null 2>&1; then
+  #           git checkout -b "automation/${{ needs.release-context.outputs.release_tag }}" origin/beta
+  #           base_branch="beta"
+  #         else
+  #           default_branch="$(gh repo view "${{ vars.FLATHUB_REPO }}" --json defaultBranchRef --jq .defaultBranchRef.name)"
+  #           git checkout -b "automation/${{ needs.release-context.outputs.release_tag }}" "origin/${default_branch}"
+  #           base_branch="${default_branch}"
+  #         fi
 
-          cp /tmp/org.lyricapp.sofar.yaml ./org.lyricapp.sofar.yaml
-          cp "${GITHUB_WORKSPACE}/packaging/linux/flatpak/flathub.json" ./flathub.json
+  #         cp /tmp/org.lyricapp.sofar.yaml ./org.lyricapp.sofar.yaml
+  #         cp "${GITHUB_WORKSPACE}/packaging/linux/flatpak/flathub.json" ./flathub.json
 
-          if [[ -n "$(git status --short)" ]]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add org.lyricapp.sofar.yaml flathub.json
-            git commit -m "Update beta manifest for ${{ needs.release-context.outputs.release_tag }}"
-            git push origin "HEAD:automation/${{ needs.release-context.outputs.release_tag }}" --force
+  #         if [[ -n "$(git status --short)" ]]; then
+  #           git config user.name "github-actions[bot]"
+  #           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+  #           git add org.lyricapp.sofar.yaml flathub.json
+  #           git commit -m "Update beta manifest for ${{ needs.release-context.outputs.release_tag }}"
+  #           git push origin "HEAD:automation/${{ needs.release-context.outputs.release_tag }}" --force
 
-            existing_pr="$(gh pr list \
-              --repo "${{ vars.FLATHUB_REPO }}" \
-              --base "$base_branch" \
-              --head "automation/${{ needs.release-context.outputs.release_tag }}" \
-              --json number \
-              --jq '.[0].number' || true)"
+  #           existing_pr="$(gh pr list \
+  #             --repo "${{ vars.FLATHUB_REPO }}" \
+  #             --base "$base_branch" \
+  #             --head "automation/${{ needs.release-context.outputs.release_tag }}" \
+  #             --json number \
+  #             --jq '.[0].number' || true)"
 
-            if [[ -n "$existing_pr" && "$existing_pr" != "null" ]]; then
-              echo "Flathub PR branch already exists."
-            else
-              gh pr create \
-                --repo "${{ vars.FLATHUB_REPO }}" \
-                --base "$base_branch" \
-                --head "automation/${{ needs.release-context.outputs.release_tag }}" \
-                --title "Update org.lyricapp.sofar for ${{ needs.release-context.outputs.release_tag }}" \
-                --body "Automated beta manifest refresh for ${{ needs.release-context.outputs.release_tag }}."
-            fi
-          else
-            echo "Flathub beta PR content already up to date."
-          fi
+  #           if [[ -n "$existing_pr" && "$existing_pr" != "null" ]]; then
+  #             echo "Flathub PR branch already exists."
+  #           else
+  #             gh pr create \
+  #               --repo "${{ vars.FLATHUB_REPO }}" \
+  #               --base "$base_branch" \
+  #               --head "automation/${{ needs.release-context.outputs.release_tag }}" \
+  #               --title "Update org.lyricapp.sofar for ${{ needs.release-context.outputs.release_tag }}" \
+  #               --body "Automated beta manifest refresh for ${{ needs.release-context.outputs.release_tag }}."
+  #           fi
+  #         else
+  #           echo "Flathub beta PR content already up to date."
+  #         fi
 
   build-windows:
     name: Build Windows installer and Store package
