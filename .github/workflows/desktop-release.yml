@@ -319,6 +319,8 @@ jobs:
     name: Build macOS DMG and App Store package
     runs-on: macos-latest
     needs: [release-context, verify]
+    outputs:
+      app_store_ready: ${{ steps.app-store-ready.outputs.ready }}
     steps:
       - uses: actions/checkout@v4
 
@@ -592,7 +594,7 @@ jobs:
           path: dist/macos
 
       - uses: actions/download-artifact@v4
-        if: ${{ needs.build-macos.result == 'success' }}
+        if: ${{ needs.build-macos.result == 'success' && needs.build-macos.outputs.app_store_ready == 'true' }}
         with:
           name: macos-app-store-package
           path: dist/macos-app-store
