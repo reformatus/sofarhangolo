@@ -370,8 +370,53 @@ jobs:
       - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
 
+      - name: Refresh Flutter macOS build environment
+        shell: bash
+        run: |
+          mkdir -p macos/Flutter/ephemeral
+          cat > macos/Flutter/ephemeral/Flutter-Generated.xcconfig <<EOF
+          FLUTTER_ROOT=${FLUTTER_ROOT}
+          FLUTTER_APPLICATION_PATH=${GITHUB_WORKSPACE}
+          COCOAPODS_PARALLEL_CODE_SIGN=true
+          FLUTTER_BUILD_DIR=build
+          FLUTTER_BUILD_NAME=${{ needs.release-context.outputs.build_name }}
+          FLUTTER_BUILD_NUMBER=${{ needs.release-context.outputs.build_number }}
+          DART_OBFUSCATION=false
+          TRACK_WIDGET_CREATION=true
+          TREE_SHAKE_ICONS=false
+          PACKAGE_CONFIG=.dart_tool/package_config.json
+          EOF
+          cat > macos/Flutter/ephemeral/flutter_export_environment.sh <<EOF
+          #!/bin/sh
+          export "FLUTTER_ROOT=${FLUTTER_ROOT}"
+          export "FLUTTER_APPLICATION_PATH=${GITHUB_WORKSPACE}"
+          export "COCOAPODS_PARALLEL_CODE_SIGN=true"
+          export "FLUTTER_BUILD_DIR=build"
+          export "FLUTTER_BUILD_NAME=${{ needs.release-context.outputs.build_name }}"
+          export "FLUTTER_BUILD_NUMBER=${{ needs.release-context.outputs.build_number }}"
+          export "DART_OBFUSCATION=false"
+          export "TRACK_WIDGET_CREATION=true"
+          export "TREE_SHAKE_ICONS=false"
+          export "PACKAGE_CONFIG=.dart_tool/package_config.json"
+          EOF
+          chmod +x macos/Flutter/ephemeral/flutter_export_environment.sh
+
       - name: Build unsigned macOS app
-        run: flutter build macos --release
+        shell: bash
+        run: |
+          xcodebuild \
+            -workspace macos/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -derivedDataPath build/macos/derived_data \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+          mkdir -p build/macos/Build/Products
+          rm -rf build/macos/Build/Products/Release
+          cp -R build/macos/derived_data/Build/Products/Release build/macos/Build/Products/Release
 
       - name: Import Developer ID certificate
         if: ${{ steps.developer-id-ready.outputs.ready == 'true' }}
