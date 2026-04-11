@@ -569,10 +569,101 @@ jobs:
           PKG_PATH="$(find "$RUNNER_TEMP/app-store" -maxdepth 1 -name '*.pkg' -print -quit)"
           xcrun altool --upload-app --file "$PKG_PATH" --type osx --apiKey "$APP_STORE_API_KEY_ID" --apiIssuer "$APP_STORE_API_ISSUER_ID"
 
+  fetch-mobile-release-assets:
+    name: Fetch mobile release assets from Codemagic
+    runs-on: ubuntu-latest
+    needs: [release-context]
+    if: ${{ vars.CODEMAGIC_APP_ID != '' && vars.CODEMAGIC_MOBILE_WORKFLOW_ID != '' && secrets.CODEMAGIC_API_TOKEN != '' }}
+    outputs:
+      has_mobile_assets: ${{ steps.collect-mobile-assets.outputs.has_mobile_assets }}
+    steps:
+      - name: Wait for Codemagic mobile build
+        env:
+          CODEMAGIC_API_TOKEN: ${{ secrets.CODEMAGIC_API_TOKEN }}
+          CODEMAGIC_APP_ID: ${{ vars.CODEMAGIC_APP_ID }}
+          CODEMAGIC_MOBILE_WORKFLOW_ID: ${{ vars.CODEMAGIC_MOBILE_WORKFLOW_ID }}
+          RELEASE_TAG: ${{ needs.release-context.outputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          deadline=$(( $(date +%s) + 3600 ))
+          build_json=""
+
+          while [[ $(date +%s) -lt $deadline ]]; do
+            builds_json="$(curl -fsSL \
+              -H "x-auth-token: ${CODEMAGIC_API_TOKEN}" \
+              --get \
+              --data-urlencode "appId=${CODEMAGIC_APP_ID}" \
+              --data-urlencode "workflowId=${CODEMAGIC_MOBILE_WORKFLOW_ID}" \
+              --data-urlencode "tag=${RELEASE_TAG}" \
+              --data-urlencode "limit=20" \
+              "https://api.codemagic.io/builds")"
+
+            candidate_json="$(python -c 'import json,sys; data=json.loads(sys.argv[1]); builds=data.get("builds", []); print(json.dumps({"build": builds[0]}) if builds else "")' "$builds_json")"
+
+            if [[ -z "$candidate_json" ]]; then
+              sleep 20
+              continue
+            fi
+
+            candidate_status="$(python -c 'import json,sys; build=json.loads(sys.argv[1]).get("build", {}); print(build.get("status", ""))' "$candidate_json")"
+
+            if [[ "$candidate_status" == "finished" ]]; then
+              build_json="$candidate_json"
+              break
+            fi
+
+            sleep 20
+          done
+
+          if [[ -z "$build_json" ]]; then
+            echo "Timed out waiting for Codemagic build for tag ${RELEASE_TAG}."
+            exit 1
+          fi
+
+          printf '%s' "$build_json" > build.json
+
+      - name: Download APK and IPA artifacts
+        id: collect-mobile-assets
+        env:
+          CODEMAGIC_API_TOKEN: ${{ secrets.CODEMAGIC_API_TOKEN }}
+          RELEASE_TAG: ${{ needs.release-context.outputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/mobile
+
+          python -c 'import json; from pathlib import Path; build=json.loads(Path("build.json").read_text())["build"]; artifacts=build.get("artefacts", []); targets=[]; [targets.append((artifact["url"], f"dist/mobile/sofar-dalapp_{build[\"tag\"]}.apk")) for artifact in artifacts if artifact.get("type")=="apk"]; [targets.append((artifact["url"], f"dist/mobile/sofar-dalapp_{build[\"tag\"]}.ipa")) for artifact in artifacts if artifact.get("type")=="ipa"]; Path("artifact_urls.txt").write_text("".join(f"{url}\\t{dest}\\n" for url, dest in targets))'
+
+          if [[ ! -s artifact_urls.txt ]]; then
+            echo "No APK or IPA artifacts found in Codemagic build."
+            echo "has_mobile_assets=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          while IFS=$'\t' read -r url destination; do
+            [[ -n "$url" ]] || continue
+            curl -fsSL \
+              -H "x-auth-token: ${CODEMAGIC_API_TOKEN}" \
+              "$url" \
+              -o "$destination"
+          done < artifact_urls.txt
+
+          echo "has_mobile_assets=true" >> "$GITHUB_OUTPUT"
+
+      - name: Upload mobile release assets
+        if: ${{ steps.collect-mobile-assets.outputs.has_mobile_assets == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-release-assets
+          path: dist/mobile/*
+          if-no-files-found: error
+
   upload-release-assets:
     name: Upload assets to GitHub release
     runs-on: ubuntu-latest
-    needs: [release-context, build-linux, build-windows, build-macos]
+    needs: [release-context, build-linux, build-windows, build-macos, fetch-mobile-release-assets]
     if: ${{ always() && needs.release-context.result == 'success' }}
     steps:
       - uses: actions/download-artifact@v4
@@ -598,6 +689,12 @@ jobs:
         with:
           name: macos-app-store-package
           path: dist/macos-app-store
+
+      - uses: actions/download-artifact@v4
+        if: ${{ needs.fetch-mobile-release-assets.result == 'success' && needs.fetch-mobile-release-assets.outputs.has_mobile_assets == 'true' }}
+        with:
+          name: mobile-release-assets
+          path: dist/mobile
 
       - name: Upload installers to the release
         env:
