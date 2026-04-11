@@ -97,10 +97,6 @@ jobs:
             ninja-build \
             pkg-config
 
-      - name: Add Flathub remote
-        run: |
-          flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-
       - name: Stamp AppStream release metadata
         shell: bash
         run: |
@@ -374,24 +370,8 @@ jobs:
       - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Prepare macOS project for release build
-        run: flutter build macos --release --config-only
-
       - name: Build unsigned macOS app
-        shell: bash
-        run: |
-          xcodebuild \
-            -workspace macos/Runner.xcworkspace \
-            -scheme Runner \
-            -configuration Release \
-            -derivedDataPath build/macos/derived_data \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" \
-            build
-          mkdir -p build/macos/Build/Products
-          rm -rf build/macos/Build/Products/Release
-          cp -R build/macos/derived_data/Build/Products/Release build/macos/Build/Products/Release
+        run: flutter build macos --release
 
       - name: Import Developer ID certificate
         if: ${{ steps.developer-id-ready.outputs.ready == 'true' }}
@@ -490,7 +470,6 @@ jobs:
       - name: Archive macOS App Store build
         if: ${{ steps.app-store-ready.outputs.ready == 'true' }}
         run: |
-          flutter build macos --release --config-only
           bash tool/render_macos_appstore_export_options.sh \
             "$RUNNER_TEMP/exportOptions.plist" \
             "${{ vars.MACOS_APPLE_TEAM_ID }}" \
