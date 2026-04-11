@@ -97,6 +97,9 @@ jobs:
             ninja-build \
             pkg-config
 
+      - name: Configure Flathub remote
+        run: sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+
       - name: Stamp AppStream release metadata
         shell: bash
         run: |
@@ -110,6 +113,9 @@ jobs:
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Install macOS CocoaPods dependencies
+        run: cd macos && pod install
 
       - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
@@ -391,6 +397,8 @@ jobs:
           TREE_SHAKE_ICONS=false
           PACKAGE_CONFIG=.dart_tool/package_config.json
           EOF
+          : > macos/Flutter/ephemeral/FlutterInputs.xcfilelist
+          : > macos/Flutter/ephemeral/FlutterOutputs.xcfilelist
           cat > macos/Flutter/ephemeral/flutter_export_environment.sh <<EOF
           #!/bin/sh
           export "FLUTTER_ROOT=${FLUTTER_ROOT}"
