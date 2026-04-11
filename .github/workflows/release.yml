@@ -23,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_tag: ${{ steps.meta.outputs.release_tag }}
+      release_ref: ${{ steps.meta.outputs.release_ref }}
       build_name: ${{ steps.meta.outputs.build_name }}
       build_number: ${{ steps.meta.outputs.build_number }}
       release_date: ${{ steps.meta.outputs.release_date }}
@@ -30,6 +31,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
           fetch-depth: 0
           fetch-tags: true
 
@@ -45,6 +47,7 @@ jobs:
           fi
 
           git rev-parse "refs/tags/${release_tag}" >/dev/null
+          release_ref="refs/tags/${release_tag}"
 
           version_line="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
           build_name="${version_line%%+*}"
@@ -58,6 +61,7 @@ jobs:
 
           {
             echo "release_tag=$release_tag"
+            echo "release_ref=$release_ref"
             echo "build_name=$build_name"
             echo "build_number=$build_number"
             echo "release_date=$release_date"
@@ -91,6 +95,8 @@ jobs:
     needs: release-context
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-context.outputs.release_ref }}
 
       - name: Install validation dependencies
         run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
@@ -119,6 +125,8 @@ jobs:
     needs: [release-context, verify]
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-context.outputs.release_ref }}
 
       - name: Install Linux build dependencies
         run: |
@@ -188,6 +196,8 @@ jobs:
       APP_VERSION: ${{ needs.release-context.outputs.build_name }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-context.outputs.release_ref }}
 
       - id: windows-store-ready
         name: Check Microsoft Store credentials
@@ -268,6 +278,8 @@ jobs:
       app_store_ready: ${{ steps.app-store-ready.outputs.ready }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-context.outputs.release_ref }}
 
       - id: developer-id-ready
         name: Check direct-distribution signing credentials
@@ -520,6 +532,8 @@ jobs:
     needs: [release-context, verify]
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-context.outputs.release_ref }}
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -549,113 +563,10 @@ jobs:
           path: build/web
           if-no-files-found: error
 
-  fetch-mobile-release-assets:
-    name: Fetch mobile release assets from Codemagic
-    runs-on: ubuntu-latest
-    needs: release-context
-    if: ${{ vars.CODEMAGIC_APP_ID != '' && vars.CODEMAGIC_MOBILE_WORKFLOW_ID != '' }}
-    outputs:
-      has_mobile_assets: ${{ steps.collect-mobile-assets.outputs.has_mobile_assets }}
-    steps:
-      - name: Wait for Codemagic mobile build
-        env:
-          CODEMAGIC_API_TOKEN: ${{ secrets.CODEMAGIC_API_TOKEN }}
-          CODEMAGIC_APP_ID: ${{ vars.CODEMAGIC_APP_ID }}
-          CODEMAGIC_MOBILE_WORKFLOW_ID: ${{ vars.CODEMAGIC_MOBILE_WORKFLOW_ID }}
-          RELEASE_TAG: ${{ needs.release-context.outputs.release_tag }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [[ -z "${CODEMAGIC_API_TOKEN}" ]]; then
-            echo "CODEMAGIC_API_TOKEN is not configured."
-            printf '%s' '{"build":{"artefacts":[]}}' > build.json
-            exit 0
-          fi
-
-          deadline=$(( $(date +%s) + 3600 ))
-          build_json=""
-
-          while [[ $(date +%s) -lt $deadline ]]; do
-            builds_json="$(curl -fsSL \
-              -H "x-auth-token: ${CODEMAGIC_API_TOKEN}" \
-              --get \
-              --data-urlencode "appId=${CODEMAGIC_APP_ID}" \
-              --data-urlencode "workflowId=${CODEMAGIC_MOBILE_WORKFLOW_ID}" \
-              --data-urlencode "tag=${RELEASE_TAG}" \
-              --data-urlencode "limit=20" \
-              "https://api.codemagic.io/builds")"
-
-            candidate_json="$(python -c 'import json,sys; data=json.loads(sys.argv[1]); builds=data.get("builds", []); print(json.dumps({"build": builds[0]}) if builds else "")' "$builds_json")"
-
-            if [[ -z "$candidate_json" ]]; then
-              sleep 20
-              continue
-            fi
-
-            candidate_status="$(python -c 'import json,sys; build=json.loads(sys.argv[1]).get("build", {}); print(build.get("status", ""))' "$candidate_json")"
-
-            if [[ "$candidate_status" == "finished" ]]; then
-              build_json="$candidate_json"
-              break
-            fi
-
-            sleep 20
-          done
-
-          if [[ -z "$build_json" ]]; then
-            echo "Timed out waiting for Codemagic build for tag ${RELEASE_TAG}."
-            exit 1
-          fi
-
-          printf '%s' "$build_json" > build.json
-
-      - name: Download APK and IPA artifacts
-        id: collect-mobile-assets
-        env:
-          CODEMAGIC_API_TOKEN: ${{ secrets.CODEMAGIC_API_TOKEN }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p dist/mobile
-
-          python -c 'import json; from pathlib import Path; build=json.loads(Path("build.json").read_text())["build"]; artifacts=build.get("artefacts", []); targets=[]; [targets.append((artifact["url"], f"dist/mobile/sofar-dalapp_{build[\"tag\"]}.apk")) for artifact in artifacts if artifact.get("type")=="apk"]; [targets.append((artifact["url"], f"dist/mobile/sofar-dalapp_{build[\"tag\"]}.ipa")) for artifact in artifacts if artifact.get("type")=="ipa"]; Path("artifact_urls.txt").write_text("".join(f"{url}\\t{dest}\\n" for url, dest in targets))'
-
-          if [[ ! -s artifact_urls.txt ]]; then
-            echo "No APK or IPA artifacts found in Codemagic build."
-            echo "has_mobile_assets=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          while IFS=$'\t' read -r url destination; do
-            [[ -n "$url" ]] || continue
-            curl -fsSL \
-              -H "x-auth-token: ${CODEMAGIC_API_TOKEN}" \
-              "$url" \
-              -o "$destination"
-          done < artifact_urls.txt
-
-          echo "has_mobile_assets=true" >> "$GITHUB_OUTPUT"
-
-      - name: Upload mobile release assets
-        if: ${{ steps.collect-mobile-assets.outputs.has_mobile_assets == 'true' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: mobile-release-assets
-          path: dist/mobile/*
-          if-no-files-found: error
-
   upload-release-assets:
     name: Upload assets to GitHub release
     runs-on: ubuntu-latest
-    needs:
-      [
-        release-context,
-        build-linux-release,
-        build-windows-release,
-        build-macos-release,
-        fetch-mobile-release-assets,
-      ]
+    needs: [release-context, build-linux-release, build-windows-release, build-macos-release]
     if: ${{ always() && needs.release-context.result == 'success' }}
     steps:
       - uses: actions/download-artifact@v4
@@ -682,12 +593,6 @@ jobs:
           name: macos-app-store-package
           path: dist/macos-app-store
 
-      - uses: actions/download-artifact@v4
-        if: ${{ needs.fetch-mobile-release-assets.result == 'success' && needs.fetch-mobile-release-assets.outputs.has_mobile_assets == 'true' }}
-        with:
-          name: mobile-release-assets
-          path: dist/mobile
-
       - name: Upload installers to the release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -708,12 +613,34 @@ jobs:
     name: Deploy web to app.sofarkotta.hu
     runs-on: ubuntu-latest
     needs: [release-context, build-web-release]
-    if: ${{ needs.build-web-release.result == 'success' }}
+    if: ${{ needs.build-web-release.result == 'success' && needs.release-context.outputs.prerelease != 'true' }}
     env:
       TARGET_REPO: reformatus/app.sofarkotta.hu
       TARGET_BRANCH: main
       TARGET_DIR: docs/web
     steps:
+      - id: release-web-ready
+        name: Check release deploy eligibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release-context.outputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          release_json="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease 2>/dev/null || true)"
+          if [[ -z "$release_json" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          is_prerelease="$(jq -r '.isPrerelease' <<<"$release_json")"
+          if [[ "$is_prerelease" == "true" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - id: deploy-key-ready
         name: Check deploy key
         env:
@@ -726,26 +653,26 @@ jobs:
           fi
 
       - name: Download web bundle
-        if: ${{ steps.deploy-key-ready.outputs.ready == 'true' }}
+        if: ${{ steps.release-web-ready.outputs.ready == 'true' && steps.deploy-key-ready.outputs.ready == 'true' }}
         uses: actions/download-artifact@v4
         with:
           name: web-release-build
           path: ${{ runner.temp }}/web-build
 
       - name: Load deploy key
-        if: ${{ steps.deploy-key-ready.outputs.ready == 'true' }}
+        if: ${{ steps.release-web-ready.outputs.ready == 'true' && steps.deploy-key-ready.outputs.ready == 'true' }}
         uses: webfactory/ssh-agent@v0.9.1
         with:
           ssh-private-key: ${{ secrets.APP_SOFARKOTTA_HU_DEPLOY_KEY }}
 
       - name: Trust GitHub SSH host key
-        if: ${{ steps.deploy-key-ready.outputs.ready == 'true' }}
+        if: ${{ steps.release-web-ready.outputs.ready == 'true' && steps.deploy-key-ready.outputs.ready == 'true' }}
         run: |
           mkdir -p ~/.ssh
           ssh-keyscan github.com >> ~/.ssh/known_hosts
 
       - name: Clone target Pages repository
-        if: ${{ steps.deploy-key-ready.outputs.ready == 'true' }}
+        if: ${{ steps.release-web-ready.outputs.ready == 'true' && steps.deploy-key-ready.outputs.ready == 'true' }}
         run: |
           git clone \
             --branch "$TARGET_BRANCH" \
@@ -753,7 +680,7 @@ jobs:
             "${RUNNER_TEMP}/pages-repo"
 
       - name: Sync web bundle into Pages repository
-        if: ${{ steps.deploy-key-ready.outputs.ready == 'true' }}
+        if: ${{ steps.release-web-ready.outputs.ready == 'true' && steps.deploy-key-ready.outputs.ready == 'true' }}
         run: |
           mkdir -p "${RUNNER_TEMP}/pages-repo/${TARGET_DIR}"
           rsync -a --delete \
@@ -761,7 +688,7 @@ jobs:
             "${RUNNER_TEMP}/pages-repo/${TARGET_DIR}/"
 
       - name: Commit deployment if needed
-        if: ${{ steps.deploy-key-ready.outputs.ready == 'true' }}
+        if: ${{ steps.release-web-ready.outputs.ready == 'true' && steps.deploy-key-ready.outputs.ready == 'true' }}
         working-directory: ${{ runner.temp }}/pages-repo
         run: |
           if [ -z "$(git status --short -- "${TARGET_DIR}")" ]; then

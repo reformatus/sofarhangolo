@@ -10,7 +10,8 @@ This repository now contains GitHub Actions based release automation for:
 
 ## Workflow entrypoint
 
-Use `.github/workflows/release.yml`.
+Use `.github/workflows/release.yml` for desktop and web release work.
+Use `.github/workflows/release-mobile-assets.yml` for mobile sidecar artifact pickup from Codemagic.
 
 Primary trigger:
 
