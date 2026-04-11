@@ -100,6 +100,23 @@
         splash?.remove();
       }, 240);
     });
+
+    window.sofarFetchGithubReleases = async function (repoPath) {
+      const response = await fetch(
+        `https://api.github.com/repos/${repoPath}/releases?per_page=20`,
+        {
+          headers: {
+            Accept: "application/vnd.github+json",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(`GitHub API hiba: ${response.status}`);
+      }
+
+      return JSON.stringify(await response.json());
+    };
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
