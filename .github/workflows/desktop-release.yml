@@ -98,7 +98,7 @@ jobs:
             pkg-config
 
       - name: Configure Flathub remote
-        run: sudo flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+        run: flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
       - name: Stamp AppStream release metadata
         shell: bash
@@ -125,6 +125,7 @@ jobs:
         run: |
           flatpak-builder \
             --force-clean \
+            --user \
             --install-deps-from=flathub \
             --repo=repo \
             build/flatpak-app \
@@ -376,7 +377,7 @@ jobs:
         run: flutter pub get
 
       - name: Install macOS CocoaPods dependencies
-        run: cd macos && pod install
+        run: cd macos && pod update sqlite3 --repo-update
 
       - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
