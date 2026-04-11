@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -7,7 +6,6 @@ import 'parts/banks/bank_chooser.dart';
 import 'parts/new_version_widget.dart';
 import 'parts/preferences/dialog.dart';
 import 'parts/promo/buttons_section.dart';
-import 'parts/promo/app_download_section.dart';
 import 'parts/promo/news_carousel.dart';
 
 class HomePage extends ConsumerStatefulWidget {
@@ -53,7 +51,6 @@ class _HomePageState extends ConsumerState<HomePage> {
                       children: [
                         NewVersionWidget(),
                         NewsCarousel(),
-                        if (kIsWeb) AppDownloadSection(),
                         ButtonsSection(),
                       ],
                     ),

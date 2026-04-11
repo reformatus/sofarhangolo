@@ -100,23 +100,6 @@
         splash?.remove();
       }, 240);
     });
-
-    window.sofarFetchReleaseSummaryJson = async function (url) {
-      const response = await fetch(
-        url,
-        {
-          headers: {
-            Accept: "application/json",
-          },
-        },
-      );
-
-      if (!response.ok) {
-        throw new Error(`Release summary hiba: ${response.status}`);
-      }
-
-      return JSON.stringify(await response.json());
-    };
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
