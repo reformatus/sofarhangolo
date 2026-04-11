@@ -1,22 +1,24 @@
-# Desktop release automation
+# Release automation
 
-This repository now contains GitHub Actions based desktop release automation for:
+This repository now contains GitHub Actions based release automation for:
 
 - Windows native installer (`.exe`) plus Microsoft Store submission package (`.msix`)
 - macOS native installer (`.dmg`) plus App Store Connect/TestFlight upload path (`.pkg`)
-- Linux Flatpak bundle (`.flatpak`) plus Flathub sync hooks for the beta branch
+- Linux Flatpak bundle (`.flatpak`)
+- mobile sidecar artifact pickup from Codemagic (`.apk`, `.ipa`) when available
+- web build plus deployment to `app.sofarkotta.hu`
 
 ## Workflow entrypoint
 
-Use `.github/workflows/desktop-release.yml`.
+Use `.github/workflows/release.yml`.
 
 Primary trigger:
 
-- GitHub Release `published` or `prereleased`
+- Git tag push
 
 Manual trigger:
 
-- `workflow_dispatch` with an existing release tag
+- `workflow_dispatch` with an existing tag
 
 Detailed setup instructions live in `docs/desktop-release-setup.md`.
 Repository secret and variable bootstrapping can be done with `tool/configure_desktop_release_github.sh.template`.
@@ -65,22 +67,19 @@ Repository secrets:
 - `MACOS_APP_STORE_API_ISSUER_ID`
 - `MACOS_APP_STORE_API_KEY_BASE64`
 
-### Flathub beta sync
+### Mobile sidecar pickup
 
 Repository variables:
 
-- `FLATHUB_REPO`
-- `FLATHUB_REPO_URL`
+- `CODEMAGIC_APP_ID`
+- `CODEMAGIC_MOBILE_WORKFLOW_ID`
 
 Repository secrets:
 
-- `FLATHUB_REPO_DEPLOY_KEY`
-- `FLATHUB_REPO_TOKEN`
-
-`FLATHUB_REPO` should point at the dedicated Flathub app repository once the submission has been accepted, for example `flathub/org.lyricapp.sofar`. The token must be able to open pull requests in that repository.
+- `CODEMAGIC_API_TOKEN`
 
 ## Store-specific notes
 
 - Windows beta publishing uses Microsoft Store flights via the Microsoft Store Developer CLI.
 - macOS beta publishing uploads the exported App Store package to App Store Connect. Processing and tester distribution remain controlled in App Store Connect.
-- Flathub beta publishing is branch-based. The workflow sync step pushes release metadata into the `beta` branch of the Flathub app repository when that repository and deploy key exist.
+- Mobile release assets are built in Codemagic and attached by GitHub Actions after the matching tagged mobile build finishes.
