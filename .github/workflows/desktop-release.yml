@@ -117,14 +117,19 @@ jobs:
       - name: Build Linux app bundle
         run: flutter build linux --release --verbose
 
-      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
-        with:
-          bundle: sofar-hangolo-${{ needs.release-context.outputs.build_name }}-linux-x86_64.flatpak
-          manifest-path: packaging/linux/flatpak/org.lyricapp.sofar.yaml
-          cache-key: flatpak-builder-${{ github.sha }}
-          arch: x86_64
-          verbose: true
-          upload-artifact: false
+      - name: Package Flatpak bundle
+        shell: bash
+        run: |
+          flatpak-builder \
+            --force-clean \
+            --install-deps-from=flathub \
+            --repo=repo \
+            build/flatpak-app \
+            packaging/linux/flatpak/org.lyricapp.sofar.yaml
+          flatpak build-bundle \
+            repo \
+            "sofar-hangolo-${{ needs.release-context.outputs.build_name }}-linux-x86_64.flatpak" \
+            org.lyricapp.sofar
 
       - name: Upload Linux release assets
         uses: actions/upload-artifact@v4
