@@ -3,7 +3,7 @@ description: "Minden kotta, mindig veled"
 
 publish_to: 'none'
 
-version: 1.1.1+111
+version: 1.1.2+112
 
 environment:
   sdk: '>=3.11.4 <4.0.0'
@@ -13,7 +13,7 @@ msix_config:
     # 1.2.3 - Semantic version
     # [major+10].[minor].[patch].0
     # 11.2.3.0 - MSIX version
-  msix_version: 11.1.1.0
+  msix_version: 11.1.2.0
   display_name: Sófár Hangoló
   identity_name: RefLabs.SfrHangolo
   publisher_display_name: RefLabs
