@@ -9,8 +9,6 @@ import '../../data/log/provider.dart';
 import '../../services/app_links/app_links.dart';
 import '../../services/app_version/check_new_version.dart';
 import '../../services/connectivity/provider.dart';
-import '../../services/app_links/navigation.dart';
-import '../cue/cue_page_type.dart';
 import '../cue/session/session_provider.dart';
 import 'cue_shell_inset.dart';
 import 'widgets/active_cue_shell_card.dart';
@@ -69,7 +67,7 @@ class BaseScaffold extends ConsumerStatefulWidget {
 
 class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
   final _contentScaffoldKey = GlobalKey<ScaffoldState>();
-  bool _desktopCueListVisible = true;
+  bool _desktopCueListVisible = false;
   bool _tabletCueDrawerVisible = false;
   _ShellNavigationSizeClass? _activeNavigationSizeClass;
   _ShellNavigationSizeClass? _scheduledNavigationSizeClass;
@@ -197,11 +195,10 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
         // TODO move this to global; take this into account on song page as well?
         bool showBottomNavBar =
             constraints.maxHeight / constraints.maxWidth > 1.41;
-        final supportsCueOverlay = _supportsCueOverlayForPath(currentPath);
-        final showCueOverlay =
-            showBottomNavBar && supportsCueOverlay && activeCueSession != null;
-        final showSidebarCueControls =
-            !showBottomNavBar && supportsCueOverlay && activeCueSession != null;
+        final hasActiveCueSession =
+            activeCueSession != null && !_isCueEditPath(currentPath);
+        final showCueOverlay = showBottomNavBar && hasActiveCueSession;
+        final showSidebarCueControls = !showBottomNavBar && hasActiveCueSession;
         final usesCueDrawer = showSidebarCueControls && !isDesktop;
         final sidebarCueSession = showSidebarCueControls
             ? activeCueSession
@@ -217,7 +214,7 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
         const cueOverlayInset = 0.0;
         final cueOverlayAnimationDuration = accessibleNavigation
             ? Duration.zero
-            : Durations.medium2;
+            : Durations.medium4;
         final showDesktopCueSidebar = showSidebarCueControls && isDesktop;
         final cueAwareChild = CueShellInset(
           bottomInset: cueOverlayInset,
@@ -293,38 +290,94 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
                                             ),
                                           ),
                                         ),
-                                        if (showSidebarCueControls)
-                                          Padding(
-                                            padding: EdgeInsets.fromLTRB(
-                                              8,
-                                              8,
-                                              sidebarCueListVisible ? 0 : 8,
-                                              8,
-                                            ),
-                                            child: ActiveCueSidebarIndicator(
-                                              session: sidebarCueSession!,
-                                              extendedRail: extendedNavRail,
-                                              listVisible:
-                                                  sidebarCueListVisible,
-                                              onToggleList: () {
-                                                if (isDesktop) {
-                                                  toggleDesktopCueList();
-                                                } else if (usesCueDrawer) {
-                                                  if (_tabletCueDrawerVisible) {
-                                                    Navigator.of(
-                                                      context,
-                                                    ).maybePop();
-                                                  } else {
-                                                    _contentScaffoldKey
-                                                        .currentState
-                                                        ?.openDrawer();
-                                                  }
+                                        AnimatedSwitcher(
+                                          duration: cueOverlayAnimationDuration,
+                                          reverseDuration:
+                                              cueOverlayAnimationDuration,
+                                          switchInCurve:
+                                              Curves.easeInOutCubicEmphasized,
+                                          switchOutCurve: Curves
+                                              .easeInOutCubicEmphasized
+                                              .flipped,
+                                          layoutBuilder:
+                                              (currentChild, previousChildren) {
+                                                final children = <Widget>[
+                                                  ...previousChildren,
+                                                ];
+                                                if (currentChild != null) {
+                                                  children.add(currentChild);
                                                 }
+                                                return Stack(
+                                                  alignment:
+                                                      Alignment.centerRight,
+                                                  children: children,
+                                                );
                                               },
-                                              attachedColor:
-                                                  cueIndicatorAttachedColor,
-                                            ),
-                                          ),
+                                          transitionBuilder:
+                                              (child, animation) {
+                                                final offsetAnimation =
+                                                    Tween<Offset>(
+                                                      begin: const Offset(
+                                                        -0.45,
+                                                        0,
+                                                      ),
+                                                      end: Offset.zero,
+                                                    ).animate(animation);
+
+                                                return FadeTransition(
+                                                  opacity: animation,
+                                                  child: ClipRect(
+                                                    child: SlideTransition(
+                                                      position: offsetAnimation,
+                                                      child: child,
+                                                    ),
+                                                  ),
+                                                );
+                                              },
+                                          child: showSidebarCueControls
+                                              ? Padding(
+                                                  key: ValueKey(
+                                                    'cue-sidebar-indicator-${sidebarCueSession!.cue.uuid}',
+                                                  ),
+                                                  padding: EdgeInsets.fromLTRB(
+                                                    8,
+                                                    8,
+                                                    sidebarCueListVisible
+                                                        ? 0
+                                                        : 8,
+                                                    8,
+                                                  ),
+                                                  child: ActiveCueSidebarIndicator(
+                                                    session: sidebarCueSession,
+                                                    extendedRail:
+                                                        extendedNavRail,
+                                                    listVisible:
+                                                        sidebarCueListVisible,
+                                                    onToggleList: () {
+                                                      if (isDesktop) {
+                                                        toggleDesktopCueList();
+                                                      } else if (usesCueDrawer) {
+                                                        if (_tabletCueDrawerVisible) {
+                                                          _contentScaffoldKey
+                                                              .currentState
+                                                              ?.closeDrawer();
+                                                        } else {
+                                                          _contentScaffoldKey
+                                                              .currentState
+                                                              ?.openDrawer();
+                                                        }
+                                                      }
+                                                    },
+                                                    attachedColor:
+                                                        cueIndicatorAttachedColor,
+                                                  ),
+                                                )
+                                              : const SizedBox.shrink(
+                                                  key: ValueKey(
+                                                    'cue-sidebar-indicator-empty',
+                                                  ),
+                                                ),
+                                        ),
                                         Spacer(),
                                         if (connection ==
                                             ConnectionType.offline)
@@ -450,6 +503,7 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
                                       child: CueShellPanel(
                                         session: sidebarCueSession!,
                                         currentPath: currentPath,
+                                        listVisible: _desktopCueListVisible,
                                       ),
                                     ),
                                   ),
@@ -480,11 +534,8 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
                                             child: CueShellPanel(
                                               session: sidebarCueSession!,
                                               currentPath: currentPath,
-                                              onAfterSlideSelected: () {
-                                                Navigator.of(
-                                                  context,
-                                                ).maybePop();
-                                              },
+                                              listVisible:
+                                                  _tabletCueDrawerVisible,
                                             ),
                                           ),
                                         )
@@ -581,20 +632,6 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
     );
   }
 
-  bool _supportsCueOverlayForPath(String path) {
-    return path.startsWith('/bank') || path.startsWith('/song/');
-  }
-
-  void _openCueEditor(BuildContext context, {required String cueUuid}) {
-    GoRouter.of(context).go(
-      cueRoutePath(
-        cueUuid,
-        CuePageType.edit,
-        slideUuid: ref.read(currentSlideUuidProvider),
-      ),
-    );
-  }
-
   void _onDestinationSelected(int index, BuildContext context) {
     switch (index) {
       case 0:
@@ -606,5 +643,12 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
       default:
         return;
     }
+  }
+
+  bool _isCueEditPath(String path) {
+    final segments = Uri.parse(path).pathSegments;
+    return segments.length >= 3 &&
+        segments[0] == 'cue' &&
+        segments[2] == 'edit';
   }
 }

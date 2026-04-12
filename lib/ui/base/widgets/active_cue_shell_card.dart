@@ -14,6 +14,7 @@ import '../../../services/ui/messenger_service.dart';
 import '../../cue/cue_page_type.dart';
 import '../../cue/session/cue_session.dart';
 import '../../cue/session/session_provider.dart';
+import '../../cue/widgets/slide_navigation_controls.dart';
 import '../../cue/widgets/slide_list.dart';
 import '../../song/state.dart';
 import '../../song/transpose/state.dart';
@@ -83,8 +84,13 @@ class ActiveCueShellCard extends StatelessWidget {
                 ),
               ),
             ),
+            _ActiveCueCardSongAction(
+              session: session,
+              currentPath: currentPath,
+            ),
+            const SizedBox(width: 8),
             IconButton(
-              tooltip: 'Lista megnyitása',
+              tooltip: 'Lista kinyitása',
               onPressed: () => _openSheet(context),
               icon: const Icon(Icons.keyboard_arrow_up),
             ),
@@ -125,8 +131,21 @@ class ActiveCueShellCard extends StatelessWidget {
               child: CueShellPanel(
                 session: session,
                 currentPath: currentPath,
+                showSongAction: false,
+                onOpenCueEditor: () {
+                  Navigator.of(sheetContext).pop();
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (!context.mounted) return;
+                    context.push(
+                      cueRoutePath(
+                        session.cue.uuid,
+                        CuePageType.edit,
+                        slideUuid: session.currentSlideUuid,
+                      ),
+                    );
+                  });
+                },
                 onClose: () => Navigator.of(sheetContext).pop(),
-                onAfterSlideSelected: () => Navigator.of(sheetContext).pop(),
                 showDragHandle: true,
               ),
             ),
@@ -134,6 +153,147 @@ class ActiveCueShellCard extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+class _ActiveCueCardSongAction extends ConsumerWidget {
+  const _ActiveCueCardSongAction({
+    required this.session,
+    required this.currentPath,
+  });
+
+  final CueSession session;
+  final String currentPath;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentSongUuid = _songUuidFromPath(currentPath);
+    if (currentSongUuid == null) {
+      return const SizedBox.shrink();
+    }
+
+    final currentSong = ref.watch(songFromUuidProvider(currentSongUuid)).value;
+    if (currentSong == null) {
+      return const SizedBox.shrink();
+    }
+
+    final songAlreadyInCue = session.slides.whereType<SongSlide>().any(
+      (slide) => slide.song.uuid == currentSong.uuid,
+    );
+
+    if (songAlreadyInCue) {
+      return Padding(
+        padding: const EdgeInsets.only(right: 4),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.check_circle,
+              size: 18,
+              color: Theme.of(context).colorScheme.secondary,
+            ),
+            const SizedBox(width: 6),
+            Text('Listában', style: Theme.of(context).textTheme.labelMedium),
+          ],
+        ),
+      );
+    }
+
+    final currentTranspose = ref.watch(transposeStateForProvider(currentSong));
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: _ActiveCueCardAddButton(
+        session: session,
+        currentSong: currentSong,
+        currentTranspose: currentTranspose,
+      ),
+    );
+  }
+}
+
+class _ActiveCueCardAddButton extends ConsumerStatefulWidget {
+  const _ActiveCueCardAddButton({
+    required this.session,
+    required this.currentSong,
+    required this.currentTranspose,
+  });
+
+  final CueSession session;
+  final Song currentSong;
+  final SongTranspose? currentTranspose;
+
+  @override
+  ConsumerState<_ActiveCueCardAddButton> createState() =>
+      _ActiveCueCardAddButtonState();
+}
+
+class _ActiveCueCardAddButtonState
+    extends ConsumerState<_ActiveCueCardAddButton> {
+  bool _isAdding = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.tonalIcon(
+      onPressed: _isAdding ? null : _handleAddCurrentSong,
+      icon: _isAdding
+          ? const SizedBox.square(
+              dimension: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.add),
+      label: const Text('Hozzáadás'),
+    );
+  }
+
+  Future<void> _handleAddCurrentSong() async {
+    if (_isAdding) return;
+
+    setState(() => _isAdding = true);
+    try {
+      final currentViewType = await ref.read(
+        viewTypeForProvider(widget.currentSong, null).future,
+      );
+
+      ref
+          .read(activeCueSessionProvider.notifier)
+          .addSlide(
+            SongSlide.from(
+              widget.currentSong,
+              viewType: currentViewType,
+              transpose: widget.currentTranspose,
+            ),
+          );
+
+      messengerService.showSnackBarReplacingCurrent(
+        SnackBar(
+          showCloseIcon: true,
+          content: Text(
+            '${widget.currentSong.title} hozzáadva a listához: ${widget.session.cue.title}',
+          ),
+          duration: const Duration(seconds: 4),
+        ),
+        forceHideAfter: const Duration(seconds: 4),
+      );
+    } catch (e, s) {
+      log.severe(
+        'Nem sikerült alapértelmezett nézetet betölteni gyors hozzáadáshoz: ${widget.currentSong.uuid}',
+        e,
+        s,
+      );
+      messengerService.showSnackBarReplacingCurrent(
+        const SnackBar(
+          showCloseIcon: true,
+          content: Text('Nem sikerült hozzáadni dalt a listához.'),
+          duration: Duration(seconds: 4),
+        ),
+        forceHideAfter: const Duration(seconds: 4),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isAdding = false);
+      }
+    }
   }
 }
 
@@ -225,7 +385,7 @@ class _ExpandedIndicator extends StatelessWidget {
     return InkWell(
       onTap: onToggleList,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+        padding: const EdgeInsets.fromLTRB(12, 15, 8, 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -233,7 +393,7 @@ class _ExpandedIndicator extends StatelessWidget {
             Text(
               title,
               maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+              overflow: TextOverflow.fade,
               style: railLabelStyle?.copyWith(
                 color: foregroundColor,
                 fontWeight: FontWeight.w500,
@@ -322,75 +482,28 @@ class CueShellPanel extends StatelessWidget {
   const CueShellPanel({
     required this.session,
     required this.currentPath,
+    this.listVisible = true,
+    this.showSongAction = true,
+    this.onOpenCueEditor,
     this.onClose,
-    this.onAfterSlideSelected,
     this.showDragHandle = false,
     super.key,
   });
 
   final CueSession session;
   final String currentPath;
-  final VoidCallback? onClose;
-  final VoidCallback? onAfterSlideSelected;
-  final bool showDragHandle;
-
-  @override
-  Widget build(BuildContext context) {
-    return Drawer(
-      width: double.infinity,
-      shape: const RoundedRectangleBorder(),
-      child: Column(
-        children: [
-          _CuePanelHeader(
-            session: session,
-            onClose: onClose,
-            showDragHandle: showDragHandle,
-            onOpenCueEditor: () =>
-                _openCueEditor(context, slideUuid: session.currentSlideUuid),
-          ),
-          Expanded(
-            child: SlideList(
-              onSlideSelected: (slide) {
-                final ref = ProviderScope.containerOf(context, listen: false);
-                ref
-                    .read(activeCueSessionProvider.notifier)
-                    .goToSlide(slide.uuid);
-                _openCueEditor(context, slideUuid: slide.uuid);
-                onAfterSlideSelected?.call();
-              },
-            ),
-          ),
-          _CuePanelSongAction(session: session, currentPath: currentPath),
-        ],
-      ),
-    );
-  }
-
-  void _openCueEditor(BuildContext context, {String? slideUuid}) {
-    context.go(
-      cueRoutePath(session.cue.uuid, CuePageType.edit, slideUuid: slideUuid),
-    );
-  }
-}
-
-class _CuePanelHeader extends StatelessWidget {
-  const _CuePanelHeader({
-    required this.session,
-    required this.onOpenCueEditor,
-    this.onClose,
-    this.showDragHandle = false,
-  });
-
-  final CueSession session;
-  final VoidCallback onOpenCueEditor;
+  final bool listVisible;
+  final bool showSongAction;
+  final VoidCallback? onOpenCueEditor;
   final VoidCallback? onClose;
   final bool showDragHandle;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final cueSubtitle = _cueSubtitleOf(session);
-    final hasSubtitle = cueSubtitle.isNotEmpty;
+    final drawerBackgroundColor =
+        theme.drawerTheme.backgroundColor ??
+        theme.colorScheme.surfaceContainerLow;
     final appBarBackgroundColor =
         theme.appBarTheme.backgroundColor ??
         (theme.useMaterial3
@@ -398,78 +511,196 @@ class _CuePanelHeader extends StatelessWidget {
             : (theme.colorScheme.brightness == Brightness.dark
                   ? theme.colorScheme.surface
                   : theme.colorScheme.primary));
-    final foregroundColor =
-        theme.appBarTheme.foregroundColor ?? theme.colorScheme.onSurface;
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (showDragHandle)
-          ColoredBox(
-            color: appBarBackgroundColor,
-            child: Center(
-              child: Container(
-                width: 36,
-                height: 4,
-                margin: const EdgeInsets.only(top: 8, bottom: 4),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.onSurfaceVariant.withValues(
-                    alpha: 0.4,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SizedBox.expand(
+          child: Column(
+            children: [
+              if (showDragHandle)
+                _CuePanelDragHandle(backgroundColor: appBarBackgroundColor),
+              Expanded(
+                child: Scaffold(
+                  backgroundColor: drawerBackgroundColor,
+                  appBar: _CuePanelAppBar(
+                    session: session,
+                    backgroundColor: appBarBackgroundColor,
+                    onClose: onClose,
+                    onOpenCueEditor:
+                        onOpenCueEditor ??
+                        () => _openCueEditor(
+                          context,
+                          slideUuid: session.currentSlideUuid,
+                        ),
                   ),
-                  borderRadius: BorderRadius.circular(999),
+                  body: Column(
+                    children: [
+                      Expanded(
+                        child: SlideList(
+                          isVisible: listVisible,
+                          onSlideSelected: (slide) {
+                            final ref = ProviderScope.containerOf(
+                              context,
+                              listen: false,
+                            );
+                            ref
+                                .read(activeCueSessionProvider.notifier)
+                                .goToSlide(slide.uuid);
+                          },
+                        ),
+                      ),
+                      const _CuePanelFooter(),
+                    ],
+                  ),
+                  floatingActionButton: showSongAction
+                      ? _CuePanelSongAction(
+                          session: session,
+                          currentPath: currentPath,
+                          availableWidth: constraints.maxWidth,
+                        )
+                      : null,
+                  floatingActionButtonLocation:
+                      FloatingActionButtonLocation.endFloat,
                 ),
               ),
-            ),
+            ],
           ),
-        AppBar(
-          backgroundColor: appBarBackgroundColor,
-          title: hasSubtitle
-              ? Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      session.cue.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.appBarTheme.titleTextStyle,
-                    ),
-                    Text(
-                      cueSubtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ],
-                )
-              : Text(session.cue.title),
-          automaticallyImplyLeading: false,
-          leading: Icon(Icons.list),
-          actions: [
-            IconButton(
-              tooltip: 'Lista szerkesztése',
-              onPressed: onOpenCueEditor,
-              icon: const Icon(Icons.open_in_new),
-            ),
-            if (onClose != null)
-              IconButton(
-                tooltip: 'Bezárás',
-                onPressed: onClose,
-                icon: const Icon(Icons.keyboard_arrow_down),
-              ),
-            const SizedBox(width: 4),
-          ],
+        );
+      },
+    );
+  }
+
+  void _openCueEditor(BuildContext context, {String? slideUuid}) {
+    context.push(
+      cueRoutePath(session.cue.uuid, CuePageType.edit, slideUuid: slideUuid),
+    );
+  }
+}
+
+class _CuePanelDragHandle extends StatelessWidget {
+  const _CuePanelDragHandle({required this.backgroundColor});
+
+  final Color backgroundColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: backgroundColor,
+      child: Center(
+        child: Container(
+          width: 36,
+          height: 4,
+          margin: const EdgeInsets.only(top: 8, bottom: 4),
+          decoration: BoxDecoration(
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+            borderRadius: BorderRadius.circular(999),
+          ),
         ),
+      ),
+    );
+  }
+}
+
+class _CuePanelAppBar extends StatelessWidget implements PreferredSizeWidget {
+  const _CuePanelAppBar({
+    required this.session,
+    required this.onOpenCueEditor,
+    required this.backgroundColor,
+    this.onClose,
+  });
+
+  final CueSession session;
+  final VoidCallback onOpenCueEditor;
+  final Color backgroundColor;
+  final VoidCallback? onClose;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cueSubtitle = _cueSubtitleOf(session);
+    final hasSubtitle = cueSubtitle.isNotEmpty;
+    return AppBar(
+      backgroundColor: backgroundColor,
+      title: hasSubtitle
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  session.cue.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.appBarTheme.titleTextStyle,
+                ),
+                Text(
+                  cueSubtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            )
+          : Text(session.cue.title),
+      automaticallyImplyLeading: false,
+      leading: const Icon(Icons.list),
+      actions: [
+        IconButton.filledTonal(
+          tooltip: 'Lista szerkesztése',
+          onPressed: onOpenCueEditor,
+          icon: const Icon(Icons.open_in_new),
+        ),
+        if (onClose != null)
+          IconButton(
+            tooltip: 'Bezárás',
+            onPressed: onClose,
+            icon: const Icon(Icons.keyboard_arrow_down),
+          ),
+        const SizedBox(width: 4),
       ],
     );
   }
 }
 
+class _CuePanelFooter extends StatelessWidget {
+  const _CuePanelFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainer,
+      ),
+      child: SafeArea(
+        top: false,
+        left: false,
+        right: false,
+        child: Padding(
+          padding: const EdgeInsets.all(8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [CueSlideNavigationControls()],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CuePanelSongAction extends ConsumerWidget {
-  const _CuePanelSongAction({required this.session, required this.currentPath});
+  const _CuePanelSongAction({
+    required this.session,
+    required this.currentPath,
+    required this.availableWidth,
+  });
 
   final CueSession session;
   final String currentPath;
+  final double availableWidth;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -486,22 +717,15 @@ class _CuePanelSongAction extends ConsumerWidget {
     final currentSongAlreadyInCue = session.slides.whereType<SongSlide>().any(
       (slide) => slide.song.uuid == currentSong.uuid,
     );
-    if (currentSongAlreadyInCue) {
-      return const SizedBox.shrink();
-    }
 
     final currentTranspose = ref.watch(transposeStateForProvider(currentSong));
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-      child: Align(
-        alignment: Alignment.bottomRight,
-        child: _CuePanelAddCurrentSongButton(
-          session: session,
-          currentSong: currentSong,
-          currentTranspose: currentTranspose,
-        ),
-      ),
+    return _CuePanelAddCurrentSongButton(
+      session: session,
+      currentSong: currentSong,
+      currentTranspose: currentTranspose,
+      songAlreadyInCue: currentSongAlreadyInCue,
+      availableWidth: availableWidth,
     );
   }
 }
@@ -511,11 +735,15 @@ class _CuePanelAddCurrentSongButton extends ConsumerStatefulWidget {
     required this.session,
     required this.currentSong,
     required this.currentTranspose,
+    required this.songAlreadyInCue,
+    required this.availableWidth,
   });
 
   final CueSession session;
   final Song currentSong;
   final SongTranspose? currentTranspose;
+  final bool songAlreadyInCue;
+  final double availableWidth;
 
   @override
   ConsumerState<_CuePanelAddCurrentSongButton> createState() =>
@@ -528,15 +756,49 @@ class _CuePanelAddCurrentSongButtonState
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final useMiniFab = widget.availableWidth < 280;
+    final useCollapsedFab = !useMiniFab && widget.availableWidth < 350;
+    final tooltip = widget.songAlreadyInCue
+        ? 'Újra hozzáadás ehhez a listához'
+        : 'Dal hozzáadása ehhez a listához';
+    final backgroundColor = widget.songAlreadyInCue
+        ? scheme.surfaceContainerHigh
+        : null;
+    final foregroundColor = widget.songAlreadyInCue ? scheme.onSurface : null;
+    final icon = _isAddingCurrentSong
+        ? const SizedBox.square(
+            dimension: 18,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          )
+        : const Icon(Icons.add);
+
+    if (useMiniFab) {
+      return FloatingActionButton.small(
+        tooltip: tooltip,
+        backgroundColor: backgroundColor,
+        foregroundColor: foregroundColor,
+        onPressed: _isAddingCurrentSong ? null : _handleAddCurrentSong,
+        child: icon,
+      );
+    }
+
+    if (useCollapsedFab) {
+      return FloatingActionButton(
+        tooltip: tooltip,
+        backgroundColor: backgroundColor,
+        foregroundColor: foregroundColor,
+        onPressed: _isAddingCurrentSong ? null : _handleAddCurrentSong,
+        child: icon,
+      );
+    }
+
     return FloatingActionButton.extended(
-      tooltip: 'Dal hozzáadása listához',
+      tooltip: tooltip,
+      backgroundColor: backgroundColor,
+      foregroundColor: foregroundColor,
       onPressed: _isAddingCurrentSong ? null : _handleAddCurrentSong,
-      icon: _isAddingCurrentSong
-          ? const SizedBox.square(
-              dimension: 18,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : const Icon(Icons.add),
+      icon: icon,
       label: const Text('Hozzáadás'),
     );
   }

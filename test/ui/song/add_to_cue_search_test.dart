@@ -133,7 +133,9 @@ void main() {
 
     await _pumpSubject(tester, song: song, cues: const []);
 
-    expect(find.byType(FilledButton), findsOneWidget);
+    expect(find.byType(IconButton), findsOneWidget);
+    expect(find.byIcon(Icons.playlist_add), findsOneWidget);
+    expect(find.byTooltip('Hozzáadás listához'), findsOneWidget);
     expect(find.byType(TextButton), findsNothing);
   });
 
@@ -160,7 +162,7 @@ void main() {
     );
   });
 
-  testWidgets('shows icon add action when song is already in active cue', (
+  testWidgets('shows text add action when song is already in active cue', (
     tester,
   ) async {
     final song = _createSong('song-1', 'Song');
@@ -172,8 +174,10 @@ void main() {
 
     await _pumpSubject(tester, song: song, session: session, cues: const []);
 
-    expect(find.byType(IconButton), findsOneWidget);
-    expect(find.byTooltip('Hozzáadás listához'), findsOneWidget);
+    expect(
+      find.widgetWithText(TextButton, 'Hozzáadás listához'),
+      findsOneWidget,
+    );
     expect(find.byType(FilledButton), findsNothing);
   });
 
@@ -186,7 +190,7 @@ void main() {
 
     final container = await _pumpSubject(tester, song: song);
 
-    await tester.tap(find.byType(FilledButton));
+    await tester.tap(find.byTooltip('Hozzáadás listához'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Target cue'));
     await tester.pumpAndSettle();

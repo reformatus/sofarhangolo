@@ -199,6 +199,7 @@ class _SlideViewState extends ConsumerState<SlideView>
     if (_settleController.isAnimating && !transitionShouldNotifySession) {
       stopSettleAnimation();
       setState(() {
+        warmSlide(nextRequestedSlideUuid);
         settledSlideUuid = nextRequestedSlideUuid;
         clearTransitionState();
       });

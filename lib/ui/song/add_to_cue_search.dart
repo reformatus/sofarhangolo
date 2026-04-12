@@ -122,33 +122,22 @@ class _AddToCueSearchState extends ConsumerState<AddToCueSearch> {
       },
       builder: (context, controller) {
         if (!widget.isDesktop) {
-          if (songInActiveCue) {
-            return IconButton(
-              tooltip: 'Hozzáadás listához',
+          if (!hasActiveCue) {
+            return FilledButton.tonalIcon(
               onPressed: () => controller.openView(),
               icon: const Icon(Icons.playlist_add),
+              label: const Text('Hozzáadás listához'),
             );
           }
 
-          final useSecondaryStyle = hasActiveCue && !songInActiveCue;
-          final label = useSecondaryStyle
-              ? 'Másik listához adás'
-              : 'Hozzáadás listához';
-          final child = Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.playlist_add),
-              const SizedBox(width: 8),
-              Text(label),
-            ],
+          final label = songInActiveCue
+              ? 'Hozzáadás listához'
+              : 'Másik listához adás';
+          return TextButton.icon(
+            onPressed: () => controller.openView(),
+            icon: const Icon(Icons.playlist_add),
+            label: Text(label),
           );
-
-          return useSecondaryStyle
-              ? TextButton(onPressed: () => controller.openView(), child: child)
-              : FilledButton.tonal(
-                  onPressed: () => controller.openView(),
-                  child: child,
-                );
         } else {
           return ConstrainedBox(
             constraints: BoxConstraints(maxWidth: 250),
