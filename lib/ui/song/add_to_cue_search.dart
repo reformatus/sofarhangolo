@@ -13,6 +13,7 @@ import '../../services/ui/messenger_service.dart';
 import '../base/cues/dialogs.dart';
 import '../common/error/card.dart';
 import '../cue/cue_page_type.dart';
+import '../cue/session/session_provider.dart';
 import 'state.dart';
 
 /// A reusable widget that provides search functionality for adding songs to cues
@@ -45,6 +46,15 @@ class _AddToCueSearchState extends ConsumerState<AddToCueSearch> {
   @override
   Widget build(BuildContext context) {
     final cuesAsync = ref.watch(watchAllCuesProvider);
+    final activeCueSession = ref.watch(
+      activeCueSessionProvider.select((sessionAsync) => sessionAsync.value),
+    );
+    final hasActiveCue = activeCueSession != null;
+    final songInActiveCue =
+        activeCueSession?.slides.whereType<SongSlide>().any(
+          (slide) => slide.song.uuid == widget.song.uuid,
+        ) ??
+        false;
 
     Future<void> handleCueSelection(
       SearchController controller,
@@ -58,6 +68,12 @@ class _AddToCueSearchState extends ConsumerState<AddToCueSearch> {
         transpose: widget.transpose,
       );
       await addSlideToCue(songSlide, cue, ref: ref);
+
+      if (!hasActiveCue) {
+        await ref
+            .read(activeCueSessionProvider.notifier)
+            .load(cue.uuid, initialSlideUuid: songSlide.uuid);
+      }
 
       messengerService.showSnackBarReplacingCurrent(
         SnackBar(
@@ -106,10 +122,21 @@ class _AddToCueSearchState extends ConsumerState<AddToCueSearch> {
       },
       builder: (context, controller) {
         if (!widget.isDesktop) {
-          return FilledButton.tonalIcon(
-            icon: Icon(Icons.playlist_add),
-            label: Text('Listához adás'),
+          if (!hasActiveCue) {
+            return FilledButton.tonalIcon(
+              onPressed: () => controller.openView(),
+              icon: const Icon(Icons.playlist_add),
+              label: const Text('Hozzáadás listához'),
+            );
+          }
+
+          final label = songInActiveCue
+              ? 'Hozzáadás listához'
+              : 'Másik listához adás';
+          return TextButton.icon(
             onPressed: () => controller.openView(),
+            icon: const Icon(Icons.playlist_add),
+            label: Text(label),
           );
         } else {
           return ConstrainedBox(

@@ -21,6 +21,7 @@ class SongPageBody extends ConsumerWidget {
     required this.summaryContent,
     required this.detailsContent,
     required this.actionButtonsScrollController,
+    required this.shellBottomInset,
     required this.transposeOverlayVisible,
     required this.onShowDetailsSheet,
     required this.detailsSheetScrollController,
@@ -33,6 +34,7 @@ class SongPageBody extends ConsumerWidget {
   final List<Widget> summaryContent;
   final List<Widget> detailsContent;
   final ScrollController actionButtonsScrollController;
+  final double shellBottomInset;
   final ValueNotifier<bool> transposeOverlayVisible;
   final Function(BuildContext, ScrollController, List<Widget>)
   onShowDetailsSheet;
@@ -54,6 +56,10 @@ class SongPageBody extends ConsumerWidget {
     }
 
     final viewType = viewTypeAsync.requireValue;
+    final bottomInsetAnimationDuration =
+        MediaQuery.maybeOf(context)?.accessibleNavigation ?? false
+        ? Duration.zero
+        : Durations.medium2;
 
     if (isDesktop) {
       return Flex(
@@ -91,6 +97,11 @@ class SongPageBody extends ConsumerWidget {
               actionButtonsScrollController: actionButtonsScrollController,
               transposeOverlayVisible: transposeOverlayVisible,
             ),
+            AnimatedContainer(
+              duration: bottomInsetAnimationDuration,
+              curve: Curves.easeInOutCubicEmphasized,
+              height: shellBottomInset,
+            ),
           ],
         ),
         // Fixed position transpose overlay with reactive visibility
@@ -99,7 +110,7 @@ class SongPageBody extends ConsumerWidget {
           builder: (context, isVisible, child) {
             if (viewType == SongViewType.chords && isVisible) {
               return Positioned(
-                bottom: 60, // Above the bottom bar
+                bottom: 60 + shellBottomInset, // Above the bottom bars
                 right: 16,
                 child: Card(
                   child: Padding(

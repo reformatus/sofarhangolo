@@ -12,6 +12,7 @@ import '../cue_page_type.dart';
 import '../session/cue_session.dart';
 import '../session/session_provider.dart';
 import '../widgets/actions_drawer.dart';
+import '../widgets/slide_navigation_controls.dart';
 import '../widgets/slide_list.dart';
 import '../widgets/slide_view.dart';
 
@@ -72,10 +73,6 @@ class _CueEditPageState extends ConsumerState<CueEditPage> {
 
   @override
   Widget build(BuildContext context) {
-    final slideIndex = ref.watch(slideIndexProvider);
-    final canNavigatePrevious = ref.watch(canNavigatePreviousProvider);
-    final canNavigateNext = ref.watch(canNavigateNextProvider);
-
     return BrowserTitle(
       contextTitle: widget.session.cue.title,
       child: AdaptivePage(
@@ -92,26 +89,7 @@ class _CueEditPageState extends ConsumerState<CueEditPage> {
         rightDrawerTooltip: 'Opciók',
         actionBarChildren: [
           const SizedBox(width: 8),
-          IconButton.filledTonal(
-            onPressed: canNavigatePrevious
-                ? () => ref.read(activeCueSessionProvider.notifier).navigate(-1)
-                : null,
-            icon: const Icon(Icons.navigate_before),
-            tooltip: 'Előző dia',
-          ),
-          const SizedBox(width: 8),
-          IconButton.filledTonal(
-            onPressed: canNavigateNext
-                ? () => ref.read(activeCueSessionProvider.notifier).navigate(1)
-                : null,
-            icon: const Icon(Icons.navigate_next),
-            tooltip: 'Következő dia',
-          ),
-          const SizedBox(width: 16),
-          Text(
-            '${(slideIndex?.index ?? 0) + 1}. / ${slideIndex?.total} dia',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+          const CueSlideNavigationControls(),
         ],
         actionBarTrailingChildren: [
           IconButton.filledTonal(

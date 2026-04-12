@@ -627,6 +627,54 @@ void main() {
     );
 
     testWidgets(
+      'rapid button navigation during settle does not crash the active slide view',
+      (tester) async {
+        final cue = await insertCueHarnessCue(
+          cueUuid: 'cue-rapid-buttons',
+          fixtures: const [
+            CueSongFixture(
+              songUuid: 'song-1',
+              slideUuid: 'slide-1',
+              title: 'Song 1',
+              lyrics: '[V1]\n Alpha line',
+            ),
+            CueSongFixture(
+              songUuid: 'song-2',
+              slideUuid: 'slide-2',
+              title: 'Song 2',
+              lyrics: '[V1]\n Beta line',
+            ),
+            CueSongFixture(
+              songUuid: 'song-3',
+              slideUuid: 'slide-3',
+              title: 'Song 3',
+              lyrics: '[V1]\n Gamma line',
+            ),
+          ],
+        );
+
+        final cueHarness = await pumpCueWidgetHarness(
+          tester,
+          testHarness: harness,
+          cueUuid: cue.uuid,
+        );
+
+        await tester.tap(find.byKey(cueHarnessNextButtonKey));
+        await tester.pump(const Duration(milliseconds: 50));
+
+        await tester.tap(find.byKey(cueHarnessNextButtonKey));
+        await tester.pump();
+
+        expect(tester.takeException(), isNull);
+
+        await tester.pumpAndSettle();
+
+        expect(cueHarness.session.currentSlideUuid, 'slide-3');
+        expect(find.text('Gamma line'), findsOneWidget);
+      },
+    );
+
+    testWidgets(
       'view chooser mutates the current cue slide without rebuilding the slide tree',
       (tester) async {
         configureCueHarnessSvgResponse(harness, svgLabel: 'Cue SVG');

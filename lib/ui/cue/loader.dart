@@ -28,7 +28,7 @@ class _CueLoaderPageState extends ConsumerState<CueLoaderPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadIfNeeded());
+    Future.microtask(_loadIfNeeded);
   }
 
   @override
@@ -36,7 +36,7 @@ class _CueLoaderPageState extends ConsumerState<CueLoaderPage> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.uuid != widget.uuid ||
         oldWidget.initialSlideUuid != widget.initialSlideUuid) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _loadIfNeeded());
+      Future.microtask(_loadIfNeeded);
     }
   }
 
@@ -78,7 +78,7 @@ class _CueLoaderPageState extends ConsumerState<CueLoaderPage> {
         ),
       ),
       data: (session) {
-        if (session == null) {
+        if (session == null || session.cue.uuid != widget.uuid) {
           return const Scaffold(
             body: Center(child: CircularProgressIndicator()),
           );
