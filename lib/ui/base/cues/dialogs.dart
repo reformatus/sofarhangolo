@@ -5,13 +5,20 @@ import '../../common/confirm_dialog.dart';
 
 import '../../../data/cue/cue.dart';
 import '../../../services/cue/write_cue.dart';
+import '../../cue/session/session_provider.dart';
 
 class EditCueDialog extends ConsumerStatefulWidget {
   /// If cue is null, dialog adds new cue
-  const EditCueDialog({this.cue, this.prefilledTitle, super.key});
+  const EditCueDialog({
+    this.cue,
+    this.prefilledTitle,
+    this.activateAfterCreate = false,
+    super.key,
+  });
 
   final Cue? cue;
   final String? prefilledTitle;
+  final bool activateAfterCreate;
 
   @override
   EditCueDialogState createState() => EditCueDialogState();
@@ -63,6 +70,11 @@ class EditCueDialogState extends ConsumerState<EditCueDialog> {
             title: _titleController.text,
             description: _descriptionController.text,
           );
+          if (widget.activateAfterCreate) {
+            await ref
+                .read(activeCueSessionProvider.notifier)
+                .load(createdCue.uuid);
+          }
           // ignore: use_build_context_synchronously
           context.pop<Cue>(createdCue);
         }

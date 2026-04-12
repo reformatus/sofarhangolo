@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/song/song.dart';
 import '../../../config/config.dart';
+import '../../base/cue_shell_inset.dart';
 import 'app_bar.dart';
 import 'body.dart';
 import 'song_details_helpers.dart';
@@ -32,6 +33,7 @@ class SongPageContent extends ConsumerWidget {
             (constraints.maxHeight < constraints.maxWidth) &&
             constraints.maxWidth > appConfig.breakpoints.desktopFromWidth;
         final isMobile = constraints.maxWidth < 400;
+        final shellBottomInset = CueShellInset.bottomInsetOf(context);
 
         final summaryContent = getDetailsSummaryContent(song, context);
         final detailsContent = getDetailsContent(song, context);
@@ -56,6 +58,7 @@ class SongPageContent extends ConsumerWidget {
             summaryContent: summaryContent,
             detailsContent: detailsContent,
             actionButtonsScrollController: actionButtonsScrollController,
+            shellBottomInset: shellBottomInset,
             transposeOverlayVisible: transposeOverlayVisible,
             onShowDetailsSheet: onShowDetailsSheet,
             detailsSheetScrollController: detailsSheetScrollController,

@@ -120,19 +120,38 @@ class _SongPageState extends ConsumerState<SongPage> {
         cornerRadius: 20,
         dismissOnBackdropTap: true,
         duration: Durations.medium2,
-        headerBuilder: (context, state) => Padding(
-          padding: const EdgeInsets.only(left: 16, right: 8, top: 8),
-          child: Row(
-            children: [
-              Text('Részletek', style: Theme.of(context).textTheme.titleMedium),
-              const Spacer(),
-              IconButton(
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close),
-              ),
-            ],
-          ),
-        ),
+        headerBuilder: (context, state) {
+          final theme = Theme.of(context);
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurfaceVariant.withValues(
+                      alpha: 0.4,
+                    ),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Text('Részletek', style: theme.textTheme.titleMedium),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.keyboard_arrow_down),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
         builder: (context, state) {
           return Material(child: Column(children: detailsContent));
         },
