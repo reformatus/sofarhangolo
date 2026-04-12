@@ -15,15 +15,8 @@ finish-args:
 modules:
   - name: sofar-hangolo
     buildsystem: simple
-    build-options:
-      append-path: /run/build/sofar-hangolo/flutter/bin
-      env:
-        PUB_CACHE: /run/build/sofar-hangolo/.pub-cache
     build-commands:
-      - flutter --version
-      - flutter pub get
-      - dart run build_runner build --delete-conflicting-outputs
-      - flutter build linux --release --no-pub
+      - test -f build/linux/x64/release/bundle/sofarhangolo
       - mkdir -p /app/lib/sofarhangolo
       - install -D build/linux/x64/release/bundle/sofarhangolo /app/lib/sofarhangolo/sofarhangolo
       - cp -r build/linux/x64/release/bundle/lib /app/lib/sofarhangolo/
@@ -38,7 +31,3 @@ modules:
     sources:
       - type: dir
         path: ../../..
-      - type: archive
-        url: https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.38.7-stable.tar.xz
-        sha256: 2d72de31119ccba1421391aa9ab53891a3e4905987a13f8272766ad78e3bbf93
-        dest: flutter

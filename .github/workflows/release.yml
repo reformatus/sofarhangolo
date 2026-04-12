@@ -1,12 +1,12 @@
-name: Desktop Release
+name: Release
 
 on:
-  release:
-    types: [published, prereleased]
+  push:
+    tags: ["*"]
   workflow_dispatch:
     inputs:
       release_tag:
-        description: Existing Git tag/release to attach desktop assets to
+        description: Existing tag to build and publish
         required: true
         type: string
 
@@ -14,7 +14,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: desktop-release-${{ github.event.release.tag_name || inputs.release_tag }}
+  group: release-${{ github.ref_name || inputs.release_tag }}
   cancel-in-progress: false
 
 jobs:
@@ -23,41 +23,82 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_tag: ${{ steps.meta.outputs.release_tag }}
+      release_ref: ${{ steps.meta.outputs.release_ref }}
       build_name: ${{ steps.meta.outputs.build_name }}
       build_number: ${{ steps.meta.outputs.build_number }}
       release_date: ${{ steps.meta.outputs.release_date }}
+      prerelease: ${{ steps.meta.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref }}
+          fetch-depth: 0
+          fetch-tags: true
 
       - id: meta
         shell: bash
         run: |
+          set -euo pipefail
+
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
             release_tag="${{ inputs.release_tag }}"
           else
-            release_tag="${{ github.event.release.tag_name }}"
+            release_tag="${GITHUB_REF_NAME}"
           fi
+
+          git rev-parse "refs/tags/${release_tag}" >/dev/null
+          release_ref="refs/tags/${release_tag}"
 
           version_line="$(grep '^version:' pubspec.yaml | awk '{print $2}')"
           build_name="${version_line%%+*}"
           build_number="${version_line##*+}"
           release_date="$(date -u +%F)"
 
+          prerelease=false
+          if [[ "${release_tag%%+*}" == *-* ]]; then
+            prerelease=true
+          fi
+
           {
             echo "release_tag=$release_tag"
+            echo "release_ref=$release_ref"
             echo "build_name=$build_name"
             echo "build_number=$build_number"
             echo "release_date=$release_date"
+            echo "prerelease=$prerelease"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Ensure GitHub release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.meta.outputs.release_tag }}
+          PRERELEASE: ${{ steps.meta.outputs.prerelease }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $RELEASE_TAG already exists."
+            exit 0
+          fi
+
+          args=(--repo "$GITHUB_REPOSITORY" --title "$RELEASE_TAG" --notes "" --verify-tag)
+          if [[ "$PRERELEASE" == "true" ]]; then
+            args+=(--prerelease)
+          fi
+
+          gh release create "$RELEASE_TAG" "${args[@]}"
+
   verify:
-    name: Verify tests
+    name: Verify release build
     runs-on: ubuntu-latest
     needs: release-context
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-context.outputs.release_ref }}
 
-      - name: Install test dependencies
+      - name: Install validation dependencies
         run: sudo apt-get update && sudo apt-get install -y libsqlite3-dev
 
       - name: Set up Flutter
@@ -72,126 +113,82 @@ jobs:
       - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
 
+      - name: Analyze code
+        run: flutter analyze
+
       - name: Run tests
         run: flutter test test
 
-  build-linux:
+  build-linux-release:
     name: Build Linux Flatpak
     runs-on: ubuntu-latest
     needs: [release-context, verify]
-    container:
-      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
-      options: --privileged
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-context.outputs.release_ref }}
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang \
+            cmake \
+            desktop-file-utils \
+            flatpak \
+            flatpak-builder \
+            libgtk-3-dev \
+            liblzma-dev \
+            libsqlite3-dev \
+            ninja-build \
+            pkg-config
+
+      - name: Configure Flathub remote
+        run: flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 
       - name: Stamp AppStream release metadata
         shell: bash
         run: |
           perl -0pi -e 's#<release version="[^"]+" date="[^"]+" */>#<release version="${{ needs.release-context.outputs.build_name }}" date="${{ needs.release-context.outputs.release_date }}" />#' linux/packaging/org.lyricapp.sofar.metainfo.xml
 
-      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
         with:
-          bundle: sofar-hangolo-${{ needs.release-context.outputs.build_name }}-linux-x86_64.flatpak
-          manifest-path: packaging/linux/flatpak/org.lyricapp.sofar.yaml
-          cache-key: flatpak-builder-${{ github.sha }}
-          arch: x86_64
-          verbose: true
+          channel: stable
+          cache: true
 
-  # prepare-flathub-beta-pr:
-  #   name: Prepare Flathub beta PR
-  #   runs-on: ubuntu-latest
-  #   needs: [release-context, build-linux]
-  #   if: ${{ vars.FLATHUB_REPO != '' && vars.FLATHUB_REPO_URL != '' }}
-  #   steps:
-  #     - uses: actions/checkout@v4
+      - name: Install dependencies
+        run: flutter pub get
 
-  #     - id: flathub-ready
-  #       name: Check Flathub credentials
-  #       env:
-  #         FLATHUB_REPO_DEPLOY_KEY: ${{ secrets.FLATHUB_REPO_DEPLOY_KEY }}
-  #         FLATHUB_REPO_TOKEN: ${{ secrets.FLATHUB_REPO_TOKEN }}
-  #       shell: bash
-  #       run: |
-  #         if [[ -n "$FLATHUB_REPO_DEPLOY_KEY" && -n "$FLATHUB_REPO_TOKEN" ]]; then
-  #           echo "ready=true" >> "$GITHUB_OUTPUT"
-  #         else
-  #           echo "ready=false" >> "$GITHUB_OUTPUT"
-  #           echo "Skipping Flathub PR prep because credentials are missing."
-  #         fi
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
 
-  #     - name: Render Flathub manifest
-  #       if: ${{ steps.flathub-ready.outputs.ready == 'true' }}
-  #       shell: bash
-  #       run: |
-  #         bash tool/render_flathub_manifest.sh \
-  #           packaging/linux/flatpak/org.lyricapp.sofar.flathub.yaml.in \
-  #           /tmp/org.lyricapp.sofar.yaml \
-  #           "${{ vars.FLATHUB_REPO_URL }}" \
-  #           "${{ needs.release-context.outputs.release_tag }}"
+      - name: Build Linux app bundle
+        run: flutter build linux --release --verbose
 
-  #     - name: Load Flathub deploy key
-  #       if: ${{ steps.flathub-ready.outputs.ready == 'true' }}
-  #       uses: webfactory/ssh-agent@v0.9.1
-  #       with:
-  #         ssh-private-key: ${{ secrets.FLATHUB_REPO_DEPLOY_KEY }}
+      - name: Package Flatpak bundle
+        shell: bash
+        run: |
+          flatpak-builder \
+            --force-clean \
+            --user \
+            --install-deps-from=flathub \
+            --repo=repo \
+            build/flatpak-app \
+            packaging/linux/flatpak/org.lyricapp.sofar.yaml
+          flatpak build-bundle \
+            repo \
+            "sofar-hangolo-${{ needs.release-context.outputs.build_name }}-linux-x86_64.flatpak" \
+            org.lyricapp.sofar
 
-  #     - name: Trust GitHub SSH host key
-  #       if: ${{ steps.flathub-ready.outputs.ready == 'true' }}
-  #       run: |
-  #         mkdir -p ~/.ssh
-  #         ssh-keyscan github.com >> ~/.ssh/known_hosts
+      - name: Upload Linux release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-release-assets
+          path: sofar-hangolo-${{ needs.release-context.outputs.build_name }}-linux-x86_64.flatpak
+          if-no-files-found: error
 
-  #     - name: Sync beta branch
-  #       if: ${{ steps.flathub-ready.outputs.ready == 'true' }}
-  #       shell: bash
-  #       env:
-  #         GH_TOKEN: ${{ secrets.FLATHUB_REPO_TOKEN }}
-  #       run: |
-  #         git clone "git@github.com:${{ vars.FLATHUB_REPO }}.git" /tmp/flathub-app
-  #         cd /tmp/flathub-app
-
-  #         if git ls-remote --exit-code --heads origin beta >/dev/null 2>&1; then
-  #           git checkout -b "automation/${{ needs.release-context.outputs.release_tag }}" origin/beta
-  #           base_branch="beta"
-  #         else
-  #           default_branch="$(gh repo view "${{ vars.FLATHUB_REPO }}" --json defaultBranchRef --jq .defaultBranchRef.name)"
-  #           git checkout -b "automation/${{ needs.release-context.outputs.release_tag }}" "origin/${default_branch}"
-  #           base_branch="${default_branch}"
-  #         fi
-
-  #         cp /tmp/org.lyricapp.sofar.yaml ./org.lyricapp.sofar.yaml
-  #         cp "${GITHUB_WORKSPACE}/packaging/linux/flatpak/flathub.json" ./flathub.json
-
-  #         if [[ -n "$(git status --short)" ]]; then
-  #           git config user.name "github-actions[bot]"
-  #           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-  #           git add org.lyricapp.sofar.yaml flathub.json
-  #           git commit -m "Update beta manifest for ${{ needs.release-context.outputs.release_tag }}"
-  #           git push origin "HEAD:automation/${{ needs.release-context.outputs.release_tag }}" --force
-
-  #           existing_pr="$(gh pr list \
-  #             --repo "${{ vars.FLATHUB_REPO }}" \
-  #             --base "$base_branch" \
-  #             --head "automation/${{ needs.release-context.outputs.release_tag }}" \
-  #             --json number \
-  #             --jq '.[0].number' || true)"
-
-  #           if [[ -n "$existing_pr" && "$existing_pr" != "null" ]]; then
-  #             echo "Flathub PR branch already exists."
-  #           else
-  #             gh pr create \
-  #               --repo "${{ vars.FLATHUB_REPO }}" \
-  #               --base "$base_branch" \
-  #               --head "automation/${{ needs.release-context.outputs.release_tag }}" \
-  #               --title "Update org.lyricapp.sofar for ${{ needs.release-context.outputs.release_tag }}" \
-  #               --body "Automated beta manifest refresh for ${{ needs.release-context.outputs.release_tag }}."
-  #           fi
-  #         else
-  #           echo "Flathub beta PR content already up to date."
-  #         fi
-
-  build-windows:
+  build-windows-release:
     name: Build Windows installer and Store package
     runs-on: windows-latest
     needs: [release-context, verify]
@@ -199,6 +196,8 @@ jobs:
       APP_VERSION: ${{ needs.release-context.outputs.build_name }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-context.outputs.release_ref }}
 
       - id: windows-store-ready
         name: Check Microsoft Store credentials
@@ -271,12 +270,16 @@ jobs:
           msstore reconfigure --tenantId "$env:WINDOWS_STORE_TENANT_ID" --sellerId "$env:WINDOWS_STORE_SELLER_ID" --clientId "$env:WINDOWS_STORE_CLIENT_ID" --clientSecret "$env:WINDOWS_STORE_CLIENT_SECRET"
           msstore publish . --inputFile "$($storePackage.FullName)" --appId "${{ vars.WINDOWS_STORE_APP_ID }}" --flightId "${{ vars.WINDOWS_STORE_BETA_FLIGHT_ID }}"
 
-  build-macos:
+  build-macos-release:
     name: Build macOS DMG and App Store package
     runs-on: macos-latest
     needs: [release-context, verify]
+    outputs:
+      app_store_ready: ${{ steps.app-store-ready.outputs.ready }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-context.outputs.release_ref }}
 
       - id: developer-id-ready
         name: Check direct-distribution signing credentials
@@ -332,11 +335,61 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Install macOS CocoaPods dependencies
+        run: cd macos && pod update sqlite3 --repo-update
+
       - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
 
+      - name: Refresh Flutter macOS build environment
+        shell: bash
+        run: |
+          mkdir -p macos/Flutter/ephemeral
+          cat > macos/Flutter/ephemeral/Flutter-Generated.xcconfig <<EOF
+          FLUTTER_ROOT=${FLUTTER_ROOT}
+          FLUTTER_APPLICATION_PATH=${GITHUB_WORKSPACE}
+          COCOAPODS_PARALLEL_CODE_SIGN=true
+          FLUTTER_BUILD_DIR=build
+          FLUTTER_BUILD_NAME=${{ needs.release-context.outputs.build_name }}
+          FLUTTER_BUILD_NUMBER=${{ needs.release-context.outputs.build_number }}
+          DART_OBFUSCATION=false
+          TRACK_WIDGET_CREATION=true
+          TREE_SHAKE_ICONS=false
+          PACKAGE_CONFIG=.dart_tool/package_config.json
+          EOF
+          : > macos/Flutter/ephemeral/FlutterInputs.xcfilelist
+          : > macos/Flutter/ephemeral/FlutterOutputs.xcfilelist
+          cat > macos/Flutter/ephemeral/flutter_export_environment.sh <<EOF
+          #!/bin/sh
+          export "FLUTTER_ROOT=${FLUTTER_ROOT}"
+          export "FLUTTER_APPLICATION_PATH=${GITHUB_WORKSPACE}"
+          export "COCOAPODS_PARALLEL_CODE_SIGN=true"
+          export "FLUTTER_BUILD_DIR=build"
+          export "FLUTTER_BUILD_NAME=${{ needs.release-context.outputs.build_name }}"
+          export "FLUTTER_BUILD_NUMBER=${{ needs.release-context.outputs.build_number }}"
+          export "DART_OBFUSCATION=false"
+          export "TRACK_WIDGET_CREATION=true"
+          export "TREE_SHAKE_ICONS=false"
+          export "PACKAGE_CONFIG=.dart_tool/package_config.json"
+          EOF
+          chmod +x macos/Flutter/ephemeral/flutter_export_environment.sh
+
       - name: Build unsigned macOS app
-        run: flutter build macos --release --no-codesign
+        shell: bash
+        run: |
+          xcodebuild \
+            -workspace macos/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -derivedDataPath build/macos/derived_data \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+          mkdir -p build/macos/Build/Products
+          rm -rf build/macos/Build/Products/Release
+          cp -R build/macos/derived_data/Build/Products/Release build/macos/Build/Products/Release
 
       - name: Import Developer ID certificate
         if: ${{ steps.developer-id-ready.outputs.ready == 'true' }}
@@ -435,7 +488,6 @@ jobs:
       - name: Archive macOS App Store build
         if: ${{ steps.app-store-ready.outputs.ready == 'true' }}
         run: |
-          flutter build macos --release --config-only
           bash tool/render_macos_appstore_export_options.sh \
             "$RUNNER_TEMP/exportOptions.plist" \
             "${{ vars.MACOS_APPLE_TEAM_ID }}" \
@@ -474,21 +526,80 @@ jobs:
           PKG_PATH="$(find "$RUNNER_TEMP/app-store" -maxdepth 1 -name '*.pkg' -print -quit)"
           xcrun altool --upload-app --file "$PKG_PATH" --type osx --apiKey "$APP_STORE_API_KEY_ID" --apiIssuer "$APP_STORE_API_ISSUER_ID"
 
+  build-web-release:
+    name: Build web bundle
+    runs-on: ubuntu-latest
+    needs: [release-context, verify]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-context.outputs.release_ref }}
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Prepare Drift web assets
+        run: dart run tool/prepare_web.dart
+
+      - name: Build Flutter web bundle
+        run: flutter build web --release --base-href /web/
+
+      - name: Finalize built web bundle
+        run: dart run tool/finalize_web_build.dart
+
+      - name: Upload web release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-release-build
+          path: build/web
+          if-no-files-found: error
+
   upload-release-assets:
     name: Upload assets to GitHub release
     runs-on: ubuntu-latest
-    needs: [release-context, build-linux, build-windows, build-macos]
+    needs: [release-context, build-linux-release, build-windows-release, build-macos-release]
+    if: ${{ always() && needs.release-context.result == 'success' }}
     steps:
       - uses: actions/download-artifact@v4
+        if: ${{ needs.build-linux-release.result == 'success' }}
         with:
-          path: dist
+          name: linux-release-assets
+          path: dist/linux
+
+      - uses: actions/download-artifact@v4
+        if: ${{ needs.build-windows-release.result == 'success' }}
+        with:
+          name: windows-release-assets
+          path: dist/windows
+
+      - uses: actions/download-artifact@v4
+        if: ${{ needs.build-macos-release.result == 'success' }}
+        with:
+          name: macos-release-assets
+          path: dist/macos
+
+      - uses: actions/download-artifact@v4
+        if: ${{ needs.build-macos-release.result == 'success' && needs.build-macos-release.outputs.app_store_ready == 'true' }}
+        with:
+          name: macos-app-store-package
+          path: dist/macos-app-store
 
       - name: Upload installers to the release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release-context.outputs.release_tag }}
         shell: bash
         run: |
-          tag="${{ needs.release-context.outputs.release_tag }}"
+          set -euo pipefail
           mapfile -t files < <(find dist -type f | sort)
 
           if [[ "${#files[@]}" -eq 0 ]]; then
@@ -496,4 +607,97 @@ jobs:
             exit 1
           fi
 
-          gh release upload "$tag" "${files[@]}" --clobber
+          gh release upload "$RELEASE_TAG" "${files[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+
+  deploy-web:
+    name: Deploy web to app.sofarkotta.hu
+    runs-on: ubuntu-latest
+    needs: [release-context, build-web-release]
+    if: ${{ needs.build-web-release.result == 'success' && needs.release-context.outputs.prerelease != 'true' }}
+    env:
+      TARGET_REPO: reformatus/app.sofarkotta.hu
+      TARGET_BRANCH: main
+      TARGET_DIR: docs/web
+    steps:
+      - id: release-web-ready
+        name: Check release deploy eligibility
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.release-context.outputs.release_tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          release_json="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease 2>/dev/null || true)"
+          if [[ -z "$release_json" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          is_prerelease="$(jq -r '.isPrerelease' <<<"$release_json")"
+          if [[ "$is_prerelease" == "true" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - id: deploy-key-ready
+        name: Check deploy key
+        env:
+          DEPLOY_KEY: ${{ secrets.APP_SOFARKOTTA_HU_DEPLOY_KEY }}
+        run: |
+          if [ -z "$DEPLOY_KEY" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download web bundle
+        if: ${{ steps.release-web-ready.outputs.ready == 'true' && steps.deploy-key-ready.outputs.ready == 'true' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: web-release-build
+          path: ${{ runner.temp }}/web-build
+
+      - name: Load deploy key
+        if: ${{ steps.release-web-ready.outputs.ready == 'true' && steps.deploy-key-ready.outputs.ready == 'true' }}
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.APP_SOFARKOTTA_HU_DEPLOY_KEY }}
+
+      - name: Trust GitHub SSH host key
+        if: ${{ steps.release-web-ready.outputs.ready == 'true' && steps.deploy-key-ready.outputs.ready == 'true' }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Clone target Pages repository
+        if: ${{ steps.release-web-ready.outputs.ready == 'true' && steps.deploy-key-ready.outputs.ready == 'true' }}
+        run: |
+          git clone \
+            --branch "$TARGET_BRANCH" \
+            "git@github.com:${TARGET_REPO}.git" \
+            "${RUNNER_TEMP}/pages-repo"
+
+      - name: Sync web bundle into Pages repository
+        if: ${{ steps.release-web-ready.outputs.ready == 'true' && steps.deploy-key-ready.outputs.ready == 'true' }}
+        run: |
+          mkdir -p "${RUNNER_TEMP}/pages-repo/${TARGET_DIR}"
+          rsync -a --delete \
+            "${RUNNER_TEMP}/web-build/" \
+            "${RUNNER_TEMP}/pages-repo/${TARGET_DIR}/"
+
+      - name: Commit deployment if needed
+        if: ${{ steps.release-web-ready.outputs.ready == 'true' && steps.deploy-key-ready.outputs.ready == 'true' }}
+        working-directory: ${{ runner.temp }}/pages-repo
+        run: |
+          if [ -z "$(git status --short -- "${TARGET_DIR}")" ]; then
+            echo "No web changes to deploy."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A "${TARGET_DIR}"
+          git commit -m "Deploy lyric web from ${GITHUB_REPOSITORY}@${GITHUB_SHA}"
+          git push origin "$TARGET_BRANCH"

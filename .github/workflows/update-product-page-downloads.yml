@@ -1,0 +1,103 @@
+name: Update Product Page Downloads
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag that completed publishing
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+concurrency:
+  group: product-page-downloads-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+jobs:
+  generate-shared-config:
+    name: Generate shared config
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.meta.outputs.release_tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - id: meta
+        run: echo "release_tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
+
+      - name: Ensure GitHub release exists
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
+
+      - name: Generate product page shared config
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python tool/generate_product_page_shared_config_js.py \
+            "$GITHUB_REPOSITORY" \
+            build/downloads/shared-config.js
+
+      - name: Upload shared config artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: product-page-shared-config
+          path: build/downloads/shared-config.js
+          if-no-files-found: error
+
+  deploy-shared-config:
+    name: Deploy shared config to app.sofarkotta.hu
+    runs-on: ubuntu-latest
+    needs: generate-shared-config
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.generate-shared-config.outputs.release_tag }}
+
+      - id: deploy-key-ready
+        name: Check deploy key
+        env:
+          DEPLOY_KEY: ${{ secrets.APP_SOFARKOTTA_HU_DEPLOY_KEY }}
+        run: |
+          if [[ -z "$DEPLOY_KEY" ]]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download shared config artifact
+        if: ${{ steps.deploy-key-ready.outputs.ready == 'true' }}
+        uses: actions/download-artifact@v4
+        with:
+          name: product-page-shared-config
+          path: build/downloads
+
+      - name: Load deploy key
+        if: ${{ steps.deploy-key-ready.outputs.ready == 'true' }}
+        uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.APP_SOFARKOTTA_HU_DEPLOY_KEY }}
+
+      - name: Trust GitHub SSH host key
+        if: ${{ steps.deploy-key-ready.outputs.ready == 'true' }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Deploy shared config
+        if: ${{ steps.deploy-key-ready.outputs.ready == 'true' }}
+        run: |
+          bash tool/deploy_product_page_shared_config.sh \
+            build/downloads/shared-config.js \
+            reformatus/app.sofarkotta.hu \
+            main \
+            docs/assets \
+            "Update product page downloads config for ${{ needs.generate-shared-config.outputs.release_tag }}"

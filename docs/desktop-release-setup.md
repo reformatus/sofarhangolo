@@ -1,6 +1,6 @@
 # Desktop Release Setup Runbook
 
-This runbook covers the remaining manual setup needed to make `.github/workflows/desktop-release.yml` publish desktop beta builds from GitHub Actions.
+This runbook covers the remaining manual setup needed to make `.github/workflows/release.yml` publish tagged release builds from GitHub Actions.
 
 Use the exact repository secret and variable names listed here. The workflow already expects them.
 
