@@ -119,7 +119,7 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                       child: Scaffold(
                         resizeToAvoidBottomInset: false,
                         appBar: AppBar(
-                          toolbarHeight: 48,
+                          toolbarHeight: 51,
                           title: // Search bar
                           TextField(
                             controller: _searchFieldController,

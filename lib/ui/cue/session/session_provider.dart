@@ -102,8 +102,6 @@ class ActiveCueSession extends AsyncNotifier<CueSession?> {
       _externalChangesSubscription = _source!.externalChanges.listen(
         _handleExternalChange,
       );
-
-      log.info('Lista betöltve: ${cue.title} (${slides.length} dia)');
     } catch (e, s) {
       log.severe('Hiba lista betöltése közben:', e, s);
       state = AsyncValue.error(e, s);

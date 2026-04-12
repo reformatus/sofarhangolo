@@ -4,15 +4,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
-import 'package:sofar/data/cue/cue.dart';
-import 'package:sofar/data/cue/slide.dart';
-import 'package:sofar/data/log/provider.dart';
-import 'package:sofar/services/app_links/app_links.dart';
-import 'package:sofar/services/app_version/check_new_version.dart';
-import 'package:sofar/services/connectivity/provider.dart';
-import 'package:sofar/ui/base/scaffold.dart';
-import 'package:sofar/ui/cue/session/cue_session.dart';
-import 'package:sofar/ui/cue/session/session_provider.dart';
+import 'package:sofarhangolo/data/cue/cue.dart';
+import 'package:sofarhangolo/data/cue/slide.dart';
+import 'package:sofarhangolo/data/log/provider.dart';
+import 'package:sofarhangolo/services/app_links/app_links.dart';
+import 'package:sofarhangolo/services/app_version/check_new_version.dart';
+import 'package:sofarhangolo/services/connectivity/provider.dart';
+import 'package:sofarhangolo/ui/base/scaffold.dart';
+import 'package:sofarhangolo/ui/base/widgets/active_cue_shell_card.dart';
+import 'package:sofarhangolo/ui/cue/session/cue_session.dart';
+import 'package:sofarhangolo/ui/cue/session/session_provider.dart';
 
 class _FakeConnection extends Connection {
   @override
@@ -81,6 +82,14 @@ Future<void> pumpShellScaffold(
               child: Text('Song ${state.pathParameters['uuid']}'),
             ),
           ),
+          GoRoute(
+            path: '/cue/:uuid/edit',
+            builder: (context, state) => SizedBox.expand(
+              child: Text(
+                'Cue edit ${state.pathParameters['uuid']} ${state.uri.queryParameters['slide']}',
+              ),
+            ),
+          ),
         ],
       ),
     ],
@@ -115,10 +124,10 @@ void main() {
     );
 
     expect(find.text('Aktiv lista'), findsOneWidget);
-    expect(find.byTooltip('Aktív lista bezárása'), findsOneWidget);
+    expect(find.byTooltip('Lista megnyitása'), findsOneWidget);
   });
 
-  testWidgets('does not show the active cue overlay on desktop routes', (
+  testWidgets('shows desktop cue shell controls on desktop routes', (
     tester,
   ) async {
     await pumpShellScaffold(
@@ -128,7 +137,9 @@ void main() {
       session: await createCueSession(),
     );
 
-    expect(find.text('Aktiv lista'), findsNothing);
+    expect(find.text('Aktiv lista'), findsWidgets);
+    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
   });
 
   testWidgets('does not show the active cue overlay outside bank and song', (
@@ -144,9 +155,7 @@ void main() {
     expect(find.text('Aktiv lista'), findsNothing);
   });
 
-  testWidgets('closing the overlay clears the active cue session', (
-    tester,
-  ) async {
+  testWidgets('overlay opens cue sheet on mobile bank routes', (tester) async {
     await pumpShellScaffold(
       tester,
       size: const Size(600, 900),
@@ -154,9 +163,58 @@ void main() {
       session: await createCueSession(),
     );
 
-    await tester.tap(find.byTooltip('Aktív lista bezárása'));
+    await tester.tap(find.byTooltip('Lista megnyitása'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Aktiv lista'), findsNothing);
+    expect(find.byTooltip('Bezárás'), findsOneWidget);
+  });
+
+  testWidgets('desktop indicator tap opens cue editor page', (tester) async {
+    await pumpShellScaffold(
+      tester,
+      size: const Size(1200, 900),
+      initialLocation: '/bank',
+      session: await createCueSession(),
+    );
+
+    await tester.tap(find.byType(ActiveCueSidebarIndicator));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cue edit cue-1 slide-1'), findsOneWidget);
+  });
+
+  testWidgets('tablet chevron opens cue drawer', (tester) async {
+    await pumpShellScaffold(
+      tester,
+      size: const Size(900, 700),
+      initialLocation: '/bank',
+      session: await createCueSession(),
+    );
+
+    expect(find.byTooltip('Lista bezárása'), findsNothing);
+
+    await tester.tap(find.byTooltip('Lista megnyitása').first);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Drawer), findsOneWidget);
+  });
+
+  testWidgets('narrow landscape rail layout still opens cue drawer', (
+    tester,
+  ) async {
+    await pumpShellScaffold(
+      tester,
+      size: const Size(680, 400),
+      initialLocation: '/bank',
+      session: await createCueSession(),
+    );
+
+    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.byType(NavigationRail), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Lista megnyitása').first);
+    await tester.pumpAndSettle();
+
+    expect(find.byType(Drawer), findsOneWidget);
   });
 }

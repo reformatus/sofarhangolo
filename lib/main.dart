@@ -81,22 +81,32 @@ class _LyricAppState extends ConsumerState<LyricApp> {
   Widget build(BuildContext context) {
     final generalPrefs = ref.watch(generalPreferencesProvider);
 
-    final theme = ThemeData.from(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: appConfig.colors.seedColor,
-        primary: appConfig.colors.primaryColor,
-        brightness: Brightness.light,
-      ),
-      useMaterial3: true,
-    );
-    final darkTheme = ThemeData.from(
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: appConfig.colors.seedColor,
-        primary: appConfig.colors.primaryColor,
-        surface: generalPrefs.oledBlackBackground ? Colors.black : null,
-        brightness: Brightness.dark,
-      ),
-    );
+    final theme =
+        ThemeData.from(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: appConfig.colors.seedColor,
+            primary: appConfig.colors.primaryColor,
+            brightness: Brightness.light,
+          ),
+          useMaterial3: true,
+        ).copyWith(
+          tooltipTheme: const TooltipThemeData(
+            waitDuration: Duration(milliseconds: 500),
+          ),
+        );
+    final darkTheme =
+        ThemeData.from(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: appConfig.colors.seedColor,
+            primary: appConfig.colors.primaryColor,
+            surface: generalPrefs.oledBlackBackground ? Colors.black : null,
+            brightness: Brightness.dark,
+          ),
+        ).copyWith(
+          tooltipTheme: const TooltipThemeData(
+            waitDuration: Duration(milliseconds: 500),
+          ),
+        );
 
     final commonArgs = (
       themeMode: generalPrefs.appBrightness,

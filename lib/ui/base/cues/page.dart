@@ -8,6 +8,7 @@ import '../../../services/cue/cues.dart';
 import '../../common/centered_hint.dart';
 import '../../common/error/card.dart';
 import '../../cue/cue_page_type.dart';
+import '../../cue/session/session_provider.dart';
 import 'dialogs.dart';
 
 class SetsPage extends ConsumerStatefulWidget {
@@ -21,6 +22,11 @@ class _SetsPageState extends ConsumerState<SetsPage> {
   @override
   Widget build(BuildContext context) {
     final cues = ref.watch(watchAllCuesProvider);
+    final activeCueUuid = ref.watch(
+      activeCueSessionProvider.select(
+        (sessionAsync) => sessionAsync.value?.cue.uuid,
+      ),
+    );
 
     return Scaffold(
       appBar: AppBar(title: Text('Listáim')),
@@ -28,13 +34,12 @@ class _SetsPageState extends ConsumerState<SetsPage> {
         onPressed: () =>
             showDialog(
               context: context,
-              builder: (context) => EditCueDialog(),
+              builder: (context) => EditCueDialog(activateAfterCreate: true),
             ).then((createdCue) {
               if (!mounted) return;
               if (createdCue == null) return;
-              createdCue as Cue;
-              // ignore: use_build_context_synchronously
-              context.push(cueRoutePath(createdCue.uuid, CuePageType.edit));
+              if (!context.mounted) return;
+              context.go('/bank');
             }),
         label: Text('Új lista'),
         icon: Icon(Icons.add_box_outlined),
@@ -51,7 +56,11 @@ class _SetsPageState extends ConsumerState<SetsPage> {
         AsyncLoading() => Center(child: CircularProgressIndicator()),
         AsyncValue(:final value!) =>
           value.isNotEmpty
-              ? ListView(children: value.map((e) => CueTile(e)).toList())
+              ? ListView(
+                  children: value
+                      .map((e) => CueTile(e, isActive: e.uuid == activeCueUuid))
+                      .toList(),
+                )
               : Center(
                   child: CenteredHint(
                     'Adj hozzá egy listát a jobb alsó sarokban!',
@@ -63,17 +72,31 @@ class _SetsPageState extends ConsumerState<SetsPage> {
   }
 }
 
-class CueTile extends StatelessWidget {
-  const CueTile(this.cue, {super.key});
+class CueTile extends ConsumerWidget {
+  const CueTile(this.cue, {required this.isActive, super.key});
 
   final Cue cue;
+  final bool isActive;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return ListTile(
+      selected: isActive,
+      selectedTileColor: Theme.of(context).colorScheme.onPrimary,
       title: Text(cue.title),
       subtitle: cue.description.isNotEmpty ? Text(cue.description) : null,
-      onTap: () => context.push(cueRoutePath(cue.uuid, CuePageType.edit)),
+      onTap: () async {
+        final activeCueUuid = ref
+            .read(activeCueSessionProvider)
+            .value
+            ?.cue
+            .uuid;
+        if (activeCueUuid != null && activeCueUuid != cue.uuid) {
+          await ref.read(activeCueSessionProvider.notifier).unload();
+        }
+        if (!context.mounted) return;
+        context.push(cueRoutePath(cue.uuid, CuePageType.edit));
+      },
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -92,6 +115,13 @@ class CueTile extends StatelessWidget {
               builder: (context) => DeleteCueDialog(cue: cue),
             ),
           ),
+          if (isActive)
+            IconButton(
+              icon: const Icon(Icons.close),
+              tooltip: 'Aktív lista bezárása',
+              onPressed: () =>
+                  ref.read(activeCueSessionProvider.notifier).unload(),
+            ),
         ],
       ),
     );

@@ -5,16 +5,18 @@ import 'package:go_router/go_router.dart';
 import '../../../../data/bank/bank.dart';
 import '../../../../data/cue/slide.dart';
 import '../../../../data/database.dart';
+import '../../../../data/log/logger.dart';
 import '../../../../data/song/extensions.dart';
 import '../../../../data/song/song.dart';
 import '../../../../services/app_links/navigation.dart';
 import '../../../../services/connectivity/provider.dart';
 import '../../../../services/songs/filter.dart';
 import '../../../../services/ui/messenger_service.dart';
-import '../../../../config/config.dart';
 import '../../../cue/session/session_provider.dart';
 import '../../../song/state.dart';
 import '../../../common/key_text.dart';
+
+const double _hideDownloadIndicatorsBelowWidth = 560;
 
 class LSongResultTile extends ConsumerWidget {
   const LSongResultTile(this.songResult, this.bank, {this.onTap, super.key});
@@ -29,75 +31,37 @@ class LSongResultTile extends ConsumerWidget {
     final SongFulltextSearchResult? result = songResult.result;
     final List<String> downloadedAssets = songResult.downloadedAssets;
     final connection = ref.watch(connectionProvider);
-    final showActiveCueQuickAdd =
-        MediaQuery.sizeOf(context).width <
-            appConfig.breakpoints.desktopFromWidth &&
-        ref.watch(
-          activeCueSessionProvider.select(
-            (sessionAsync) => sessionAsync.value != null,
-          ),
-        );
-
-    return ListTile(
-      // far future todo dense on desktop (maybe even table?)
-      onTap: () {
-        onTap?.call();
-        context.push(songRoutePath(song.uuid));
-      },
-      title: RichText(
-        text: TextSpan(
-          children: spansFromSnippet(
-            result?.matchTitle ?? song.title,
-            normalStyle: Theme.of(context).textTheme.bodyLarge!,
-            highlightStyle: Theme.of(context).textTheme.bodyLarge!.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-        ),
+    final showActiveCueQuickAdd = ref.watch(
+      activeCueSessionProvider.select(
+        (sessionAsync) => sessionAsync.value != null,
       ),
-      subtitle: result == null
-          ? song.firstLine
-                        .replaceAll(RegExp(r'[^a-zA-Z]'), '')
-                        .startsWith(
-                          song.title.replaceAll(RegExp(r'[^a-zA-Z]'), ''),
-                        ) ||
-                    song.firstLine.isEmpty
-                ? null
-                : Text(
-                    song.firstLine,
-                    maxLines: 1,
-                    softWrap: false,
-                    overflow: TextOverflow.fade,
-                  )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                if (hasMatch(result.matchLyrics))
-                  contentResultRow(
-                    context,
-                    Icons.text_snippet,
-                    result.matchLyrics,
-                  ),
-              ],
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final hideSongFeatures =
+            showActiveCueQuickAdd &&
+            constraints.maxWidth < _hideDownloadIndicatorsBelowWidth;
+        final leadingChildren = <Widget>[
+          if (showActiveCueQuickAdd)
+            Padding(
+              padding: EdgeInsets.only(right: 10),
+              child: ActiveCueQuickAddButton(song: song),
             ),
-      leading: bank?.tinyLogo != null
-          ? Tooltip(
+          if (bank?.tinyLogo != null)
+            Tooltip(
               message: bank!.name,
               child: Padding(
-                padding: EdgeInsets.only(right: 5),
+                padding: const EdgeInsets.only(right: 5),
                 child: SizedBox.square(
                   dimension: 26,
                   child: Image.memory(bank!.tinyLogo!),
                 ),
               ),
-            )
-          : null,
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+            ),
+        ];
+        final trailingChildren = <Widget>[
           ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: 100),
+            constraints: const BoxConstraints(maxWidth: 100),
             child: Text(
               displayKeyFields(song.keyField),
               textAlign: TextAlign.right,
@@ -105,22 +69,75 @@ class LSongResultTile extends ConsumerWidget {
               overflow: TextOverflow.clip,
             ),
           ),
-          SizedBox(width: 10),
-          if (showActiveCueQuickAdd)
-            ActiveCueQuickAddButton(song: song)
-          else ...[
+          if (!hideSongFeatures) ...[
             if (downloadedAssets.isNotEmpty &&
-                connection == ConnectionType.offline) ...[
+                connection == ConnectionType.offline)
               Tooltip(
                 message: 'Kottakép letöltve',
                 child: Icon(Icons.offline_pin, color: Colors.green[600]),
               ),
-              SizedBox(width: 10),
-            ],
             SongFeatures(song, downloadedAssets),
           ],
-        ],
-      ),
+        ];
+
+        return ListTile(
+          // far future todo dense on desktop (maybe even table?)
+          onTap: () {
+            onTap?.call();
+            context.push(songRoutePath(song.uuid));
+          },
+          title: RichText(
+            text: TextSpan(
+              children: spansFromSnippet(
+                result?.matchTitle ?? song.title,
+                normalStyle: Theme.of(context).textTheme.bodyLarge!,
+                highlightStyle: Theme.of(context).textTheme.bodyLarge!.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+            ),
+          ),
+          subtitle: result == null
+              ? song.firstLine
+                            .replaceAll(RegExp(r'[^a-zA-Z]'), '')
+                            .startsWith(
+                              song.title.replaceAll(RegExp(r'[^a-zA-Z]'), ''),
+                            ) ||
+                        song.firstLine.isEmpty
+                    ? null
+                    : Text(
+                        song.firstLine,
+                        maxLines: 1,
+                        softWrap: false,
+                        overflow: TextOverflow.fade,
+                      )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (hasMatch(result.matchLyrics))
+                      contentResultRow(
+                        context,
+                        Icons.text_snippet,
+                        result.matchLyrics,
+                      ),
+                  ],
+                ),
+          minLeadingWidth: leadingChildren.isEmpty ? 40 : 0,
+          leading: leadingChildren.isEmpty
+              ? null
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: leadingChildren.separatedBy(
+                    const SizedBox(width: 4),
+                  ),
+                ),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: trailingChildren.separatedBy(const SizedBox(width: 10)),
+          ),
+        );
+      },
     );
   }
 
@@ -155,45 +172,110 @@ class LSongResultTile extends ConsumerWidget {
   }
 }
 
-class ActiveCueQuickAddButton extends ConsumerWidget {
+extension _SeparatedWidgets on List<Widget> {
+  List<Widget> separatedBy(Widget separator) {
+    if (isEmpty) {
+      return const [];
+    }
+
+    return [
+      for (int i = 0; i < length; i++) ...[if (i > 0) separator, this[i]],
+    ];
+  }
+}
+
+class ActiveCueQuickAddButton extends ConsumerStatefulWidget {
   const ActiveCueQuickAddButton({required this.song, super.key});
 
   final Song song;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ActiveCueQuickAddButton> createState() =>
+      _ActiveCueQuickAddButtonState();
+}
+
+class _ActiveCueQuickAddButtonState
+    extends ConsumerState<ActiveCueQuickAddButton> {
+  bool _isAdding = false;
+
+  Future<void> _handleAdd() async {
+    final session = ref.read(activeCueSessionProvider).value;
+    if (session == null || _isAdding) {
+      return;
+    }
+
+    setState(() => _isAdding = true);
+    try {
+      final defaultViewType = await ref.read(
+        viewTypeForProvider(widget.song, null).future,
+      );
+
+      ref
+          .read(activeCueSessionProvider.notifier)
+          .addSlide(SongSlide.from(widget.song, viewType: defaultViewType));
+
+      messengerService.showSnackBarReplacingCurrent(
+        SnackBar(
+          showCloseIcon: true,
+          content: Text(
+            '${widget.song.title} hozzáadva a listához: ${session.cue.title}',
+          ),
+          duration: const Duration(seconds: 4),
+        ),
+        forceHideAfter: const Duration(seconds: 4),
+      );
+    } catch (e, s) {
+      log.severe(
+        'Nem sikerült alapértelmezett nézetet betölteni gyors hozzáadáshoz: ${widget.song.uuid}',
+        e,
+        s,
+      );
+      messengerService.showSnackBarReplacingCurrent(
+        const SnackBar(
+          showCloseIcon: true,
+          content: Text('Nem sikerült hozzáadni dalt a listához.'),
+          duration: Duration(seconds: 4),
+        ),
+        forceHideAfter: const Duration(seconds: 4),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isAdding = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final session = ref.watch(
       activeCueSessionProvider.select((sessionAsync) => sessionAsync.value),
-    );
-    final defaultViewType = ref.watch(
-      viewTypeForProvider(song, null).select((asyncValue) => asyncValue.value),
     );
 
     if (session == null) {
       return const SizedBox.shrink();
     }
 
+    final songAlreadyInCue = session.slides.whereType<SongSlide>().any(
+      (slide) => slide.song.uuid == widget.song.uuid,
+    );
+
+    if (songAlreadyInCue) {
+      return IconButton(
+        tooltip: 'Újra hozzáadás ehhez a listához',
+        onPressed: _isAdding ? null : _handleAdd,
+        icon: _isAdding
+            ? const SizedBox.square(
+                dimension: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.add),
+      );
+    }
+
     return IconButton.filledTonal(
       tooltip: '${session.cue.title} listához adás',
-      onPressed: defaultViewType == null
-          ? null
-          : () {
-              ref
-                  .read(activeCueSessionProvider.notifier)
-                  .addSlide(SongSlide.from(song, viewType: defaultViewType));
-
-              messengerService.showSnackBarReplacingCurrent(
-                SnackBar(
-                  showCloseIcon: true,
-                  content: Text(
-                    '${song.title} hozzáadva a listához: ${session.cue.title}',
-                  ),
-                  duration: const Duration(seconds: 4),
-                ),
-                forceHideAfter: const Duration(seconds: 4),
-              );
-            },
-      icon: defaultViewType == null
+      onPressed: _isAdding ? null : _handleAdd,
+      icon: _isAdding
           ? const SizedBox.square(
               dimension: 16,
               child: CircularProgressIndicator(strokeWidth: 2),
