@@ -171,30 +171,30 @@ class ActiveCueSidebarIndicator extends StatelessWidget {
       right: Radius.circular(listVisible ? 0 : 24),
     );
 
-    return Tooltip(
-      message: session.cue.title,
-      child: AnimatedContainer(
-        duration: Durations.medium2,
-        curve: Curves.easeInOutCubicEmphasized,
-        decoration: BoxDecoration(color: pillColor, borderRadius: radius),
-        child: Material(
-          color: Colors.transparent,
-          borderRadius: radius,
-          clipBehavior: Clip.antiAlias,
-          child: extendedRail
-              ? _ExpandedIndicator(
-                  title: session.cue.title,
-                  slideCount: session.slideCount,
-                  foregroundColor: fgColor,
-                  onToggleList: onToggleList,
-                  listVisible: listVisible,
-                )
-              : _CollapsedIndicator(
+    return AnimatedContainer(
+      duration: Durations.medium2,
+      curve: Curves.easeInOutCubicEmphasized,
+      decoration: BoxDecoration(color: pillColor, borderRadius: radius),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: radius,
+        clipBehavior: Clip.antiAlias,
+        child: extendedRail
+            ? _ExpandedIndicator(
+                title: session.cue.title,
+                slideCount: session.slideCount,
+                foregroundColor: fgColor,
+                onToggleList: onToggleList,
+                listVisible: listVisible,
+              )
+            : Tooltip(
+                message: session.cue.title,
+                child: _CollapsedIndicator(
                   foregroundColor: fgColor,
                   onToggleList: onToggleList,
                   listVisible: listVisible,
                 ),
-        ),
+              ),
       ),
     );
   }
@@ -230,42 +230,34 @@ class _ExpandedIndicator extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(Icons.list, size: 22, color: foregroundColor),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: railLabelStyle?.copyWith(
-                      color: foregroundColor,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
+            Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: railLabelStyle?.copyWith(
+                color: foregroundColor,
+                fontWeight: FontWeight.w500,
+              ),
             ),
             const SizedBox(height: 8),
             Row(
               children: [
-                Expanded(
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: Text(
-                      '$slideCount dia',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: railLabelStyle?.copyWith(
-                        color: foregroundColor.withValues(alpha: 0.85),
-                      ),
-                    ),
+                Icon(Icons.list, size: 18, color: foregroundColor),
+                const SizedBox(width: 6),
+                Text(
+                  '$slideCount dia',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: railLabelStyle?.copyWith(
+                    color: foregroundColor.withValues(alpha: 0.85),
                   ),
                 ),
+                const Spacer(),
                 const SizedBox(width: 8),
                 IconButton.filled(
-                  tooltip: listVisible ? 'Lista bezárása' : 'Lista megnyitása',
+                  tooltip: listVisible
+                      ? 'Lista összecsukása'
+                      : 'Lista kinyitása',
                   onPressed: onToggleList,
                   visualDensity: VisualDensity.compact,
                   style: IconButton.styleFrom(
@@ -300,28 +292,27 @@ class _CollapsedIndicator extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          InkWell(
-            borderRadius: BorderRadius.circular(16),
-            onTap: onToggleList,
-            child: Padding(
+    return InkWell(
+      onTap: onToggleList,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
               padding: const EdgeInsets.fromLTRB(14, 8, 14, 6),
               child: Icon(Icons.list, color: foregroundColor, size: 26),
             ),
-          ),
-          IconButton(
-            tooltip: listVisible ? 'Lista bezárása' : 'Lista megnyitása',
-            onPressed: onToggleList,
-            icon: Icon(
-              listVisible ? Icons.chevron_left : Icons.chevron_right,
-              color: foregroundColor,
+            IconButton(
+              tooltip: listVisible ? 'Lista összecsukása' : 'Lista kinyitása',
+              onPressed: onToggleList,
+              icon: Icon(
+                listVisible ? Icons.chevron_left : Icons.chevron_right,
+                color: foregroundColor,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

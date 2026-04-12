@@ -21,6 +21,8 @@ typedef GeneralNavigationDestination = ({
   String label,
 });
 
+enum _ShellNavigationSizeClass { compact, desktop }
+
 NavigationDestination destinationFromGeneral(GeneralNavigationDestination d) =>
     NavigationDestination(
       icon: d.icon,
@@ -68,21 +70,14 @@ class BaseScaffold extends ConsumerStatefulWidget {
 class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
   final _contentScaffoldKey = GlobalKey<ScaffoldState>();
   bool _desktopCueListVisible = true;
-  bool _desktopCueListSlotVisible = true;
   bool _tabletCueDrawerVisible = false;
-  int _desktopCueListAnimationTick = 0;
+  _ShellNavigationSizeClass? _activeNavigationSizeClass;
+  _ShellNavigationSizeClass? _scheduledNavigationSizeClass;
 
   @override
   void initState() {
     super.initState();
-    //extendedNavRail = MediaQuery.of(context).size.width > appConfig.breakpoints.desktopFromWidth;
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      setState(() {
-        extendedNavRail =
-            MediaQuery.of(context).size.width >
-            appConfig.breakpoints.desktopFromWidth;
-      });
-
       shouldNavigateListener = ref.listenManual(shouldNavigateProvider, (
         _,
         path,
@@ -106,6 +101,35 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
   late ProviderSubscription shouldNavigateListener;
 
   bool extendedNavRail = true;
+
+  _ShellNavigationSizeClass _navigationSizeClassFor(double width) {
+    return width > appConfig.breakpoints.desktopFromWidth
+        ? _ShellNavigationSizeClass.desktop
+        : _ShellNavigationSizeClass.compact;
+  }
+
+  void _scheduleNavigationSizeClassSync(_ShellNavigationSizeClass sizeClass) {
+    if (_scheduledNavigationSizeClass == sizeClass) {
+      return;
+    }
+
+    _scheduledNavigationSizeClass = sizeClass;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _scheduledNavigationSizeClass != sizeClass) {
+        return;
+      }
+
+      _scheduledNavigationSizeClass = null;
+      if (_activeNavigationSizeClass == sizeClass) {
+        return;
+      }
+
+      setState(() {
+        _activeNavigationSizeClass = sizeClass;
+        extendedNavRail = sizeClass == _ShellNavigationSizeClass.desktop;
+      });
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -157,6 +181,18 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
         final theme = Theme.of(context);
         final isDesktop =
             constraints.maxWidth > appConfig.breakpoints.desktopFromWidth;
+        final navigationSizeClass = _navigationSizeClassFor(
+          constraints.maxWidth,
+        );
+
+        if (_activeNavigationSizeClass == null) {
+          _activeNavigationSizeClass = navigationSizeClass;
+          extendedNavRail =
+              navigationSizeClass == _ShellNavigationSizeClass.desktop;
+        } else if (_activeNavigationSizeClass != navigationSizeClass) {
+          _scheduleNavigationSizeClassSync(navigationSizeClass);
+        }
+
         // most songs are A4, this way we have the highest chance of fitting the song on the screen the biggest possible
         // TODO move this to global; take this into account on song page as well?
         bool showBottomNavBar =
@@ -171,6 +207,7 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
             ? activeCueSession
             : null;
         final cuePanelColor = theme.colorScheme.surfaceContainerLow;
+        final cueIndicatorAttachedColor = theme.colorScheme.surfaceBright;
         final sidebarCueListVisible = isDesktop
             ? _desktopCueListVisible
             : _tabletCueDrawerVisible;
@@ -188,32 +225,9 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
         );
 
         void toggleDesktopCueList() {
-          if (_desktopCueListVisible) {
-            final currentTick = ++_desktopCueListAnimationTick;
-            setState(() {
-              _desktopCueListVisible = false;
-            });
-            if (cueOverlayAnimationDuration == Duration.zero) {
-              setState(() {
-                _desktopCueListSlotVisible = false;
-              });
-              return;
-            }
-            Future<void>.delayed(cueOverlayAnimationDuration, () {
-              if (!mounted) return;
-              if (currentTick != _desktopCueListAnimationTick) return;
-              if (_desktopCueListVisible) return;
-              setState(() {
-                _desktopCueListSlotVisible = false;
-              });
-            });
-          } else {
-            _desktopCueListAnimationTick++;
-            setState(() {
-              _desktopCueListSlotVisible = true;
-              _desktopCueListVisible = true;
-            });
-          }
+          setState(() {
+            _desktopCueListVisible = !_desktopCueListVisible;
+          });
         }
 
         return Scaffold(
@@ -307,7 +321,8 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
                                                   }
                                                 }
                                               },
-                                              attachedColor: cuePanelColor,
+                                              attachedColor:
+                                                  cueIndicatorAttachedColor,
                                             ),
                                           ),
                                         Spacer(),
@@ -396,52 +411,46 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
                                 ),
                               ),
                             ),
-                            if (showDesktopCueSidebar &&
-                                (_desktopCueListVisible ||
-                                    _desktopCueListSlotVisible))
-                              SizedBox(
-                                width: cuePanelWidth,
-                                child: Material(
-                                  key: const ValueKey('desktop-cue-sidebar'),
-                                  elevation: 0,
-                                  shadowColor: Colors.transparent,
-                                  color: cuePanelColor,
-                                  child: SafeArea(
-                                    top: false,
-                                    bottom: false,
-                                    child: AnimatedSwitcher(
-                                      duration: cueOverlayAnimationDuration,
-                                      switchInCurve:
-                                          Curves.easeInOutCubicEmphasized,
-                                      switchOutCurve: Curves
-                                          .easeInOutCubicEmphasized
-                                          .flipped,
-                                      transitionBuilder: (child, animation) {
-                                        final offsetAnimation = Tween<Offset>(
-                                          begin: const Offset(-0.08, 0),
-                                          end: Offset.zero,
-                                        ).animate(animation);
-                                        return FadeTransition(
-                                          opacity: animation,
-                                          child: SlideTransition(
-                                            position: offsetAnimation,
-                                            child: child,
+                            if (showDesktopCueSidebar)
+                              TweenAnimationBuilder<double>(
+                                tween: Tween<double>(
+                                  end: _desktopCueListVisible ? 1 : 0,
+                                ),
+                                duration: cueOverlayAnimationDuration,
+                                curve: Curves.easeInOutCubicEmphasized,
+                                builder: (context, progress, child) {
+                                  return SizedBox(
+                                    width: cuePanelWidth * progress,
+                                    child: ClipRect(
+                                      child: OverflowBox(
+                                        alignment: Alignment.centerLeft,
+                                        minWidth: cuePanelWidth,
+                                        maxWidth: cuePanelWidth,
+                                        child: Transform.translate(
+                                          offset: Offset(
+                                            cuePanelWidth * (progress - 1),
+                                            0,
                                           ),
-                                        );
-                                      },
-                                      child: _desktopCueListVisible
-                                          ? CueShellPanel(
-                                              key: const ValueKey(
-                                                'desktop-cue-sidebar-panel',
-                                              ),
-                                              session: sidebarCueSession!,
-                                              currentPath: currentPath,
-                                            )
-                                          : const SizedBox.shrink(
-                                              key: ValueKey(
-                                                'desktop-cue-sidebar-hidden',
-                                              ),
-                                            ),
+                                          child: child,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: SizedBox(
+                                  width: cuePanelWidth,
+                                  child: Material(
+                                    key: const ValueKey('desktop-cue-sidebar'),
+                                    elevation: 0,
+                                    shadowColor: Colors.transparent,
+                                    color: cuePanelColor,
+                                    child: SafeArea(
+                                      top: false,
+                                      bottom: false,
+                                      child: CueShellPanel(
+                                        session: sidebarCueSession!,
+                                        currentPath: currentPath,
+                                      ),
                                     ),
                                   ),
                                 ),
