@@ -3,6 +3,7 @@ import 'package:dart_opensong/dart_opensong.dart' as os;
 import 'package:fading_edge_scrollview/fading_edge_scrollview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:html_unescape/html_unescape.dart';
 
 import '../../../data/cue/slide.dart';
 import '../../../data/song/lyrics/parser.dart';
@@ -11,8 +12,8 @@ import '../../../data/song/transpose.dart';
 import '../../../services/key/get_transposed.dart';
 import '../../../services/preferences/providers/lyrics_view_style.dart';
 import '../../../services/song/verse_tag_pretty.dart';
-import '../../cue/session/session_provider.dart';
 import '../../common/error/card.dart';
+import '../../cue/session/session_provider.dart';
 import '../transpose/state.dart';
 
 class LyricsView extends ConsumerWidget {
@@ -94,11 +95,11 @@ class LyricsView extends ConsumerWidget {
                       ),
                     ),
                   ...verses.map(
-                    (e) => SizedBox(
+                    (verse) => SizedBox(
                       width: cardWidth,
                       child: VerseCard(
                         song,
-                        e as OpenSongVerse,
+                        verse as OpenSongVerse,
                         transpose: transpose,
                       ),
                     ),
@@ -181,17 +182,17 @@ class _VerseCardState extends ConsumerState<VerseCard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: widget.verse.raw.parts
                         .map(
-                          (e) => switch (e) {
+                          (versePart) => switch (versePart) {
                             os.VerseLine(:final segments) => Wrap(
                               alignment: WrapAlignment.start,
                               crossAxisAlignment: WrapCrossAlignment.start,
                               children: segments
                                   .map(
-                                    (e) => LyricsSegment(
+                                    (segment) => LyricsSegment(
                                       song: widget.song,
                                       transpose: widget.transpose,
                                       segments: segments,
-                                      e: e,
+                                      segment: segment,
                                     ),
                                   )
                                   .toList(),
@@ -228,11 +229,11 @@ class LyricsSegment extends ConsumerWidget {
     required this.song,
     required this.transpose,
     required this.segments,
-    required this.e,
+    required this.segment,
   });
 
   final List<os.VerseLineSegment> segments;
-  final os.VerseLineSegment e;
+  final os.VerseLineSegment segment;
   final Song song;
   final SongTranspose transpose;
 
@@ -240,8 +241,10 @@ class LyricsSegment extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final lyricsViewStyle = ref.watch(lyricsViewStylePreferencesProvider);
 
+    segment.lyrics = HtmlUnescape().convert(segment.lyrics);
+
     final chord = getTransposedChord(
-      e.chord,
+      segment.chord,
       song.primaryKeyField?.pitch,
       transpose.finalTransposeBy,
     );
@@ -259,7 +262,7 @@ class LyricsSegment extends ConsumerWidget {
 
     final TextPainter lyricsPainter = TextPainter(
       text: TextSpan(
-        text: e.lyrics,
+        text: segment.lyrics,
         style: TextStyle(fontSize: lyricsViewStyle.lyricsSize),
       ),
       textDirection: TextDirection.ltr,
@@ -269,7 +272,7 @@ class LyricsSegment extends ConsumerWidget {
 
     double hyphenWidth = 0;
 
-    if (e.hyphenAfter) {
+    if (segment.hyphenAfter) {
       hyphenWidth = (chordWidth - lyricsPainter.width).clamp(
         0,
         double.infinity,
@@ -295,11 +298,11 @@ class LyricsSegment extends ConsumerWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (e.lyrics.isNotEmpty)
+                if (segment.lyrics.isNotEmpty)
                   ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: constraints.maxWidth),
                     child: Text(
-                      e.lyrics,
+                      segment.lyrics,
                       style: TextStyle(fontSize: lyricsViewStyle.lyricsSize),
                     ),
                   )
