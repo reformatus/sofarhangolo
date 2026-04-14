@@ -76,6 +76,7 @@ dependencies:
   cached_network_image: ^3.4.1 # TODO Replace with our implementation, as this uses sqflite
   flutter_test:
     sdk: flutter
+  html_unescape: ^2.0.0
 
 dev_dependencies:
   msix: ^3.16.9
