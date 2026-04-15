@@ -31,7 +31,6 @@ migrate_working_dir/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-pubspec.lock
 /build/
 web/drift_worker.js
 web/drift_worker.js.deps
