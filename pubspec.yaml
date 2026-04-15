@@ -58,7 +58,7 @@ dependencies:
   dart_opensong: ^0.0.4
   chord_transposer:
     git:
-      url: https://github.com/RedyAu/dart_chord_transposer
+      url: https://github.com/reformatus/dart_chord_transposer
       ref: main
   pdfrx: ^2.2.16
   music_notes: ^0.24.0
