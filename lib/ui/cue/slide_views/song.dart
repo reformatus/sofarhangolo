@@ -27,24 +27,31 @@ class SongSlideTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ReorderableDelayedDragStartListener(
       index: index,
-      child: ListTile(
-        title: Text(slide.song.title),
-        onTap: selectCallback,
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              onPressed: removeCallback,
-              icon: Icon(Icons.delete_outline),
-            ),
-            ReorderableDragStartListener(
-              index: index,
-              child: Icon(Icons.drag_handle),
-            ),
-          ],
+      child: MediaQuery.removeViewPadding(
+        removeBottom: true,
+        removeLeft: true,
+        removeRight: true,
+        removeTop: true,
+        context: context,
+        child: ListTile(
+          title: Text(slide.song.title),
+          onTap: selectCallback,
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              IconButton(
+                onPressed: removeCallback,
+                icon: Icon(Icons.delete_outline),
+              ),
+              ReorderableDragStartListener(
+                index: index,
+                child: Icon(Icons.drag_handle),
+              ),
+            ],
+          ),
+          selected: isCurrent,
+          selectedTileColor: Theme.of(context).colorScheme.onPrimary,
         ),
-        selected: isCurrent,
-        selectedTileColor: Theme.of(context).colorScheme.onPrimary,
       ),
     );
   }
