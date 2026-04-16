@@ -233,7 +233,7 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
               children: [
                 Expanded(
                   child: showBottomNavBar
-                      ? MediaQuery.removePadding(
+                      ? MediaQuery.removeViewPadding(
                           context: context,
                           removeBottom: true,
                           child: SafeArea(child: cueAwareChild),
@@ -528,9 +528,12 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
                                           backgroundColor: cuePanelColor,
                                           elevation: 0,
                                           shape: const RoundedRectangleBorder(),
-                                          child: SafeArea(
-                                            top: false,
-                                            bottom: false,
+                                          child: MediaQuery.removeViewPadding(
+                                            context: context,
+                                            removeTop: true,
+                                            removeBottom: true,
+                                            removeLeft: true,
+                                            removeRight: true,
                                             child: CueShellPanel(
                                               session: sidebarCueSession!,
                                               currentPath: currentPath,
@@ -540,7 +543,7 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
                                           ),
                                         )
                                       : null,
-                                  body: MediaQuery.removePadding(
+                                  body: MediaQuery.removeViewPadding(
                                     removeLeft: true,
                                     context: context,
                                     child: SafeArea(child: cueAwareChild),
@@ -606,7 +609,7 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
                             key: ValueKey('cue-shell-card-empty'),
                           ),
                   ),
-                  MediaQuery.removePadding(
+                  MediaQuery.removeViewPadding(
                     context: context,
                     removeTop: true,
                     child: NavigationBar(
