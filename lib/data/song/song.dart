@@ -38,7 +38,7 @@ class Song extends Insertable<Song> {
 
       // Infer format from lyrics when available, otherwise default to opensong.
       final LyricsFormat format = lyricsFromLyricsField != null
-          ? LyricsFormat.fromString(json['lyricsFormat'])
+          ? LyricsFormat.fromString(json['lyrics_format'])
           : LyricsFormat.opensong;
 
       if (!mandatoryFields.every((field) => json.containsKey(field))) {
