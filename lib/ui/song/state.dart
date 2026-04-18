@@ -59,19 +59,26 @@ class ViewTypeFor extends _$ViewTypeFor {
         .watch(songViewOrderPreferencesProvider)
         .songViewOrder;
 
+    SongViewType result;
     if (ref.read(connectionProvider) == ConnectionType.offline) {
       List<String> downloadedAssets = await downloadedAssetsForSong(song);
 
-      return songViewOrder.firstWhere(
+      result = songViewOrder.firstWhere(
         (v) =>
             (song.availableViews.contains(v.name)) &&
             (!v.requiresAsset ||
                 (v.requiresAsset && downloadedAssets.contains(v.name))),
       );
     } else {
-      return songViewOrder.firstWhere(
+      result = songViewOrder.firstWhere(
         (v) => song.availableViews.contains(v.name),
       );
+    }
+
+    if (result == SongViewType.lyrics && song.hasChords) {
+      return SongViewType.chords;
+    } else {
+      return result;
     }
   }
 
@@ -96,6 +103,10 @@ class ViewTypeFor extends _$ViewTypeFor {
       }
     }
     // Standalone: direct state update
-    state = AsyncValue.data(newValue);
+    if (newValue == SongViewType.lyrics && song.hasChords) {
+      state = AsyncValue.data(SongViewType.chords);
+    } else {
+      state = AsyncValue.data(newValue);
+    }
   }
 }
