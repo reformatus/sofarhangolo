@@ -2,7 +2,7 @@
 Version=1.0
 Type=Application
 Name=Sófár Hangoló
-GenericName=Songbook and tuning companion
+GenericName=Offline-first sheet music organisation
 Comment=Minden kotta, mindig veled
 Exec=sofarhangolo
 Icon=org.lyricapp.sofar
