@@ -23,7 +23,7 @@ msix_config:
   capabilities: internetClient
   store: true
   protocol_activation: https, lyric
-  app_uri_handler_hosts: app.sofarkotta.hu
+  app_uri_handler_hosts: app.sofarhangolo.hu
 
 dependencies:
   flutter:

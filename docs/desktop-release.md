@@ -6,13 +6,13 @@ This repository now contains GitHub Actions based release automation for:
 - macOS native installer (`.dmg`) plus App Store Connect/TestFlight upload path (`.pkg`)
 - Linux Flatpak bundle (`.flatpak`)
 - mobile sidecar artifact pickup from Codemagic (`.apk`, `.ipa`) when available
-- web build plus deployment to `app.sofarkotta.hu`
+- web build plus deployment to `app.sofarhangolo.hu`
 
 ## Workflow entrypoint
 
 Use `.github/workflows/release.yml` for desktop and web release work.
 Use `.github/workflows/release-mobile-assets.yml` for mobile sidecar artifact pickup from Codemagic.
-Use `.github/workflows/update-product-page-downloads.yml` to publish the static downloads config consumed by the `app.sofarkotta.hu` landing pages.
+Use `.github/workflows/update-product-page-downloads.yml` to publish the static downloads config consumed by the `app.sofarhangolo.hu` landing pages.
 
 Primary trigger:
 
