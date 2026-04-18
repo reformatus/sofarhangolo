@@ -10,5 +10,9 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>applinks:app.sofarhangolo.hu</string>
+	</array>
 </dict>
 </plist>

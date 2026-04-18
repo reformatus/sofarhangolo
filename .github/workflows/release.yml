@@ -413,7 +413,20 @@ jobs:
         if: ${{ steps.developer-id-ready.outputs.ready == 'true' }}
         run: |
           APP_PATH="$(find build/macos/Build/Products/Release -maxdepth 1 -name '*.app' -print -quit)"
-          codesign --deep --force --options runtime --sign "${{ secrets.MACOS_DEVELOPER_ID_APPLICATION }}" "$APP_PATH"
+          codesign \
+            --deep \
+            --force \
+            --options runtime \
+            --entitlements macos/Runner/DirectDistribution.entitlements \
+            --sign "${{ secrets.MACOS_DEVELOPER_ID_APPLICATION }}" \
+            "$APP_PATH"
+
+      - name: Verify macOS direct-distribution entitlements
+        if: ${{ steps.developer-id-ready.outputs.ready == 'true' }}
+        run: |
+          APP_PATH="$(find build/macos/Build/Products/Release -maxdepth 1 -name '*.app' -print -quit)"
+          codesign -d --entitlements :- "$APP_PATH" > "$RUNNER_TEMP/direct-distribution-entitlements.plist"
+          grep -q 'applinks:app.sofarhangolo.hu' "$RUNNER_TEMP/direct-distribution-entitlements.plist"
 
       - name: Build DMG
         run: |
@@ -508,6 +521,13 @@ jobs:
             -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
             -exportOptionsPlist "$RUNNER_TEMP/exportOptions.plist" \
             -exportPath "$RUNNER_TEMP/app-store"
+
+      - name: Verify macOS App Store entitlements
+        if: ${{ steps.app-store-ready.outputs.ready == 'true' }}
+        run: |
+          APP_PATH="$(find "$RUNNER_TEMP/Runner.xcarchive/Products/Applications" -maxdepth 1 -name '*.app' -print -quit)"
+          codesign -d --entitlements :- "$APP_PATH" > "$RUNNER_TEMP/app-store-entitlements.plist"
+          grep -q 'applinks:app.sofarhangolo.hu' "$RUNNER_TEMP/app-store-entitlements.plist"
 
       - name: Upload App Store package artifact
         if: ${{ steps.app-store-ready.outputs.ready == 'true' }}

@@ -41,6 +41,11 @@ Repository secrets:
 - `WINDOWS_STORE_CLIENT_ID`
 - `WINDOWS_STORE_CLIENT_SECRET`
 
+Notes:
+
+- Apps for Websites support is only expected for the MSIX / Microsoft Store package
+- the standalone `.exe` installer uses `lyric:` protocol registration as fallback
+
 ### macOS direct distribution
 
 Repository secrets:
@@ -51,6 +56,11 @@ Repository secrets:
 - `MACOS_NOTARY_API_KEY_ID`
 - `MACOS_NOTARY_API_ISSUER_ID`
 - `MACOS_NOTARY_API_KEY_BASE64`
+
+Notes:
+
+- direct distribution now signs with `macos/Runner/DirectDistribution.entitlements`
+- verify the signed `.app` contains `applinks:app.sofarhangolo.hu`
 
 ### macOS App Store beta
 
@@ -85,3 +95,4 @@ Repository secrets:
 - Windows beta publishing uses Microsoft Store flights via the Microsoft Store Developer CLI.
 - macOS beta publishing uploads the exported App Store package to App Store Connect. Processing and tester distribution remain controlled in App Store Connect.
 - Mobile release assets are built in Codemagic and attached by GitHub Actions after the matching tagged mobile build finishes.
+- Linux packaging supports the `lyric:` custom scheme, not verified HTTPS web-to-app linking.
