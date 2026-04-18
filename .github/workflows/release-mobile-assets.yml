@@ -149,7 +149,30 @@ jobs:
           set -euo pipefail
           mkdir -p dist/mobile
 
-          python -c 'import json; from pathlib import Path; build=json.loads(Path("build.json").read_text())["build"]; artifacts=build.get("artefacts", []); targets=[]; [targets.append((artifact["url"], f"dist/mobile/sofar-dalapp_{build[\"tag\"]}.apk")) for artifact in artifacts if artifact.get("type")=="apk"]; [targets.append((artifact["url"], f"dist/mobile/sofar-dalapp_{build[\"tag\"]}.ipa")) for artifact in artifacts if artifact.get("type")=="ipa"]; Path("artifact_urls.txt").write_text("".join(f"{url}\\t{dest}\\n" for url, dest in targets))'
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          build = json.loads(Path("build.json").read_text(encoding="utf-8"))["build"]
+          artifacts = build.get("artefacts", [])
+          targets = []
+
+          for artifact in artifacts:
+              artifact_type = artifact.get("type")
+              if artifact_type == "apk":
+                  targets.append(
+                      (artifact["url"], f'dist/mobile/sofar-dalapp_{build["tag"]}.apk')
+                  )
+              elif artifact_type == "ipa":
+                  targets.append(
+                      (artifact["url"], f'dist/mobile/sofar-dalapp_{build["tag"]}.ipa')
+                  )
+
+          Path("artifact_urls.txt").write_text(
+              "".join(f"{url}\t{dest}\n" for url, dest in targets),
+              encoding="utf-8",
+          )
+          PY
 
           if [[ ! -s artifact_urls.txt ]]; then
             echo "No APK or IPA artifacts found in Codemagic build."
