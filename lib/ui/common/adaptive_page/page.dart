@@ -20,7 +20,7 @@ class AdaptivePage extends StatefulWidget {
     this.rightDrawerIcon,
     this.rightDrawerTooltip,
     this.actionBarChildren,
-    this.actionBarTrailingChildren,
+    this.appBarActions,
     this.bodyHeroTag,
     super.key,
   });
@@ -34,7 +34,7 @@ class AdaptivePage extends StatefulWidget {
   final IconData? rightDrawerIcon;
   final String? rightDrawerTooltip;
   final List<Widget>? actionBarChildren;
-  final List<Widget>? actionBarTrailingChildren;
+  final List<Widget>? appBarActions;
   final Widget body;
   final String? bodyHeroTag;
 
@@ -303,7 +303,7 @@ class _AdaptivePageState extends State<AdaptivePage>
               automaticallyImplyLeading: false,
               actions: [
                 SizedBox.shrink(),
-                if (!tabletOrBigger) ...widget.actionBarTrailingChildren ?? [],
+                ...widget.appBarActions ?? [],
                 SizedBox(width: 8),
               ],
             ),
@@ -333,6 +333,7 @@ class _AdaptivePageState extends State<AdaptivePage>
                             ),
                           Expanded(
                             child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 if (!tabletOrBigger) _buildBody(),
                                 Container(
@@ -354,15 +355,10 @@ class _AdaptivePageState extends State<AdaptivePage>
                                           padding: EdgeInsets.symmetric(
                                             horizontal: 5,
                                           ),
-                                          child: Row(
-                                            children: [
-                                              ...widget.actionBarChildren ?? [],
-                                              Spacer(),
-                                              if (tabletOrBigger)
-                                                ...widget
-                                                        .actionBarTrailingChildren ??
-                                                    [],
-                                            ],
+                                          child: ListView(
+                                            scrollDirection: Axis.horizontal,
+                                            children:
+                                                widget.actionBarChildren ?? [],
                                           ),
                                         ),
                                       ),
