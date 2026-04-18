@@ -6,7 +6,6 @@ import 'package:sofarhangolo/data/song/song.dart';
 import 'package:sofarhangolo/services/songs/filter.dart';
 import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/field_type.dart';
 import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/key/state.dart';
-import 'package:sofarhangolo/data/bank/bank.dart';
 import 'package:sofarhangolo/data/database.dart';
 import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/search/state.dart';
 

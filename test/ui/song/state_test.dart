@@ -12,7 +12,6 @@ Song _createChordedSong() {
     uuid: 'song-1',
     title: 'Chorded Song',
     lyrics: '<song>\n[V1]\n.C    G\n Hello world\n</song>',
-    keyField: [],
     contentMap: {},
   );
 }
