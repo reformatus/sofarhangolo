@@ -4,7 +4,7 @@ description: "Minden kotta, mindig veled"
 publish_to: 'none'
 
 # Build number: Major, Minor (two digits), Patch (two digits), Build iteration (two digits)
-version: 1.1.4+1010401
+version: 1.1.5+1010500
 
 environment:
   sdk: '>=3.11.4 <4.0.0'
@@ -12,9 +12,9 @@ environment:
 msix_config:
     # MSIX version created like so:
     # 1.2.3 - Semantic version
-    # [major+10].[minor].[patch].[build iteration]
+    # [major+10].[minor].[patch].0
     # 11.2.3.0 - MSIX version
-  msix_version: 11.1.4.0
+  msix_version: 11.1.5.0
   display_name: Sófár Hangoló
   identity_name: RefLabs.SfrHangol
   publisher_display_name: RefLabs
