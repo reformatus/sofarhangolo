@@ -26,6 +26,7 @@ class SearchFieldSelectorColumn extends ConsumerWidget {
         ),
         switch (availableFields) {
           AsyncError(:final error) => ListTile(title: Text('$error')),
+          // ignore: unused_local_variable
           AsyncValue(:final value?) => switch (effectiveSearchFields) {
             AsyncError(:final error) => ListTile(title: Text('$error')),
             AsyncValue(:final value?) => Column(
