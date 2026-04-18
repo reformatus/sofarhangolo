@@ -21,37 +21,31 @@ class ViewChooser extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final List<
-      ({SongViewType value, IconData icon, String label, bool enabled})
-    >
-    viewTypeEntries = [
-      (
-        value: SongViewType.svg,
+    final Map<SongViewType, ({IconData icon, String label, bool enabled})>
+    viewTypeEntries = {
+      SongViewType.svg: (
         icon: Icons.music_note_outlined,
         label: 'Kotta',
         enabled: song.hasSvg,
       ),
-      (
-        value: SongViewType.pdf,
+      SongViewType.pdf: (
         icon: Icons.audio_file_outlined,
         label: 'PDF',
         enabled: song.hasPdf,
       ),
       if (song.hasChords)
-        (
-          value: SongViewType.chords,
+        SongViewType.chords: (
           icon: Icons.tag_outlined,
           label: 'Akkordok',
-          enabled: song.hasChords,
+          enabled: true,
         )
       else
-        (
-          value: SongViewType.lyrics,
+        SongViewType.lyrics: (
           icon: Icons.text_snippet_outlined,
           label: 'Dalszöveg',
           enabled: song.hasLyrics,
         ),
-    ];
+    };
 
     if (songSlide != null) {
       final currentSongSlide = switch (ref
@@ -84,14 +78,14 @@ class ViewChooser extends ConsumerWidget {
                   ),
                 ),
               ),
-              segments: viewTypeEntries
+              segments: viewTypeEntries.entries
                   .map(
-                    (e) => ButtonSegment(
-                      value: e.value,
-                      label: Text(e.label),
-                      icon: Icon(e.icon),
-                      enabled: e.enabled,
-                      tooltip: !e.enabled ? 'Nem elérhető' : null,
+                    (entry) => ButtonSegment(
+                      value: entry.key,
+                      label: Text(entry.value.label),
+                      icon: Icon(entry.value.icon),
+                      enabled: entry.value.enabled,
+                      tooltip: !entry.value.enabled ? 'Nem elérhető' : null,
                     ),
                   )
                   .toList(),
@@ -127,25 +121,25 @@ class ViewChooser extends ConsumerWidget {
                       currentSongSlide.copyWith(viewType: newViewType),
                     );
               },
-              items: viewTypeEntries
-                  .where((e) => e.enabled)
+              items: viewTypeEntries.entries
+                  .where((entry) => entry.value.enabled)
                   .map(
-                    (e) => DropdownMenuItem(
-                      enabled: e.enabled,
-                      value: e.value,
+                    (entry) => DropdownMenuItem(
+                      enabled: entry.value.enabled,
+                      value: entry.key,
                       child: Row(
                         children: [
                           Padding(
                             padding: EdgeInsets.only(right: 10),
                             child: Icon(
-                              e.icon,
+                              entry.value.icon,
                               color: Theme.of(
                                 context,
                               ).colorScheme.inverseSurface,
                             ),
                           ),
                           Text(
-                            e.label,
+                            entry.value.label,
                             style: TextStyle(
                               color: Theme.of(
                                 context,
@@ -188,14 +182,14 @@ class ViewChooser extends ConsumerWidget {
                 ),
               ),
             ),
-            segments: viewTypeEntries
+            segments: viewTypeEntries.entries
                 .map(
-                  (e) => ButtonSegment(
-                    value: e.value,
-                    label: Text(e.label),
-                    icon: Icon(e.icon),
-                    enabled: e.enabled,
-                    tooltip: !e.enabled ? 'Nem elérhető' : null,
+                  (entry) => ButtonSegment(
+                    value: entry.key,
+                    label: Text(entry.value.label),
+                    icon: Icon(entry.value.icon),
+                    enabled: entry.value.enabled,
+                    tooltip: !entry.value.enabled ? 'Nem elérhető' : null,
                   ),
                 )
                 .toList(),
@@ -228,25 +222,25 @@ class ViewChooser extends ConsumerWidget {
                     .read(viewTypeForProvider(song, songSlide).notifier)
                     .setTo(newViewType);
               },
-              items: viewTypeEntries
-                  .where((e) => e.enabled)
+              items: viewTypeEntries.entries
+                  .where((entry) => entry.value.enabled)
                   .map(
-                    (e) => DropdownMenuItem(
-                      enabled: e.enabled,
-                      value: e.value,
+                    (entry) => DropdownMenuItem(
+                      enabled: entry.value.enabled,
+                      value: entry.key,
                       child: Row(
                         children: [
                           Padding(
                             padding: EdgeInsets.only(right: 10),
                             child: Icon(
-                              e.icon,
+                              entry.value.icon,
                               color: Theme.of(
                                 context,
                               ).colorScheme.inverseSurface,
                             ),
                           ),
                           Text(
-                            e.label,
+                            entry.value.label,
                             style: TextStyle(
                               color: Theme.of(
                                 context,
