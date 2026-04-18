@@ -14,7 +14,7 @@ msix_config:
     # 1.2.3 - Semantic version
     # [major+10].[minor].[patch].[build iteration]
     # 11.2.3.0 - MSIX version
-  msix_version: 11.1.4.1
+  msix_version: 11.1.4.0
   display_name: Sófár Hangoló
   identity_name: RefLabs.SfrHangol
   publisher_display_name: RefLabs
