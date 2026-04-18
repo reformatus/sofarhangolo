@@ -1,6 +1,6 @@
 # Sófár Hangoló
 
-## [Homepage](https://app.sofarkotta.hu/)
+## [Homepage](https://app.sofarhangolo.hu/)
 
 #### How to build
 
@@ -19,13 +19,13 @@
 
 #### GitHub Pages deployment
 
-The `Deploy Web` workflow in this repository builds the Flutter web app and syncs the output to `reformatus/app.sofarkotta.hu` under `docs/web`.
+The `Deploy Web` workflow in this repository builds the Flutter web app and syncs the output to `reformatus/app.sofarhangolo.hu` under `docs/web`.
 
 Required repository secret in `reformatus/lyric`:
 
-1. `APP_SOFARKOTTA_HU_DEPLOY_KEY`
+1. `APP_SOFARHANGOLO_HU_DEPLOY_KEY`
 
-The secret must contain the private SSH deploy key that has write access to `reformatus/app.sofarkotta.hu`.
+The secret must contain the private SSH deploy key that has write access to `reformatus/app.sofarhangolo.hu`.
 
 #### Contributing
 

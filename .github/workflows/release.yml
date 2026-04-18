@@ -610,12 +610,12 @@ jobs:
           gh release upload "$RELEASE_TAG" "${files[@]}" --clobber --repo "$GITHUB_REPOSITORY"
 
   deploy-web:
-    name: Deploy web to app.sofarkotta.hu
+    name: Deploy web to app.sofarhangolo.hu
     runs-on: ubuntu-latest
     needs: [release-context, build-web-release]
     if: ${{ needs.build-web-release.result == 'success' && needs.release-context.outputs.prerelease != 'true' }}
     env:
-      TARGET_REPO: reformatus/app.sofarkotta.hu
+      TARGET_REPO: reformatus/app.sofarhangolo.hu
       TARGET_BRANCH: main
       TARGET_DIR: docs/web
     steps:
@@ -644,7 +644,7 @@ jobs:
       - id: deploy-key-ready
         name: Check deploy key
         env:
-          DEPLOY_KEY: ${{ secrets.APP_SOFARKOTTA_HU_DEPLOY_KEY }}
+          DEPLOY_KEY: ${{ secrets.APP_SOFARHANGOLO_HU_DEPLOY_KEY }}
         run: |
           if [ -z "$DEPLOY_KEY" ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
@@ -663,7 +663,7 @@ jobs:
         if: ${{ steps.release-web-ready.outputs.ready == 'true' && steps.deploy-key-ready.outputs.ready == 'true' }}
         uses: webfactory/ssh-agent@v0.9.1
         with:
-          ssh-private-key: ${{ secrets.APP_SOFARKOTTA_HU_DEPLOY_KEY }}
+          ssh-private-key: ${{ secrets.APP_SOFARHANGOLO_HU_DEPLOY_KEY }}
 
       - name: Trust GitHub SSH host key
         if: ${{ steps.release-web-ready.outputs.ready == 'true' && steps.deploy-key-ready.outputs.ready == 'true' }}

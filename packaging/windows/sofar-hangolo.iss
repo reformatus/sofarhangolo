@@ -1,7 +1,7 @@
 #define MyAppName "Sófár Hangoló"
 #define MyAppVersion GetEnv("APP_VERSION")
 #define MyAppPublisher "RefLabs"
-#define MyAppURL "https://app.sofarkotta.hu/"
+#define MyAppURL "https://app.sofarhangolo.hu/"
 #define MyAppExeName "lyric.exe"
 #define MyAppId "org.lyricapp.sofar"
 
