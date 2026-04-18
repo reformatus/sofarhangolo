@@ -107,6 +107,10 @@ def classify_asset(name: str) -> tuple[str, str] | None:
     return None
 
 
+def strip_build_metadata(version: str) -> str:
+    return version.split("+", 1)[0]
+
+
 def build_platforms(track_id: str, release: dict) -> dict:
     platforms = {}
     for platform_id, meta in PLATFORM_META.items():
@@ -142,13 +146,15 @@ def simplify_release(release: dict) -> dict | None:
         return None
 
     track_id = "prerelease" if release.get("prerelease") else "stable"
+    display_version = strip_build_metadata(release["tag_name"])
     return {
         "id": track_id,
         "title": TRACK_META[track_id]["title"],
-        "version": release["tag_name"],
+        "version": display_version,
         "release": {
-            "title": release.get("name") or release["tag_name"],
+            "title": release.get("name") or display_version,
             "tag": release["tag_name"],
+            "displayTag": display_version,
             "descriptionHtml": release.get("body_html") or "",
             "url": release["html_url"],
         },
