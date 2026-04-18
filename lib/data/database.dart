@@ -34,7 +34,7 @@ class LyricDatabase extends _$LyricDatabase {
     : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration {
@@ -71,6 +71,11 @@ class LyricDatabase extends _$LyricDatabase {
           await m.addColumn(schema.banks, schema.banks.totalSongsInBank);
         },
         from3To4: (m, schema) async {
+          await customStatement(
+            "UPDATE banks SET last_updated = '1900-01-01T00:00:00'",
+          );
+        },
+        from4To5: (m, schema) async {
           await customStatement(
             "UPDATE banks SET last_updated = '1900-01-01T00:00:00'",
           );

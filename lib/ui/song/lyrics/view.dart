@@ -3,7 +3,6 @@ import 'package:dart_opensong/dart_opensong.dart' as os;
 import 'package:fading_edge_scrollview/fading_edge_scrollview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:html_unescape/html_unescape.dart';
 
 import '../../../data/cue/slide.dart';
 import '../../../data/song/lyrics/parser.dart';
@@ -240,8 +239,6 @@ class LyricsSegment extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final lyricsViewStyle = ref.watch(lyricsViewStylePreferencesProvider);
-
-    segment.lyrics = HtmlUnescape().convert(segment.lyrics);
 
     final chord = getTransposedChord(
       segment.chord,

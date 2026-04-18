@@ -98,6 +98,40 @@ void main() {
       expect(updatedSong.contentMap['pdf'], equals('/new.pdf'));
     });
 
+    test('stores decoded lyrics and metadata from escaped API payloads', () async {
+      final bank = await insertBank();
+
+      dio.httpClientAdapter = RecordingHttpAdapter(
+        responseBuilder: (options) {
+          if (options.path.contains('/songs')) {
+            return ResponseBody.fromString(
+              '[{"uuid":"song-1","title":"Tom &amp; Jerry"}]',
+              200,
+            );
+          }
+
+          if (options.path.contains('/song/song-1')) {
+            return ResponseBody.fromString(
+              '[{"uuid":"song-1","title":"Tom &amp; Jerry","lyrics":"[V1]\\n A &amp; B","lyrics_format":"opensong","composer":"John &amp; Jane"}]',
+              200,
+            );
+          }
+
+          return ResponseBody.fromString('[]', 200);
+        },
+      );
+
+      final task = BankSongUpdateTask(bank: bank, dio: dio);
+      await task.run();
+
+      final updatedSong =
+          await (db.songs.select()..where((s) => s.uuid.equals('song-1')))
+              .getSingle();
+      expect(updatedSong.title, equals('Tom & Jerry'));
+      expect(updatedSong.lyrics, equals('[V1]\n A & B'));
+      expect(updatedSong.contentMap['composer'], equals('John & Jane'));
+    });
+
     test('keeps assets for unrelated songs', () async {
       final bank = await insertBank();
       final existingSong = Song.fromBankApiJson({
@@ -234,7 +268,7 @@ void main() {
         responseBuilder: (options) {
           if (options.path.contains('/songs')) {
             return ResponseBody.fromString(
-              '[{"uuid":"song-1","title":"Song 1"}]',
+              '[{"uuid":"song-1","title":"Song &amp; 1"}]',
               200,
             );
           }
@@ -254,6 +288,10 @@ void main() {
           await (db.banks.select()..where((b) => b.uuid.equals(bank.uuid)))
               .getSingle();
       expect(bankAfterFirstRun.failedProtoSongs.map((e) => e.uuid), ['song-1']);
+      expect(
+        bankAfterFirstRun.failedProtoSongs.map((e) => e.title),
+        ['Song & 1'],
+      );
 
       final adapter = RecordingHttpAdapter(
         responseBuilder: (options) {

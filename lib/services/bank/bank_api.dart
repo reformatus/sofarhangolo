@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:html_unescape/html_unescape.dart';
 import 'package:intl/intl.dart';
 
 import '../../data/bank/bank.dart';
@@ -13,12 +14,30 @@ class BankApi {
 
   const BankApi(this.dio);
 
+  static final HtmlUnescape _htmlUnescape = HtmlUnescape();
+
   Object? _decodeJsonBody(Object? body) {
     if (body is String) {
       return jsonDecode(body);
     }
 
     return body;
+  }
+
+  Object? _normalizeDecodedJson(Object? value) {
+    return switch (value) {
+      String() => _htmlUnescape.convert(value),
+      List() => value.map(_normalizeDecodedJson).toList(growable: false),
+      Map() => Map<String, dynamic>.fromEntries(
+        value.entries.map(
+          (entry) => MapEntry(
+            entry.key.toString(),
+            _normalizeDecodedJson(entry.value),
+          ),
+        ),
+      ),
+      _ => value,
+    };
   }
 
   Future<List<ProtoSong>> getProtoSongs(Bank bank, {DateTime? since}) async {
@@ -31,7 +50,10 @@ class BankApi {
       queryParameters: queryParameters.isEmpty ? null : queryParameters,
     );
     final resp = await dio.getUri(source);
-    final jsonList = (_decodeJsonBody(resp.data) ?? const <dynamic>[]) as List;
+    final jsonList =
+        (_normalizeDecodedJson(_decodeJsonBody(resp.data)) ??
+                const <dynamic>[])
+            as List;
 
     return jsonList
         .map((e) => ProtoSong.fromJson(e as Map<String, dynamic>))
@@ -43,7 +65,7 @@ class BankApi {
 
     final resp = await dio.getUri(source);
     try {
-      final songsJson = _decodeJsonBody(resp.data);
+      final songsJson = _normalizeDecodedJson(_decodeJsonBody(resp.data));
       if (songsJson is List) {
         List<Song> songs = [];
         for (Map songJson in songsJson) {
