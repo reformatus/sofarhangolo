@@ -16,6 +16,7 @@ class SongPageBody extends ConsumerWidget {
     super.key,
     required this.song,
     required this.isDesktop,
+    required this.showTabletCueAction,
     required this.isMobile,
     required this.constraints,
     required this.summaryContent,
@@ -29,6 +30,7 @@ class SongPageBody extends ConsumerWidget {
 
   final Song song;
   final bool isDesktop;
+  final bool showTabletCueAction;
   final bool isMobile;
   final BoxConstraints constraints;
   final List<Widget> summaryContent;
@@ -96,6 +98,7 @@ class SongPageBody extends ConsumerWidget {
               constraints: constraints,
               actionButtonsScrollController: actionButtonsScrollController,
               transposeOverlayVisible: transposeOverlayVisible,
+              showOpenCueAction: showTabletCueAction,
             ),
             AnimatedContainer(
               duration: bottomInsetAnimationDuration,

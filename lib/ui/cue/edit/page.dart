@@ -91,7 +91,7 @@ class _CueEditPageState extends ConsumerState<CueEditPage> {
           const SizedBox(width: 8),
           const CueSlideNavigationControls(),
         ],
-        actionBarTrailingChildren: [
+        appBarActions: [
           IconButton.filledTonal(
             onPressed: () => showShareDialog(
               context,

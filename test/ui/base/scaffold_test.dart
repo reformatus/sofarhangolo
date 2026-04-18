@@ -11,7 +11,6 @@ import 'package:sofarhangolo/services/app_links/app_links.dart';
 import 'package:sofarhangolo/services/app_version/check_new_version.dart';
 import 'package:sofarhangolo/services/connectivity/provider.dart';
 import 'package:sofarhangolo/ui/base/scaffold.dart';
-import 'package:sofarhangolo/ui/base/widgets/active_cue_shell_card.dart';
 import 'package:sofarhangolo/ui/cue/session/cue_session.dart';
 import 'package:sofarhangolo/ui/cue/session/session_provider.dart';
 
@@ -124,7 +123,7 @@ void main() {
     );
 
     expect(find.text('Aktiv lista'), findsOneWidget);
-    expect(find.byTooltip('Lista megnyitása'), findsOneWidget);
+    expect(find.byTooltip('Lista kinyitása'), findsOneWidget);
   });
 
   testWidgets('shows desktop cue shell controls on desktop routes', (
@@ -142,7 +141,7 @@ void main() {
     expect(find.byType(NavigationBar), findsNothing);
   });
 
-  testWidgets('does not show the active cue overlay outside bank and song', (
+  testWidgets('shows the active cue overlay on cues routes too', (
     tester,
   ) async {
     await pumpShellScaffold(
@@ -152,7 +151,7 @@ void main() {
       session: await createCueSession(),
     );
 
-    expect(find.text('Aktiv lista'), findsNothing);
+    expect(find.text('Aktiv lista'), findsOneWidget);
   });
 
   testWidgets('overlay opens cue sheet on mobile bank routes', (tester) async {
@@ -163,13 +162,15 @@ void main() {
       session: await createCueSession(),
     );
 
-    await tester.tap(find.byTooltip('Lista megnyitása'));
+    await tester.tap(find.byTooltip('Lista kinyitása'));
     await tester.pumpAndSettle();
 
     expect(find.byTooltip('Bezárás'), findsOneWidget);
   });
 
-  testWidgets('desktop indicator tap opens cue editor page', (tester) async {
+  testWidgets('desktop cue editor button opens cue editor page', (
+    tester,
+  ) async {
     await pumpShellScaffold(
       tester,
       size: const Size(1200, 900),
@@ -177,7 +178,9 @@ void main() {
       session: await createCueSession(),
     );
 
-    await tester.tap(find.byType(ActiveCueSidebarIndicator));
+    await tester.tap(find.byTooltip('Lista kinyitása'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Lista szerkesztése'));
     await tester.pumpAndSettle();
 
     expect(find.text('Cue edit cue-1 slide-1'), findsOneWidget);
@@ -193,7 +196,7 @@ void main() {
 
     expect(find.byTooltip('Lista bezárása'), findsNothing);
 
-    await tester.tap(find.byTooltip('Lista megnyitása').first);
+    await tester.tap(find.byTooltip('Lista kinyitása').first);
     await tester.pumpAndSettle();
 
     expect(find.byType(Drawer), findsOneWidget);
@@ -212,7 +215,7 @@ void main() {
     expect(find.byType(NavigationBar), findsNothing);
     expect(find.byType(NavigationRail), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Lista megnyitása').first);
+    await tester.tap(find.byTooltip('Lista kinyitása').first);
     await tester.pumpAndSettle();
 
     expect(find.byType(Drawer), findsOneWidget);

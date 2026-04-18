@@ -5,18 +5,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../data/cue/slide.dart';
-import '../../../data/log/logger.dart';
 import '../../../data/song/song.dart';
 import '../../../data/song/transpose.dart';
 import '../../../services/app_links/navigation.dart';
 import '../../../services/song/from_uuid.dart';
-import '../../../services/ui/messenger_service.dart';
 import '../../cue/cue_page_type.dart';
 import '../../cue/session/cue_session.dart';
 import '../../cue/session/session_provider.dart';
 import '../../cue/widgets/slide_navigation_controls.dart';
 import '../../cue/widgets/slide_list.dart';
-import '../../song/state.dart';
+import '../../song/cue_actions.dart';
 import '../../song/transpose/state.dart';
 
 const double cueShellOverlayReservedHeight = 56;
@@ -130,8 +128,6 @@ class ActiveCueShellCard extends StatelessWidget {
               ),
               child: CueShellPanel(
                 session: session,
-                currentPath: currentPath,
-                showSongAction: false,
                 onOpenCueEditor: () {
                   Navigator.of(sheetContext).pop();
                   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -251,43 +247,11 @@ class _ActiveCueCardAddButtonState
 
     setState(() => _isAdding = true);
     try {
-      final currentViewType = await ref.read(
-        viewTypeForProvider(widget.currentSong, null).future,
-      );
-
-      ref
-          .read(activeCueSessionProvider.notifier)
-          .addSlide(
-            SongSlide.from(
-              widget.currentSong,
-              viewType: currentViewType,
-              transpose: widget.currentTranspose,
-            ),
-          );
-
-      messengerService.showSnackBarReplacingCurrent(
-        SnackBar(
-          showCloseIcon: true,
-          content: Text(
-            '${widget.currentSong.title} hozzáadva a listához: ${widget.session.cue.title}',
-          ),
-          duration: const Duration(seconds: 4),
-        ),
-        forceHideAfter: const Duration(seconds: 4),
-      );
-    } catch (e, s) {
-      log.severe(
-        'Nem sikerült alapértelmezett nézetet betölteni gyors hozzáadáshoz: ${widget.currentSong.uuid}',
-        e,
-        s,
-      );
-      messengerService.showSnackBarReplacingCurrent(
-        const SnackBar(
-          showCloseIcon: true,
-          content: Text('Nem sikerült hozzáadni dalt a listához.'),
-          duration: Duration(seconds: 4),
-        ),
-        forceHideAfter: const Duration(seconds: 4),
+      await addSongToActiveCue(
+        ref: ref,
+        song: widget.currentSong,
+        transpose: widget.currentTranspose,
+        session: widget.session,
       );
     } finally {
       if (mounted) {
@@ -402,17 +366,25 @@ class _ExpandedIndicator extends StatelessWidget {
             const SizedBox(height: 8),
             Row(
               children: [
-                Icon(Icons.list, size: 18, color: foregroundColor),
-                const SizedBox(width: 6),
-                Text(
-                  '$slideCount dia',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: railLabelStyle?.copyWith(
-                    color: foregroundColor.withValues(alpha: 0.85),
+                Expanded(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.list, size: 18, color: foregroundColor),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          '$slideCount dia',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: railLabelStyle?.copyWith(
+                            color: foregroundColor.withValues(alpha: 0.85),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const Spacer(),
                 const SizedBox(width: 8),
                 IconButton.filled(
                   tooltip: listVisible
@@ -481,9 +453,7 @@ class _CollapsedIndicator extends StatelessWidget {
 class CueShellPanel extends StatelessWidget {
   const CueShellPanel({
     required this.session,
-    required this.currentPath,
     this.listVisible = true,
-    this.showSongAction = true,
     this.onOpenCueEditor,
     this.onClose,
     this.showDragHandle = false,
@@ -491,9 +461,7 @@ class CueShellPanel extends StatelessWidget {
   });
 
   final CueSession session;
-  final String currentPath;
   final bool listVisible;
-  final bool showSongAction;
   final VoidCallback? onOpenCueEditor;
   final VoidCallback? onClose;
   final bool showDragHandle;
@@ -512,61 +480,49 @@ class CueShellPanel extends StatelessWidget {
                   ? theme.colorScheme.surface
                   : theme.colorScheme.primary));
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SizedBox.expand(
-          child: Column(
-            children: [
-              if (showDragHandle)
-                _CuePanelDragHandle(backgroundColor: appBarBackgroundColor),
-              Expanded(
-                child: Scaffold(
-                  backgroundColor: drawerBackgroundColor,
-                  appBar: _CuePanelAppBar(
-                    session: session,
-                    backgroundColor: appBarBackgroundColor,
-                    onClose: onClose,
-                    onOpenCueEditor:
-                        onOpenCueEditor ??
-                        () => _openCueEditor(
-                          context,
-                          slideUuid: session.currentSlideUuid,
-                        ),
-                  ),
-                  body: Column(
-                    children: [
-                      Expanded(
-                        child: SlideList(
-                          isVisible: listVisible,
-                          onSlideSelected: (slide) {
-                            final ref = ProviderScope.containerOf(
-                              context,
-                              listen: false,
-                            );
-                            ref
-                                .read(activeCueSessionProvider.notifier)
-                                .goToSlide(slide.uuid);
-                          },
-                        ),
-                      ),
-                      const _CuePanelFooter(),
-                    ],
-                  ),
-                  floatingActionButton: showSongAction
-                      ? _CuePanelSongAction(
-                          session: session,
-                          currentPath: currentPath,
-                          availableWidth: constraints.maxWidth,
-                        )
-                      : null,
-                  floatingActionButtonLocation:
-                      FloatingActionButtonLocation.endFloat,
-                ),
+    return SizedBox.expand(
+      child: Column(
+        children: [
+          if (showDragHandle)
+            _CuePanelDragHandle(backgroundColor: appBarBackgroundColor),
+          Expanded(
+            child: Scaffold(
+              backgroundColor: drawerBackgroundColor,
+              appBar: _CuePanelAppBar(
+                session: session,
+                backgroundColor: appBarBackgroundColor,
+                onClose: onClose,
+                onOpenCueEditor:
+                    onOpenCueEditor ??
+                    () => _openCueEditor(
+                      context,
+                      slideUuid: session.currentSlideUuid,
+                    ),
               ),
-            ],
+              body: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Expanded(
+                    child: SlideList(
+                      isVisible: listVisible,
+                      onSlideSelected: (slide) {
+                        final ref = ProviderScope.containerOf(
+                          context,
+                          listen: false,
+                        );
+                        ref
+                            .read(activeCueSessionProvider.notifier)
+                            .goToSlide(slide.uuid);
+                      },
+                    ),
+                  ),
+                  const _CuePanelFooter(),
+                ],
+              ),
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 
@@ -671,188 +627,23 @@ class _CuePanelFooter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainer,
-      ),
-      child: SafeArea(
-        top: false,
-        left: false,
-        right: false,
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [CueSlideNavigationControls()],
+    return SafeArea(
+      top: false,
+      left: false,
+      right: false,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainer,
+        ),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: const CueSlideNavigationControls(),
           ),
         ),
       ),
     );
-  }
-}
-
-class _CuePanelSongAction extends ConsumerWidget {
-  const _CuePanelSongAction({
-    required this.session,
-    required this.currentPath,
-    required this.availableWidth,
-  });
-
-  final CueSession session;
-  final String currentPath;
-  final double availableWidth;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final currentSongUuid = _songUuidFromPath(currentPath);
-    if (currentSongUuid == null) {
-      return const SizedBox.shrink();
-    }
-
-    final currentSong = ref.watch(songFromUuidProvider(currentSongUuid)).value;
-    if (currentSong == null) {
-      return const SizedBox.shrink();
-    }
-
-    final currentSongAlreadyInCue = session.slides.whereType<SongSlide>().any(
-      (slide) => slide.song.uuid == currentSong.uuid,
-    );
-
-    final currentTranspose = ref.watch(transposeStateForProvider(currentSong));
-
-    return _CuePanelAddCurrentSongButton(
-      session: session,
-      currentSong: currentSong,
-      currentTranspose: currentTranspose,
-      songAlreadyInCue: currentSongAlreadyInCue,
-      availableWidth: availableWidth,
-    );
-  }
-}
-
-class _CuePanelAddCurrentSongButton extends ConsumerStatefulWidget {
-  const _CuePanelAddCurrentSongButton({
-    required this.session,
-    required this.currentSong,
-    required this.currentTranspose,
-    required this.songAlreadyInCue,
-    required this.availableWidth,
-  });
-
-  final CueSession session;
-  final Song currentSong;
-  final SongTranspose? currentTranspose;
-  final bool songAlreadyInCue;
-  final double availableWidth;
-
-  @override
-  ConsumerState<_CuePanelAddCurrentSongButton> createState() =>
-      _CuePanelAddCurrentSongButtonState();
-}
-
-class _CuePanelAddCurrentSongButtonState
-    extends ConsumerState<_CuePanelAddCurrentSongButton> {
-  bool _isAddingCurrentSong = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final useMiniFab = widget.availableWidth < 280;
-    final useCollapsedFab = !useMiniFab && widget.availableWidth < 350;
-    final tooltip = widget.songAlreadyInCue
-        ? 'Újra hozzáadás ehhez a listához'
-        : 'Dal hozzáadása ehhez a listához';
-    final backgroundColor = widget.songAlreadyInCue
-        ? scheme.surfaceContainerHigh
-        : null;
-    final foregroundColor = widget.songAlreadyInCue ? scheme.onSurface : null;
-    final icon = _isAddingCurrentSong
-        ? const SizedBox.square(
-            dimension: 18,
-            child: CircularProgressIndicator(strokeWidth: 2),
-          )
-        : const Icon(Icons.add);
-
-    if (useMiniFab) {
-      return FloatingActionButton.small(
-        tooltip: tooltip,
-        backgroundColor: backgroundColor,
-        foregroundColor: foregroundColor,
-        onPressed: _isAddingCurrentSong ? null : _handleAddCurrentSong,
-        child: icon,
-      );
-    }
-
-    if (useCollapsedFab) {
-      return FloatingActionButton(
-        tooltip: tooltip,
-        backgroundColor: backgroundColor,
-        foregroundColor: foregroundColor,
-        onPressed: _isAddingCurrentSong ? null : _handleAddCurrentSong,
-        child: icon,
-      );
-    }
-
-    return FloatingActionButton.extended(
-      tooltip: tooltip,
-      backgroundColor: backgroundColor,
-      foregroundColor: foregroundColor,
-      onPressed: _isAddingCurrentSong ? null : _handleAddCurrentSong,
-      icon: icon,
-      label: const Text('Hozzáadás'),
-    );
-  }
-
-  Future<void> _handleAddCurrentSong() async {
-    if (_isAddingCurrentSong) {
-      return;
-    }
-
-    setState(() => _isAddingCurrentSong = true);
-    try {
-      final currentViewType = await ref.read(
-        viewTypeForProvider(widget.currentSong, null).future,
-      );
-
-      ref
-          .read(activeCueSessionProvider.notifier)
-          .addSlide(
-            SongSlide.from(
-              widget.currentSong,
-              viewType: currentViewType,
-              transpose: widget.currentTranspose,
-            ),
-          );
-
-      messengerService.showSnackBarReplacingCurrent(
-        SnackBar(
-          showCloseIcon: true,
-          content: Text(
-            '${widget.currentSong.title} hozzáadva a listához: ${widget.session.cue.title}',
-          ),
-          duration: const Duration(seconds: 4),
-        ),
-        forceHideAfter: const Duration(seconds: 4),
-      );
-    } catch (e, s) {
-      log.severe(
-        'Nem sikerült alapértelmezett nézetet betölteni gyors hozzáadáshoz: ${widget.currentSong.uuid}',
-        e,
-        s,
-      );
-      messengerService.showSnackBarReplacingCurrent(
-        const SnackBar(
-          showCloseIcon: true,
-          content: Text('Nem sikerült hozzáadni dalt a listához.'),
-          duration: Duration(seconds: 4),
-        ),
-        forceHideAfter: const Duration(seconds: 4),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isAddingCurrentSong = false);
-      }
-    }
   }
 }
 

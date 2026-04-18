@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/song/song.dart';
-import '../add_to_cue_search.dart';
+import '../song_cue_actions.dart';
 import '../state.dart';
 import '../transpose/state.dart';
 import '../transpose/widget.dart';
@@ -30,7 +30,7 @@ class DesktopSidebar extends ConsumerWidget {
     final viewType = viewTypeAsync.requireValue;
 
     return SizedBox(
-      width: (constraints.maxWidth / 5).clamp(200, 350),
+      width: (constraints.maxWidth / 4.5).clamp(250, 450),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8),
         color: Theme.of(context).scaffoldBackgroundColor,
@@ -42,7 +42,7 @@ class DesktopSidebar extends ConsumerWidget {
                 TransposeCard(song: song),
                 SizedBox(height: 10),
               ],
-              AddToCueSearch(
+              SongCueActions(
                 song: song,
                 isDesktop: true,
                 viewType: viewType,

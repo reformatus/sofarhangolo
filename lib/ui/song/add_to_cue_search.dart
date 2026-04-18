@@ -14,6 +14,7 @@ import '../base/cues/dialogs.dart';
 import '../common/error/card.dart';
 import '../cue/cue_page_type.dart';
 import '../cue/session/session_provider.dart';
+import 'cue_actions.dart';
 import 'state.dart';
 
 /// A reusable widget that provides search functionality for adding songs to cues
@@ -49,12 +50,10 @@ class _AddToCueSearchState extends ConsumerState<AddToCueSearch> {
     final activeCueSession = ref.watch(
       activeCueSessionProvider.select((sessionAsync) => sessionAsync.value),
     );
-    final hasActiveCue = activeCueSession != null;
-    final songInActiveCue =
-        activeCueSession?.slides.whereType<SongSlide>().any(
-          (slide) => slide.song.uuid == widget.song.uuid,
-        ) ??
-        false;
+    final cueActionState = SongCueActionState.fromSession(
+      activeCueSession,
+      widget.song,
+    );
 
     Future<void> handleCueSelection(
       SearchController controller,
@@ -69,7 +68,7 @@ class _AddToCueSearchState extends ConsumerState<AddToCueSearch> {
       );
       await addSlideToCue(songSlide, cue, ref: ref);
 
-      if (!hasActiveCue) {
+      if (!cueActionState.hasActiveCue) {
         await ref
             .read(activeCueSessionProvider.notifier)
             .load(cue.uuid, initialSlideUuid: songSlide.uuid);
@@ -122,7 +121,7 @@ class _AddToCueSearchState extends ConsumerState<AddToCueSearch> {
       },
       builder: (context, controller) {
         if (!widget.isDesktop) {
-          if (!hasActiveCue) {
+          if (!cueActionState.hasActiveCue) {
             return FilledButton.tonalIcon(
               onPressed: () => controller.openView(),
               icon: const Icon(Icons.playlist_add),
@@ -130,13 +129,10 @@ class _AddToCueSearchState extends ConsumerState<AddToCueSearch> {
             );
           }
 
-          final label = songInActiveCue
-              ? 'Hozzáadás listához'
-              : 'Másik listához adás';
           return TextButton.icon(
             onPressed: () => controller.openView(),
             icon: const Icon(Icons.playlist_add),
-            label: Text(label),
+            label: Text(cueActionState.mobileAddToCueLabel),
           );
         } else {
           return ConstrainedBox(
@@ -144,7 +140,7 @@ class _AddToCueSearchState extends ConsumerState<AddToCueSearch> {
             child: SearchBar(
               controller: controller,
               leading: Icon(Icons.playlist_add),
-              hintText: 'Listához adás...',
+              hintText: cueActionState.desktopSearchHint,
               shape: WidgetStatePropertyAll(
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),

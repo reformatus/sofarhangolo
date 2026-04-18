@@ -34,6 +34,9 @@ class SongPageContent extends ConsumerWidget {
             constraints.maxWidth > appConfig.breakpoints.desktopFromWidth;
         final isMobile = constraints.maxWidth < 400;
         final shellBottomInset = CueShellInset.bottomInsetOf(context);
+        final showsBottomCueOverlay = CueShellInset.showsBottomOverlayOf(
+          context,
+        );
 
         final summaryContent = getDetailsSummaryContent(song, context);
         final detailsContent = getDetailsContent(song, context);
@@ -53,6 +56,7 @@ class SongPageContent extends ConsumerWidget {
           body: SongPageBody(
             song: song,
             isDesktop: isDesktop,
+            showTabletCueAction: !isDesktop && !showsBottomCueOverlay,
             isMobile: isMobile,
             constraints: constraints,
             summaryContent: summaryContent,

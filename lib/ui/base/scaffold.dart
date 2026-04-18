@@ -192,7 +192,7 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
         }
 
         // most songs are A4, this way we have the highest chance of fitting the song on the screen the biggest possible
-        // TODO move this to global; take this into account on song page as well?
+        // TODO refactor into clean, globally accessible UI states (isDesktop, isTablet, isMobile)
         bool showBottomNavBar =
             constraints.maxHeight / constraints.maxWidth > 1.41;
         final hasActiveCueSession =
@@ -218,6 +218,9 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
         final showDesktopCueSidebar = showSidebarCueControls && isDesktop;
         final cueAwareChild = CueShellInset(
           bottomInset: cueOverlayInset,
+          presentation: showCueOverlay
+              ? CueShellPresentation.bottomOverlay
+              : CueShellPresentation.inline,
           child: widget.child,
         );
 
@@ -502,7 +505,6 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
                                       bottom: false,
                                       child: CueShellPanel(
                                         session: sidebarCueSession!,
-                                        currentPath: currentPath,
                                         listVisible: _desktopCueListVisible,
                                       ),
                                     ),
@@ -536,7 +538,6 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
                                             removeRight: true,
                                             child: CueShellPanel(
                                               session: sidebarCueSession!,
-                                              currentPath: currentPath,
                                               listVisible:
                                                   _tabletCueDrawerVisible,
                                             ),

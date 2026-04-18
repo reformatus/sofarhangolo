@@ -16,7 +16,7 @@ class CueSlideNavigationControls extends ConsumerWidget {
         : '${slideIndex.index + 1}. / ${slideIndex.total} dia';
 
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.max,
       children: [
         IconButton.filledTonal(
           onPressed: canNavigatePrevious
@@ -33,8 +33,14 @@ class CueSlideNavigationControls extends ConsumerWidget {
           icon: const Icon(Icons.navigate_next),
           tooltip: 'Következő dia',
         ),
-        const SizedBox(width: 16),
-        Text(label, style: Theme.of(context).textTheme.bodyMedium),
+        const SizedBox(width: 12),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.end,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
       ],
     );
   }

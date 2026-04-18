@@ -65,7 +65,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Hozzáadva'), findsOneWidget);
+    expect(find.text('Listában'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Hozzáadás'), findsNothing);
   });
 }

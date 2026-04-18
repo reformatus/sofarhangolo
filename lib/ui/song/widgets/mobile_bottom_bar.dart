@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/song/song.dart';
 import '../add_to_cue_search.dart';
+import '../song_cue_actions.dart';
 import '../state.dart';
 import '../transpose/state.dart';
 import '../transpose/widget.dart';
@@ -18,12 +19,14 @@ class MobileBottomBar extends ConsumerWidget {
     required this.constraints,
     required this.actionButtonsScrollController,
     required this.transposeOverlayVisible,
+    this.showOpenCueAction = false,
   });
 
   final Song song;
   final BoxConstraints constraints;
   final ScrollController actionButtonsScrollController;
   final ValueNotifier<bool> transposeOverlayVisible;
+  final bool showOpenCueAction;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -87,6 +90,11 @@ class MobileBottomBar extends ConsumerWidget {
         viewType: viewType,
         transpose: transpose,
       ),
+      if (showOpenCueAction)
+        OpenCueActionControl(
+          song: song,
+          transpose: transpose,
+        ),
       if (viewType == SongViewType.chords) ...[
         const VerticalDivider(),
         TransposeResetButton(song, songSlide: null, isCompact: false),
