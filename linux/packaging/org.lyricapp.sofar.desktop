@@ -11,3 +11,4 @@ Categories=AudioVideo;Music;
 Keywords=lyrics;songbook;music;chords;
 StartupNotify=true
 StartupWMClass=sofarhangolo
+MimeType=x-scheme-handler/lyric;

@@ -210,6 +210,12 @@ Store that exact value in:
 
 - `MACOS_DEVELOPER_ID_APPLICATION`
 
+### 4a. Keep direct-distribution entitlements aligned
+
+The direct-distribution signing step uses `macos/Runner/DirectDistribution.entitlements`.
+
+If the universal-link host changes, update this file and verify the signed app contains the expected `Associated Domains` entitlement.
+
 ### 5. Create an App Store Connect API key for notarization
 
 In App Store Connect:
@@ -228,6 +234,12 @@ You will need:
 Reference:
 
 - <https://developer.apple.com/help/app-store-connect/get-started/app-store-connect-api>
+
+### 5a. Refresh App Store capabilities if universal-link domains change
+
+The App Store signing path uses `macos/Runner/Release.entitlements`.
+
+If a domain change introduces archive or export signing failures, refresh the app identifier capability and regenerate the provisioning profile before retrying the release workflow.
 
 ### 6. Encode the binary files for GitHub secrets
 
