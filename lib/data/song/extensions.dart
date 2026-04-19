@@ -10,7 +10,10 @@ extension PropertyUtils on Song {
 
   /// Check if lyrics contain chord annotations using the appropriate parser.
   bool get hasChords =>
-      hasLyrics && LyricsParser.forFormat(lyricsFormat).hasChords(lyrics);
+      hasLyrics &&
+      LyricsParser.forFormat(
+        lyricsFormat,
+      ).hasChords(lyrics, presentationOrder: presentationOrder);
 
   List<String> get availableViews => [
     if (hasSvg) 'svg',
