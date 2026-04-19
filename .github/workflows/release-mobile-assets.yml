@@ -161,11 +161,11 @@ jobs:
               artifact_type = artifact.get("type")
               if artifact_type == "apk":
                   targets.append(
-                      (artifact["url"], f'dist/mobile/sofar-dalapp_{build["tag"]}.apk')
+                      (artifact["url"], f'dist/mobile/sofar-hangolo-{build["tag"]}.apk')
                   )
               elif artifact_type == "ipa":
                   targets.append(
-                      (artifact["url"], f'dist/mobile/sofar-dalapp_{build["tag"]}.ipa')
+                      (artifact["url"], f'dist/mobile/sofar-hangolo-{build["tag"]}.ipa')
                   )
 
           Path("artifact_urls.txt").write_text(
