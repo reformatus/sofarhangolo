@@ -83,5 +83,17 @@ void main() {
       expect(song.lyrics, equals('[C]Amazing grace'));
       expect(song.lyricsFormat, equals(LyricsFormat.chordpro));
     });
+
+    test('exposes presentation order from song metadata', () {
+      final song = Song.fromBankApiJson({
+        'uuid': 'song-5',
+        'title': 'Song 5',
+        'lyrics': '[V1]\n First',
+        'lyricsFormat': 'opensong',
+        'presentation': 'C V1',
+      });
+
+      expect(song.presentationOrder, equals('C V1'));
+    });
   });
 }

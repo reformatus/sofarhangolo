@@ -73,7 +73,10 @@ class LyricsView extends ConsumerWidget {
           }
 
           final parser = LyricsParser.forFormat(song.lyricsFormat);
-          final verses = parser.parse(song.lyrics);
+          final verses = parser.parse(
+            song.lyrics,
+            presentationOrder: song.presentationOrder,
+          );
 
           return SingleChildScrollView(
             scrollDirection: crossAxisCount > 1

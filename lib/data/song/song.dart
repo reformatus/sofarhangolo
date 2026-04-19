@@ -81,8 +81,16 @@ class Song extends Insertable<Song> {
   });
 
   String get firstLine {
-    return LyricsParser.forFormat(lyricsFormat).getFirstLine(lyrics);
+    return LyricsParser.forFormat(
+      lyricsFormat,
+    ).getFirstLine(lyrics, presentationOrder: presentationOrder);
   }
+
+  String? get presentationOrder =>
+      _nonBlankString(contentMap['presentationOrder']) ??
+      _nonBlankString(contentMap['presentation_order']) ??
+      _nonBlankString(contentMap['presentation']) ??
+      _nonBlankString(contentMap['flow']);
 
   KeyField? get primaryKeyField {
     if (keyField.isEmpty) return null;

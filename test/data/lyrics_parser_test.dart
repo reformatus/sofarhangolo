@@ -40,6 +40,41 @@ void main() {
 
       expect(parser.getFirstLine(lyrics), isEmpty);
     });
+
+    test('applies presentation order when selecting verses', () {
+      const lyrics = '''
+[V1]
+ Első versszak
+[C]
+ Refrén
+[V2]
+ Második versszak
+''';
+
+      final verses = parser.parse(lyrics, presentationOrder: 'C V2 V1');
+
+      expect(
+        verses
+            .map((verse) => (verse.type, verse.index, verse.parts.first))
+            .map(
+              (entry) => (
+                entry.$1,
+                entry.$2,
+                (entry.$3 as ParsedVerseLine).lyrics.trim(),
+              ),
+            )
+            .toList(),
+        equals([
+          ('C', null, 'Refrén'),
+          ('V', 2, 'Második versszak'),
+          ('V', 1, 'Első versszak'),
+        ]),
+      );
+      expect(
+        parser.getFirstLine(lyrics, presentationOrder: 'C V1'),
+        equals('Refrén'),
+      );
+    });
   });
 
   group('ChordProParser', () {
@@ -72,6 +107,37 @@ void main() {
       expect(
         (verses.last.parts.single as ParsedVerseLine).lyrics,
         equals('Hallelujah'),
+      );
+    });
+
+    test('applies embedded flow order to parsed verses', () {
+      const lyrics = '''
+{flow: Verse 2, Chorus, Verse 1}
+{start_of_verse: 1}
+One
+{end_of_verse}
+{start_of_chorus}
+Two
+{end_of_chorus}
+{start_of_verse: 2}
+Three
+{end_of_verse}
+''';
+
+      final verses = parser.parse(lyrics);
+
+      expect(
+        verses
+            .map((verse) => (verse.type, verse.index, verse.parts.first))
+            .map(
+              (entry) => (
+                entry.$1,
+                entry.$2,
+                (entry.$3 as ParsedVerseLine).lyrics.trim(),
+              ),
+            )
+            .toList(),
+        equals([('V', 2, 'Three'), ('C', null, 'Two'), ('V', 1, 'One')]),
       );
     });
   });
