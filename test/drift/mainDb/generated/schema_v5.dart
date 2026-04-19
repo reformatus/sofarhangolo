@@ -941,14 +941,6 @@ class Songs extends Table with TableInfo<Songs, SongsData> {
     $customConstraints: 'NOT NULL DEFAULT \'opensong\'',
     defaultValue: const CustomExpression('\'opensong\''),
   );
-  late final GeneratedColumn<String> keyField = GeneratedColumn<String>(
-    'key_field',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
-  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -958,7 +950,6 @@ class Songs extends Table with TableInfo<Songs, SongsData> {
     title,
     lyrics,
     lyricsFormat,
-    keyField,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -999,10 +990,6 @@ class Songs extends Table with TableInfo<Songs, SongsData> {
         DriftSqlType.string,
         data['${effectivePrefix}lyrics_format'],
       )!,
-      keyField: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}key_field'],
-      )!,
     );
   }
 
@@ -1023,7 +1010,6 @@ class SongsData extends DataClass implements Insertable<SongsData> {
   final String title;
   final String lyrics;
   final String lyricsFormat;
-  final String keyField;
   const SongsData({
     required this.id,
     required this.uuid,
@@ -1032,7 +1018,6 @@ class SongsData extends DataClass implements Insertable<SongsData> {
     required this.title,
     required this.lyrics,
     required this.lyricsFormat,
-    required this.keyField,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1046,7 +1031,6 @@ class SongsData extends DataClass implements Insertable<SongsData> {
     map['title'] = Variable<String>(title);
     map['lyrics'] = Variable<String>(lyrics);
     map['lyrics_format'] = Variable<String>(lyricsFormat);
-    map['key_field'] = Variable<String>(keyField);
     return map;
   }
 
@@ -1061,7 +1045,6 @@ class SongsData extends DataClass implements Insertable<SongsData> {
       title: Value(title),
       lyrics: Value(lyrics),
       lyricsFormat: Value(lyricsFormat),
-      keyField: Value(keyField),
     );
   }
 
@@ -1078,7 +1061,6 @@ class SongsData extends DataClass implements Insertable<SongsData> {
       title: serializer.fromJson<String>(json['title']),
       lyrics: serializer.fromJson<String>(json['lyrics']),
       lyricsFormat: serializer.fromJson<String>(json['lyricsFormat']),
-      keyField: serializer.fromJson<String>(json['keyField']),
     );
   }
   @override
@@ -1092,7 +1074,6 @@ class SongsData extends DataClass implements Insertable<SongsData> {
       'title': serializer.toJson<String>(title),
       'lyrics': serializer.toJson<String>(lyrics),
       'lyricsFormat': serializer.toJson<String>(lyricsFormat),
-      'keyField': serializer.toJson<String>(keyField),
     };
   }
 
@@ -1104,7 +1085,6 @@ class SongsData extends DataClass implements Insertable<SongsData> {
     String? title,
     String? lyrics,
     String? lyricsFormat,
-    String? keyField,
   }) => SongsData(
     id: id ?? this.id,
     uuid: uuid ?? this.uuid,
@@ -1113,7 +1093,6 @@ class SongsData extends DataClass implements Insertable<SongsData> {
     title: title ?? this.title,
     lyrics: lyrics ?? this.lyrics,
     lyricsFormat: lyricsFormat ?? this.lyricsFormat,
-    keyField: keyField ?? this.keyField,
   );
   SongsData copyWithCompanion(SongsCompanion data) {
     return SongsData(
@@ -1130,7 +1109,6 @@ class SongsData extends DataClass implements Insertable<SongsData> {
       lyricsFormat: data.lyricsFormat.present
           ? data.lyricsFormat.value
           : this.lyricsFormat,
-      keyField: data.keyField.present ? data.keyField.value : this.keyField,
     );
   }
 
@@ -1143,8 +1121,7 @@ class SongsData extends DataClass implements Insertable<SongsData> {
           ..write('contentMap: $contentMap, ')
           ..write('title: $title, ')
           ..write('lyrics: $lyrics, ')
-          ..write('lyricsFormat: $lyricsFormat, ')
-          ..write('keyField: $keyField')
+          ..write('lyricsFormat: $lyricsFormat')
           ..write(')'))
         .toString();
   }
@@ -1158,7 +1135,6 @@ class SongsData extends DataClass implements Insertable<SongsData> {
     title,
     lyrics,
     lyricsFormat,
-    keyField,
   );
   @override
   bool operator ==(Object other) =>
@@ -1170,8 +1146,7 @@ class SongsData extends DataClass implements Insertable<SongsData> {
           other.contentMap == this.contentMap &&
           other.title == this.title &&
           other.lyrics == this.lyrics &&
-          other.lyricsFormat == this.lyricsFormat &&
-          other.keyField == this.keyField);
+          other.lyricsFormat == this.lyricsFormat);
 }
 
 class SongsCompanion extends UpdateCompanion<SongsData> {
@@ -1182,7 +1157,6 @@ class SongsCompanion extends UpdateCompanion<SongsData> {
   final Value<String> title;
   final Value<String> lyrics;
   final Value<String> lyricsFormat;
-  final Value<String> keyField;
   const SongsCompanion({
     this.id = const Value.absent(),
     this.uuid = const Value.absent(),
@@ -1191,7 +1165,6 @@ class SongsCompanion extends UpdateCompanion<SongsData> {
     this.title = const Value.absent(),
     this.lyrics = const Value.absent(),
     this.lyricsFormat = const Value.absent(),
-    this.keyField = const Value.absent(),
   });
   SongsCompanion.insert({
     this.id = const Value.absent(),
@@ -1201,12 +1174,10 @@ class SongsCompanion extends UpdateCompanion<SongsData> {
     required String title,
     required String lyrics,
     this.lyricsFormat = const Value.absent(),
-    required String keyField,
   }) : uuid = Value(uuid),
        contentMap = Value(contentMap),
        title = Value(title),
-       lyrics = Value(lyrics),
-       keyField = Value(keyField);
+       lyrics = Value(lyrics);
   static Insertable<SongsData> custom({
     Expression<int>? id,
     Expression<String>? uuid,
@@ -1215,7 +1186,6 @@ class SongsCompanion extends UpdateCompanion<SongsData> {
     Expression<String>? title,
     Expression<String>? lyrics,
     Expression<String>? lyricsFormat,
-    Expression<String>? keyField,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1225,7 +1195,6 @@ class SongsCompanion extends UpdateCompanion<SongsData> {
       if (title != null) 'title': title,
       if (lyrics != null) 'lyrics': lyrics,
       if (lyricsFormat != null) 'lyrics_format': lyricsFormat,
-      if (keyField != null) 'key_field': keyField,
     });
   }
 
@@ -1237,7 +1206,6 @@ class SongsCompanion extends UpdateCompanion<SongsData> {
     Value<String>? title,
     Value<String>? lyrics,
     Value<String>? lyricsFormat,
-    Value<String>? keyField,
   }) {
     return SongsCompanion(
       id: id ?? this.id,
@@ -1247,7 +1215,6 @@ class SongsCompanion extends UpdateCompanion<SongsData> {
       title: title ?? this.title,
       lyrics: lyrics ?? this.lyrics,
       lyricsFormat: lyricsFormat ?? this.lyricsFormat,
-      keyField: keyField ?? this.keyField,
     );
   }
 
@@ -1275,9 +1242,6 @@ class SongsCompanion extends UpdateCompanion<SongsData> {
     if (lyricsFormat.present) {
       map['lyrics_format'] = Variable<String>(lyricsFormat.value);
     }
-    if (keyField.present) {
-      map['key_field'] = Variable<String>(keyField.value);
-    }
     return map;
   }
 
@@ -1290,8 +1254,7 @@ class SongsCompanion extends UpdateCompanion<SongsData> {
           ..write('contentMap: $contentMap, ')
           ..write('title: $title, ')
           ..write('lyrics: $lyrics, ')
-          ..write('lyricsFormat: $lyricsFormat, ')
-          ..write('keyField: $keyField')
+          ..write('lyricsFormat: $lyricsFormat')
           ..write(')'))
         .toString();
   }
@@ -2326,6 +2289,22 @@ class DatabaseAtV5 extends GeneratedDatabase {
   late final Banks banks = Banks(this);
   late final Songs songs = Songs(this);
   late final SongsFts songsFts = SongsFts(this);
+  late final Trigger songsAi = Trigger(
+    'CREATE TRIGGER songs_ai AFTER INSERT ON songs BEGIN INSERT INTO songs_fts ("rowid", title, lyrics) VALUES (new.id, new.title, new.lyrics);END',
+    'songs_ai',
+  );
+  late final Trigger songsAd = Trigger(
+    'CREATE TRIGGER songs_ad AFTER DELETE ON songs BEGIN INSERT INTO songs_fts (songs_fts, "rowid", title, lyrics) VALUES (\'delete\', old.id, old.title, old.lyrics);END',
+    'songs_ad',
+  );
+  late final Trigger songsAu = Trigger(
+    'CREATE TRIGGER songs_au AFTER UPDATE ON songs BEGIN INSERT INTO songs_fts (songs_fts, "rowid", title, lyrics) VALUES (\'delete\', old.id, old.title, old.lyrics);INSERT INTO songs_fts ("rowid", title, lyrics) VALUES (new.id, new.title, new.lyrics);END',
+    'songs_au',
+  );
+  late final Index songsUuid = Index(
+    'songs_uuid',
+    'CREATE UNIQUE INDEX songs_uuid ON songs (uuid)',
+  );
   late final PreferenceStorage preferenceStorage = PreferenceStorage(this);
   late final Cues cues = Cues(this);
   late final Index cuesUuid = Index(
@@ -2337,22 +2316,6 @@ class DatabaseAtV5 extends GeneratedDatabase {
     'asset_source_url',
     'CREATE UNIQUE INDEX asset_source_url ON assets (source_url)',
   );
-  late final Index songsUuid = Index(
-    'songs_uuid',
-    'CREATE UNIQUE INDEX songs_uuid ON songs (uuid)',
-  );
-  late final Trigger songsAi = Trigger(
-    'CREATE TRIGGER songs_ai AFTER INSERT ON songs BEGIN INSERT INTO songs_fts ("rowid", title, lyrics) VALUES (new.id, new.title, new.lyrics);END',
-    'songs_ai',
-  );
-  late final Trigger songsAd = Trigger(
-    'CREATE TRIGGER songs_ad AFTER DELETE ON songs BEGIN INSERT INTO songs_fts (songs_fts, "rowid", title, lyrics) VALUES (\'delete\', "rowid", old.title, old.lyrics);END',
-    'songs_ad',
-  );
-  late final Trigger songsAu = Trigger(
-    'CREATE TRIGGER songs_au AFTER UPDATE ON songs BEGIN INSERT INTO songs_fts (songs_fts, "rowid", title, lyrics) VALUES (\'delete\', "rowid", old.title, old.lyrics);INSERT INTO songs_fts ("rowid", title, lyrics) VALUES (new.id, new.title, new.lyrics);END',
-    'songs_au',
-  );
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2361,15 +2324,15 @@ class DatabaseAtV5 extends GeneratedDatabase {
     banks,
     songs,
     songsFts,
+    songsAi,
+    songsAd,
+    songsAu,
+    songsUuid,
     preferenceStorage,
     cues,
     cuesUuid,
     assets,
     assetSourceUrl,
-    songsUuid,
-    songsAi,
-    songsAd,
-    songsAu,
   ];
   @override
   StreamQueryUpdateRules get streamUpdateRules => const StreamQueryUpdateRules([

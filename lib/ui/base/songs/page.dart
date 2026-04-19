@@ -86,7 +86,6 @@ class _SongsPageState extends ConsumerState<SongsPage> {
     final filterState = ref.watch(multiselectTagsFilterStateProvider);
     final keyFilterState = ref.watch(keyFilterStateProvider);
     final banksFilterState = ref.watch(banksFilterStateProvider);
-    final searchString = ref.watch(searchStringStateProvider);
     final shellCueInset = CueShellInset.bottomInsetOf(context);
     final insetAnimationDuration =
         MediaQuery.maybeOf(context)?.accessibleNavigation ?? false
@@ -294,13 +293,6 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                                   value == null
                                       ? const Center(
                                           child: CircularProgressIndicator(),
-                                        )
-                                      : searchString.trim().isNotEmpty &&
-                                            searchString.trim().length < 3
-                                      ? CenteredHint(
-                                          'Írj be legalább három betűt a kereséshez.',
-                                          iconData: Icons.search,
-                                          alignment: Alignment.topCenter,
                                         )
                                       : value.isEmpty
                                       ? CenteredHint(

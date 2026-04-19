@@ -4,7 +4,11 @@ import '../../../data/song/song.dart';
 import '../../base/songs/widgets/filter/types/field_type.dart';
 
 // Helper functions for song details
-List<Widget> getDetailsSummaryContent(Song song, BuildContext context) {
+List<Widget> getDetailsSummaryContent(
+  Song song,
+  BuildContext context,
+  SongFieldCatalog catalog,
+) {
   const Set<String> fieldsToShowInDetailsSummary = {
     'composer',
     'lyricist',
@@ -14,12 +18,14 @@ List<Widget> getDetailsSummaryContent(Song song, BuildContext context) {
   List<Widget> detailsSummary = [];
   for (String field in fieldsToShowInDetailsSummary) {
     if (song.contentMap[field] != null && song.contentMap[field]!.isNotEmpty) {
+      final definition = catalog[field] ?? fallbackSongFieldCatalog[field];
+      if (definition == null) continue;
       detailsSummary.add(
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              songFieldsMap[field]!['icon'],
+              definition.icon,
               color: Theme.of(context).colorScheme.secondary,
             ),
             const SizedBox(width: 3),
@@ -40,7 +46,11 @@ List<Widget> getDetailsSummaryContent(Song song, BuildContext context) {
   return detailsSummary;
 }
 
-List<Widget> getDetailsContent(Song song, BuildContext context) {
+List<Widget> getDetailsContent(
+  Song song,
+  BuildContext context,
+  SongFieldCatalog catalog,
+) {
   const Set<String> fieldsToOmitFromDetails = {
     'title',
     'uuid',
@@ -56,13 +66,16 @@ List<Widget> getDetailsContent(Song song, BuildContext context) {
   for (MapEntry<String, String> contentEntry in song.contentMap.entries) {
     if (fieldsToOmitFromDetails.contains(contentEntry.key)) continue;
     if (contentEntry.value.isNotEmpty) {
-      if (songFieldsMap.containsKey(contentEntry.key)) {
+      final definition =
+          catalog[contentEntry.key] ??
+          fallbackSongFieldCatalog[contentEntry.key];
+      if (definition != null) {
         detailsContent.add(
           ListTile(
             visualDensity: VisualDensity.compact,
-            leading: Icon(songFieldsMap[contentEntry.key]!['icon']),
+            leading: Icon(definition.icon),
             title: Text(
-              songFieldsMap[contentEntry.key]!['title_hu'],
+              definition.titleHu,
               style: Theme.of(context).primaryTextTheme.labelMedium,
             ),
             subtitle: Text(contentEntry.value),

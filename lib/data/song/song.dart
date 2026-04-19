@@ -13,7 +13,6 @@ class Song extends Insertable<Song> {
   final String title;
   final String lyrics;
   final LyricsFormat lyricsFormat;
-  final List<KeyField> keyField;
 
   Map<String, String> contentMap;
 
@@ -59,7 +58,6 @@ class Song extends Insertable<Song> {
         title: json['title'],
         lyrics: lyricsContent,
         lyricsFormat: format,
-        keyField: KeyField.fromStringList(json['key']),
         contentMap: contentMap,
         sourceBank: sourceBank?.uuid,
       );
@@ -75,10 +73,11 @@ class Song extends Insertable<Song> {
     required this.title,
     required this.lyrics,
     this.lyricsFormat = LyricsFormat.opensong,
-    required this.keyField,
     required this.contentMap,
     this.sourceBank,
   });
+
+  List<KeyField> get keyField => KeyField.fromStringList(contentMap['key']);
 
   String get firstLine {
     return LyricsParser.forFormat(lyricsFormat).getFirstLine(lyrics);
@@ -89,11 +88,7 @@ class Song extends Insertable<Song> {
     return keyField.first;
   }
 
-  int get contentHash => Object.hash(
-    jsonEncode(contentMap),
-    jsonEncode(keyField.map((e) => e.toString()).toList()),
-    sourceBank,
-  );
+  int get contentHash => Object.hash(jsonEncode(contentMap), sourceBank);
 
   @override
   bool operator ==(Object other) {
@@ -113,7 +108,6 @@ class Song extends Insertable<Song> {
       title: Value(title),
       lyrics: Value(lyrics),
       lyricsFormat: Value(lyricsFormat),
-      keyField: Value(keyField),
     ).toColumns(nullToAbsent);
   }
 }
@@ -125,7 +119,6 @@ const Set<String> _excludedFromContentMap = {
   'lyrics',
   'opensong', // legacy field name
   'lyricsFormat',
-  'key',
 };
 
 /// Mandatory fields that must be present in API JSON (lyrics checked separately).
@@ -143,7 +136,6 @@ class Songs extends Table {
   TextColumn get lyricsFormat => text()
       .withDefault(const Constant('opensong'))
       .map(const LyricsFormatConverter())();
-  TextColumn get keyField => text().map(const KeyFieldConverter())();
 }
 
 class SongContentConverter extends TypeConverter<Map<String, String>, String> {
@@ -157,20 +149,6 @@ class SongContentConverter extends TypeConverter<Map<String, String>, String> {
   @override
   String toSql(Map<String, String> value) {
     return jsonEncode(value);
-  }
-}
-
-class KeyFieldConverter extends TypeConverter<List<KeyField>, String> {
-  const KeyFieldConverter();
-
-  @override
-  List<KeyField> fromSql(String fromDb) {
-    return KeyField.fromStringList(fromDb);
-  }
-
-  @override
-  String toSql(List<KeyField> value) {
-    return value.map((e) => e.toString()).join(', ');
   }
 }
 

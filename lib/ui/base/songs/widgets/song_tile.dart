@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../data/bank/bank.dart';
 import '../../../../data/cue/slide.dart';
-import '../../../../data/database.dart';
 import '../../../../data/log/logger.dart';
 import '../../../../data/song/extensions.dart';
 import '../../../../data/song/song.dart';
@@ -28,7 +27,6 @@ class LSongResultTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final Song song = songResult.song;
-    final SongFulltextSearchResult? result = songResult.result;
     final List<String> downloadedAssets = songResult.downloadedAssets;
     final connection = ref.watch(connectionProvider);
     final showActiveCueQuickAdd = ref.watch(
@@ -89,7 +87,7 @@ class LSongResultTile extends ConsumerWidget {
           title: RichText(
             text: TextSpan(
               children: spansFromSnippet(
-                result?.matchTitle ?? song.title,
+                songResult.matchTitle ?? song.title,
                 normalStyle: Theme.of(context).textTheme.bodyLarge!,
                 highlightStyle: Theme.of(context).textTheme.bodyLarge!.copyWith(
                   fontWeight: FontWeight.bold,
@@ -98,7 +96,8 @@ class LSongResultTile extends ConsumerWidget {
               ),
             ),
           ),
-          subtitle: result == null
+          subtitle:
+              songResult.matchTitle == null && songResult.matchLyrics == null
               ? song.firstLine
                             .replaceAll(RegExp(r'[^a-zA-Z]'), '')
                             .startsWith(
@@ -115,11 +114,11 @@ class LSongResultTile extends ConsumerWidget {
               : Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (hasMatch(result.matchLyrics))
+                    if (hasMatch(songResult.matchLyrics))
                       contentResultRow(
                         context,
                         Icons.text_snippet,
-                        result.matchLyrics,
+                        songResult.matchLyrics,
                       ),
                   ],
                 ),
