@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sofarhangolo/ui/common/export_dialog/export_single_song_dialog.dart';
 
 import '../../../data/song/song.dart';
 import '../../../services/app_links/get_shareable.dart';
@@ -65,6 +66,15 @@ class SongPageAppBar extends ConsumerWidget implements PreferredSizeWidget {
           ),
           icon: Icon(Icons.share),
           tooltip: 'Megosztási lehetőségek',
+        ),
+        const SizedBox(width: 8),
+        IconButton.filledTonal(
+          onPressed: () => showDialog(
+            context: context,
+            builder: (context) => ExportSingleSongDialog(song: song),
+          ),
+          icon: Icon(Icons.download),
+          tooltip: 'Letöltés',
         ),
         const SizedBox(width: 8),
       ],
