@@ -68,7 +68,7 @@ dependencies:
   wtf_sliding_sheet: ^1.1.5
   app_links: ^7.0.0
   qr_flutter: ^4.1.0
-  share_plus: ^13.0.0
+  share_plus: ^13.1.0
   dynamic_icons: ^1.0.1
   font_awesome_flutter: 10.8.0
   xml: ^6.5.0
