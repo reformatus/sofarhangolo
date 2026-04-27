@@ -1,5 +1,4 @@
 import 'package:chord_transposer/chord_transposer.dart';
-import 'package:dart_opensong/dart_opensong.dart' as os;
 import 'package:fading_edge_scrollview/fading_edge_scrollview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -96,11 +95,7 @@ class LyricsView extends ConsumerWidget {
                   ...verses.map(
                     (verse) => SizedBox(
                       width: cardWidth,
-                      child: VerseCard(
-                        song,
-                        verse as OpenSongVerse,
-                        transpose: transpose,
-                      ),
+                      child: VerseCard(song, verse, transpose: transpose),
                     ),
                   ),
                 ],
@@ -116,7 +111,7 @@ class LyricsView extends ConsumerWidget {
 class VerseCard extends ConsumerStatefulWidget {
   const VerseCard(this.song, this.verse, {required this.transpose, super.key});
 
-  final OpenSongVerse verse;
+  final ParsedVerse verse;
   final Song song;
   final SongTranspose transpose;
 
@@ -163,6 +158,7 @@ class _VerseCardState extends ConsumerState<VerseCard> {
                       getPrettyVerseTagFrom(
                         widget.verse.type,
                         widget.verse.index,
+                        label: widget.verse.label,
                       ),
                       style: TextStyle(
                         color: Theme.of(context).colorScheme.onPrimary,
@@ -179,10 +175,10 @@ class _VerseCardState extends ConsumerState<VerseCard> {
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: widget.verse.raw.parts
+                    children: widget.verse.parts
                         .map(
-                          (versePart) => switch (versePart) {
-                            os.VerseLine(:final segments) => Wrap(
+                          (part) => switch (part) {
+                            ParsedVerseLine(:final segments) => Wrap(
                               alignment: WrapAlignment.start,
                               crossAxisAlignment: WrapCrossAlignment.start,
                               children: segments
@@ -196,18 +192,19 @@ class _VerseCardState extends ConsumerState<VerseCard> {
                                   )
                                   .toList(),
                             ),
-                            os.CommentLine(:final comment) => Text(
+                            ParsedCommentLine(:final comment) => Text(
                               comment,
                               style: TextStyle(fontStyle: FontStyle.italic),
                             ),
-                            os.NewSlide() => Divider(),
-                            os.EmptyLine() => Text(''),
-                            os.UnsupportedLine(:final original) => LErrorCard(
-                              type: LErrorType.info,
-                              title: 'Ismeretlen sortípus',
-                              message: original,
-                              icon: Icons.question_mark,
-                            ),
+                            ParsedNewSlide() => Divider(),
+                            ParsedEmptyLine() => Text(''),
+                            ParsedUnsupportedLine(:final original) =>
+                              LErrorCard(
+                                type: LErrorType.info,
+                                title: 'Ismeretlen sortípus',
+                                message: original,
+                                icon: Icons.question_mark,
+                              ),
                           },
                         )
                         .toList(),
@@ -231,8 +228,8 @@ class LyricsSegment extends ConsumerWidget {
     required this.segment,
   });
 
-  final List<os.VerseLineSegment> segments;
-  final os.VerseLineSegment segment;
+  final List<ParsedVerseLineSegment> segments;
+  final ParsedVerseLineSegment segment;
   final Song song;
   final SongTranspose transpose;
 

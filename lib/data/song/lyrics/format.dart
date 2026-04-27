@@ -7,7 +7,11 @@ import 'package:drift/drift.dart';
 enum LyricsFormat {
   /// OpenSong format - uses brackets for sections, dots for chord lines.
   /// See: http://www.opensong.org/
-  opensong('opensong');
+  opensong('opensong'),
+
+  /// ChordPro format - uses inline bracket chords and brace directives.
+  /// See: https://www.chordpro.org/
+  chordpro('chordpro');
 
   final String value;
   const LyricsFormat(this.value);

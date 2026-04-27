@@ -314,6 +314,15 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.7"
+  dart_chordpro:
+    dependency: "direct main"
+    description:
+      path: "."
+      ref: a9cb4b5
+      resolved-ref: a9cb4b5247df18c4d90759c204270c8edc35517c
+      url: "https://github.com/reformatus/dart_chordpro"
+    source: git
+    version: "0.0.1"
   dart_opensong:
     dependency: "direct main"
     description:

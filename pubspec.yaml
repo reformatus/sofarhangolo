@@ -56,6 +56,10 @@ dependencies:
   msgpack_dart: ^1.0.1
   mailto: ^2.0.0
   flutter_markdown: ^0.7.7+1
+  dart_chordpro:
+    git:
+      url: https://github.com/reformatus/dart_chordpro
+      ref: a9cb4b5
   dart_opensong: ^0.0.4
   chord_transposer:
     git:
