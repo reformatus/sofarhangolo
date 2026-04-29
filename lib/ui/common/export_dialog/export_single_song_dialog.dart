@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sofarhangolo/data/song/lyrics/parser.dart';
 import 'package:sofarhangolo/data/song/song.dart';
 import 'package:sofarhangolo/ui/common/export_dialog/export_util.dart';
 
@@ -26,6 +27,29 @@ class ExportSingleSongDialog extends ConsumerWidget {
       );
     }
 
+    if (song.lyrics.isNotEmpty) {
+      shareWidgets.add(
+        SizedBox(
+          width: double.infinity,
+          child: TextButton(
+            onPressed: () => copyLyricsText(song),
+            child: const Text('Dalszöveg'),
+          ),
+        ),
+      );
+    }
+
+    if (LyricsParser.forFormat(song.lyricsFormat).hasChords(song.lyrics)) {
+      shareWidgets.add(
+        SizedBox(
+          width: double.infinity,
+          child: TextButton(
+            onPressed: () => copyLyrics(song),
+            child: const Text('Akkordos dalszöveg'),
+          ),
+        ),
+      );
+    }
 
     return AlertDialog(
       title: const Text('Dal letöltése'),
@@ -50,7 +74,7 @@ class ExportSingleSongDialog extends ConsumerWidget {
                   ),
                 ),
               ),
-              child: Column(spacing: 20, children: shareWidgets),
+              child: Column(children: shareWidgets),
             ),
           ],
         ),

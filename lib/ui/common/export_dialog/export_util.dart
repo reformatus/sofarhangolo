@@ -1,11 +1,23 @@
 import 'dart:async';
 
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:sofarhangolo/data/log/logger.dart';
+import 'package:sofarhangolo/data/song/lyrics/parser.dart';
 import 'package:sofarhangolo/data/song/song.dart';
 import 'package:sofarhangolo/services/assets/get_song_asset.dart';
+
+Future<void> copyLyricsText(Song song) async {
+  await SharePlus.instance.share(
+    ShareParams(
+      text: LyricsParser.forFormat(song.lyricsFormat).getText(song.lyrics),
+    ),
+  );
+}
+
+Future<void> copyLyrics(Song song) async {
+  await SharePlus.instance.share(ShareParams(text: song.lyrics));
+}
 
 Future<void> getPDF(Song song, WidgetRef ref) async {
   final assetProvider = getSongAssetProvider(song, 'pdf');
@@ -17,6 +29,7 @@ Future<void> getPDF(Song song, WidgetRef ref) async {
     case AsyncData(value: final assetResult):
       if (assetResult.data != null) {
         try {
+          // TODO not supported on linux, download it to a selectable location
           await SharePlus.instance.share(
             ShareParams(
               files: [XFile.fromData(assetResult.data!)],
