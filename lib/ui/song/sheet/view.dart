@@ -126,17 +126,10 @@ class SheetView extends ConsumerWidget {
 }
 
 class _PdfSheetAssetView extends StatefulWidget {
-  const _PdfSheetAssetView({
-    required this.sourceName,
-    required this.data,
-    this.backgroundColor = Colors.transparent,
-    this.shadowColor = Colors.transparent,
-  });
+  const _PdfSheetAssetView({required this.sourceName, required this.data});
 
   final String sourceName;
   final Uint8List data;
-  final Color backgroundColor;
-  final Color shadowColor;
 
   @override
   State<_PdfSheetAssetView> createState() => _PdfSheetAssetViewState();
@@ -163,11 +156,6 @@ class _PdfSheetAssetViewState extends State<_PdfSheetAssetView> {
         !identical(widget.data, oldWidget.data)) {
       _documentRef = _createDocumentRef();
     }
-
-    if (widget.backgroundColor != oldWidget.backgroundColor ||
-        widget.shadowColor != oldWidget.shadowColor) {
-      _viewerParams = _createViewerParams();
-    }
   }
 
   PdfDocumentRefData _createDocumentRef() {
@@ -184,10 +172,10 @@ class _PdfSheetAssetViewState extends State<_PdfSheetAssetView> {
 
   PdfViewerParams _createViewerParams() {
     return PdfViewerParams(
-      backgroundColor: widget.backgroundColor,
+      backgroundColor: Colors.transparent,
       calculateInitialZoom: _calculatePdfInitialZoom,
       loadingBannerBuilder: _buildPdfLoadingBanner,
-      pageDropShadow: BoxShadow(color: widget.shadowColor, blurRadius: 30),
+      pageDropShadow: null,
       scrollByMouseWheel: null,
     );
   }
