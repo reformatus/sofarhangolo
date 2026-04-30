@@ -93,12 +93,26 @@ class SheetView extends ConsumerWidget {
                 ),
               );
             case SongViewType.pdf || _:
-              return _PdfSheetAssetView(
-                sourceName: song.uuid,
-                data: assetResult.data!,
-                backgroundColor: Theme.of(context).canvasColor,
-                shadowColor: Theme.of(context).shadowColor.withAlpha(30),
-              );
+              switch (sheetBrightness) {
+                case Brightness.dark:
+                  return ColorFiltered(
+                    colorFilter: ColorFilter.matrix([
+                      -1, 0, 0, 0, 255, // Red
+                      0, -1, 0, 0, 255, // Green
+                      0, 0, -1, 0, 255, // Blue
+                      0, 0, 0, 1, 0, // Alpha
+                    ]),
+                    child: _PdfSheetAssetView(
+                      sourceName: song.uuid,
+                      data: assetResult.data!,
+                    ),
+                  );
+                case Brightness.light:
+                  return _PdfSheetAssetView(
+                    sourceName: song.uuid,
+                    data: assetResult.data!,
+                  );
+              }
           }
         } else {
           return Center(
@@ -112,17 +126,10 @@ class SheetView extends ConsumerWidget {
 }
 
 class _PdfSheetAssetView extends StatefulWidget {
-  const _PdfSheetAssetView({
-    required this.sourceName,
-    required this.data,
-    required this.backgroundColor,
-    required this.shadowColor,
-  });
+  const _PdfSheetAssetView({required this.sourceName, required this.data});
 
   final String sourceName;
   final Uint8List data;
-  final Color backgroundColor;
-  final Color shadowColor;
 
   @override
   State<_PdfSheetAssetView> createState() => _PdfSheetAssetViewState();
@@ -149,11 +156,6 @@ class _PdfSheetAssetViewState extends State<_PdfSheetAssetView> {
         !identical(widget.data, oldWidget.data)) {
       _documentRef = _createDocumentRef();
     }
-
-    if (widget.backgroundColor != oldWidget.backgroundColor ||
-        widget.shadowColor != oldWidget.shadowColor) {
-      _viewerParams = _createViewerParams();
-    }
   }
 
   PdfDocumentRefData _createDocumentRef() {
@@ -170,10 +172,10 @@ class _PdfSheetAssetViewState extends State<_PdfSheetAssetView> {
 
   PdfViewerParams _createViewerParams() {
     return PdfViewerParams(
-      backgroundColor: widget.backgroundColor,
+      backgroundColor: Colors.transparent,
       calculateInitialZoom: _calculatePdfInitialZoom,
       loadingBannerBuilder: _buildPdfLoadingBanner,
-      pageDropShadow: BoxShadow(color: widget.shadowColor, blurRadius: 30),
+      pageDropShadow: null,
       scrollByMouseWheel: null,
     );
   }
