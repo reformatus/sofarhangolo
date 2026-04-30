@@ -28,7 +28,7 @@ class SongSlide extends Slide {
   String get title => song.title;
 
   @override
-  String get preview => song.firstLine;
+  String get preview => song.firstLine ?? '';
 
   static Future<SongSlide> reviveFromJson(Map json, Cue parent) async {
     final songJson = Map<String, dynamic>.from(json['song'] as Map);

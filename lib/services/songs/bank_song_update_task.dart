@@ -89,6 +89,7 @@ class BankSongUpdateTask extends BackgroundTask {
       List<ProtoSong> toUpdate;
       int? totalSongsInBank = bank.totalSongsInBank;
 
+      // Fetch songs that were updated in the bank
       if (bank.noCms) {
         final remoteLastUpdated = await bankApi.getRemoteLastUpdated(bank);
         if (remoteLastUpdated != null &&
@@ -106,6 +107,7 @@ class BankSongUpdateTask extends BackgroundTask {
         }
       }
 
+      // Add previously failed song to the update list
       final persistedFailedSongs = bank.failedProtoSongs;
       if (persistedFailedSongs.isNotEmpty) {
         final mergedByUuid = <String, ProtoSong>{
@@ -265,6 +267,15 @@ class BankSongUpdateTask extends BackgroundTask {
         }
       }
 
+      Future<void> processVersions() async {
+        final query = db.songs.select()
+          ..where((song) => song.variationOf.isNotNull());
+        for (var song in await query.get()) {
+          // TODO recursive function that filles missing values from variations
+          // upsertSong(song);
+        }
+      }
+
       if (toUpdate.isNotEmpty) {
         final queue = Queue(parallel: bank.parallelUpdateJobs);
         final toUpdateBatches = <List<ProtoSong>>[];
@@ -287,6 +298,10 @@ class BankSongUpdateTask extends BackgroundTask {
             await processBatch(protoSongs);
           });
         }
+
+        queue.add(() async {
+          await processVersions();
+        });
 
         await for (final remaining in queue.remainingItems) {
           notifyListeners();
