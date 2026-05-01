@@ -267,15 +267,6 @@ class BankSongUpdateTask extends BackgroundTask {
         }
       }
 
-      Future<void> processVersions() async {
-        final query = db.songs.select()
-          ..where((song) => song.variationOf.isNotNull());
-        for (var song in await query.get()) {
-          // TODO recursive function that filles missing values from variations
-          // upsertSong(song);
-        }
-      }
-
       if (toUpdate.isNotEmpty) {
         final queue = Queue(parallel: bank.parallelUpdateJobs);
         final toUpdateBatches = <List<ProtoSong>>[];
@@ -299,10 +290,6 @@ class BankSongUpdateTask extends BackgroundTask {
           });
         }
 
-        queue.add(() async {
-          await processVersions();
-        });
-
         await for (final remaining in queue.remainingItems) {
           notifyListeners();
           if (remaining == 0) break;
@@ -316,6 +303,53 @@ class BankSongUpdateTask extends BackgroundTask {
 
         await persistBankState();
         await setAsUpdatedNow(bank);
+      }
+
+      // Copy values from variations
+      Future<Song?> updateRecursive(Song song) async {
+        Song? parent;
+        if (song.variationOf != null) {
+          parent =
+              await (db.songs.select()..where(
+                    (songRecord) => songRecord.uuid.equals(song.variationOf!),
+                  ))
+                  .getSingleOrNull();
+        }
+        if (parent == null) {
+          if (toUpdate.any((protoSong) => protoSong.uuid == song.uuid)) {
+            return song;
+          }
+        } else {
+          final updatedParent = await updateRecursive(parent);
+          if (updatedParent != null) {
+            // TODO only initially empty properties should be derived from parent
+            song = Song(
+              contentMap: updatedParent.contentMap,
+              keyField: updatedParent.keyField,
+              title: song.title,
+              uuid: song.uuid,
+              lyrics: updatedParent.lyrics,
+              lyricsFormat: updatedParent.lyricsFormat,
+              sourceBank: song.sourceBank,
+              variationOf: song.variationOf,
+            );
+            upsertSong(song);
+            return song;
+          } else {
+            if (toUpdate.any((protoSong) => protoSong.uuid == song.uuid)) {
+              return song;
+            }
+          }
+        }
+        return null;
+      }
+
+      // Process variations
+      for (var song
+          in await (db.songs.select()
+                ..where((song) => song.variationOf.isNotNull()))
+              .get()) {
+        await updateRecursive(song);
       }
 
       if (!hadErrors) {

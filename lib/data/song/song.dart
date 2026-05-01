@@ -42,7 +42,7 @@ class Song extends Insertable<Song> {
           'Missing mandatory fields in: ${json['title']} (${json['uuid']})',
         );
       }
-      final variationOf = json['variation_of'];
+      final variationOf = _nonBlankString(json['variation_of']);
 
       // Build contentMap excluding fields that have dedicated columns
       final contentMap = Map<String, String>.fromEntries(
@@ -114,6 +114,7 @@ class Song extends Insertable<Song> {
       title: Value(title),
       lyrics: Value(lyrics),
       lyricsFormat: Value(lyricsFormat),
+      variationOf: Value(variationOf),
       keyField: Value(keyField),
     ).toColumns(nullToAbsent);
   }
