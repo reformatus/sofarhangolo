@@ -369,6 +369,12 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
               ? linkShareWidget
               : Column(
                   children: [
+                    const TabBar(
+                      tabs: [
+                        SizedBox(height: 25, child: Text('Link')),
+                        SizedBox(height: 25, child: Text('Kotta')),
+                      ],
+                    ),
                     Expanded(
                       child: TabBarView(
                         children: [
@@ -381,12 +387,6 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
                           ),
                         ],
                       ),
-                    ),
-                    const TabBar(
-                      tabs: [
-                        SizedBox(height: 25, child: Text('Link')),
-                        SizedBox(height: 25, child: Text('Kotta')),
-                      ],
                     ),
                   ],
                 ),
