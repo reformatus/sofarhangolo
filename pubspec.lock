@@ -817,10 +817,10 @@ packages:
     dependency: "direct main"
     description:
       name: music_notes
-      sha256: "6deb2bbc6bb6490d3323d8782825bb43f168b147ff26d1795101a6578edfe665"
+      sha256: "41d29c4900d7592e91c95c4dea0f2e75cc46d30f94719ba33f7c9abb0c125cbf"
       url: "https://pub.dev"
     source: hosted
-    version: "0.24.0"
+    version: "0.25.0"
   native_toolchain_c:
     dependency: transitive
     description:
