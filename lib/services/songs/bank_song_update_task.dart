@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:queue/queue.dart';
+import 'package:sofarhangolo/data/song/extensions.dart';
 
 import '../../data/bank/bank.dart';
 import '../../data/database.dart';
@@ -322,16 +323,29 @@ class BankSongUpdateTask extends BackgroundTask {
         } else {
           final updatedParent = await updateRecursive(parent);
           if (updatedParent != null) {
-            // TODO only initially empty properties should be derived from parent
+            final originalSong = (await bankApi.getDetailsForSongs(bank, [
+              song.uuid,
+            ]))[0];
             song = Song(
-              contentMap: updatedParent.contentMap,
-              keyField: updatedParent.keyField,
-              title: song.title,
-              uuid: song.uuid,
-              lyrics: updatedParent.lyrics,
-              lyricsFormat: updatedParent.lyricsFormat,
-              sourceBank: song.sourceBank,
-              variationOf: song.variationOf,
+              contentMap: updatedParent.contentMap.map((key, value) {
+                final orginalValue = originalSong.contentMap[key];
+                if (orginalValue != null && orginalValue.isNotEmpty) {
+                  return MapEntry(key, orginalValue);
+                } else {
+                  return MapEntry(key, value);
+                }
+              }),
+              keyField: updatedParent.keyField.isNotEmpty
+                  ? originalSong.keyField
+                  : updatedParent.keyField,
+              title: originalSong.title,
+              uuid: originalSong.uuid,
+              lyrics: originalSong.hasLyrics
+                  ? originalSong.lyrics
+                  : updatedParent.lyrics,
+              lyricsFormat: originalSong.lyricsFormat,
+              sourceBank: originalSong.sourceBank,
+              variationOf: originalSong.variationOf,
             );
             upsertSong(song);
             return song;
