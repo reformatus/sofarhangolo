@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:queue/queue.dart';
+import 'package:sofarhangolo/data/song/extensions.dart';
 
 import '../../data/bank/bank.dart';
 import '../../data/database.dart';
@@ -89,6 +90,7 @@ class BankSongUpdateTask extends BackgroundTask {
       List<ProtoSong> toUpdate;
       int? totalSongsInBank = bank.totalSongsInBank;
 
+      // Fetch songs that were updated in the bank
       if (bank.noCms) {
         final remoteLastUpdated = await bankApi.getRemoteLastUpdated(bank);
         if (remoteLastUpdated != null &&
@@ -106,6 +108,7 @@ class BankSongUpdateTask extends BackgroundTask {
         }
       }
 
+      // Add previously failed song to the update list
       final persistedFailedSongs = bank.failedProtoSongs;
       if (persistedFailedSongs.isNotEmpty) {
         final mergedByUuid = <String, ProtoSong>{
@@ -301,6 +304,76 @@ class BankSongUpdateTask extends BackgroundTask {
 
         await persistBankState();
         await setAsUpdatedNow(bank);
+      }
+
+      // Check circular dependency with this array
+      List<String> variationChain = [];
+
+      // Copy values from variations
+      Future<Song?> updateRecursive(Song song) async {
+        if (variationChain.contains(song.uuid)) {
+          throw Exception(
+            'Circular dependency in variation chain! Found at song: ${song.title} (uuid: ${song.uuid})',
+          );
+        }
+        variationChain.add(song.uuid);
+        Song? parent;
+        if (song.variationOf != null) {
+          parent =
+              await (db.songs.select()..where(
+                    (songRecord) => songRecord.uuid.equals(song.variationOf!),
+                  ))
+                  .getSingleOrNull();
+        }
+        if (parent == null) {
+          if (toUpdate.any((protoSong) => protoSong.uuid == song.uuid)) {
+            return song;
+          }
+        } else {
+          final updatedParent = await updateRecursive(parent);
+          if (updatedParent != null) {
+            final originalSong = (await bankApi.getDetailsForSongs(bank, [
+              song.uuid,
+            ]))[0];
+            song = Song(
+              contentMap: updatedParent.contentMap.map((key, value) {
+                final orginalValue = originalSong.contentMap[key];
+                if (orginalValue != null && orginalValue.isNotEmpty) {
+                  return MapEntry(key, orginalValue);
+                } else {
+                  return MapEntry(key, value);
+                }
+              }),
+              keyField: updatedParent.keyField.isNotEmpty
+                  ? originalSong.keyField
+                  : updatedParent.keyField,
+              title: originalSong.title,
+              uuid: originalSong.uuid,
+              lyrics: originalSong.hasLyrics
+                  ? originalSong.lyrics
+                  : updatedParent.lyrics,
+              lyricsFormat: originalSong.lyricsFormat,
+              sourceBank: originalSong.sourceBank,
+              variationOf: originalSong.variationOf,
+            );
+            upsertSong(song);
+            return song;
+          } else {
+            if (toUpdate.any((protoSong) => protoSong.uuid == song.uuid)) {
+              return song;
+            }
+          }
+        }
+        return null;
+      }
+
+      // Process variations
+      for (var song
+          in await (db.songs.select()
+                ..where((song) => song.variationOf.isNotNull()))
+              .get()) {
+        variationChain.clear();
+        await updateRecursive(song);
       }
 
       if (!hadErrors) {

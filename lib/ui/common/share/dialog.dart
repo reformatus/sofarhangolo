@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:sofarhangolo/data/song/lyrics/parser.dart';
+import 'package:sofarhangolo/data/song/extensions.dart';
 import 'package:sofarhangolo/data/song/song.dart';
 import 'package:sofarhangolo/ui/common/share/export_util.dart';
 
@@ -317,7 +317,7 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
         );
       }
 
-      if (song.lyrics.isNotEmpty) {
+      if (song.hasLyrics) {
         shareWidgets.add(
           SizedBox(
             width: double.infinity,
@@ -329,7 +329,8 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
         );
       }
 
-      if (LyricsParser.forFormat(song.lyricsFormat).hasChords(song.lyrics)) {
+      // TODO copy transposed
+      if (song.hasChords) {
         shareWidgets.add(
           SizedBox(
             width: double.infinity,

@@ -11,8 +11,9 @@ class Song extends Insertable<Song> {
   final String uuid;
   final String? sourceBank;
   final String title;
-  final String lyrics;
+  final String? lyrics;
   final LyricsFormat lyricsFormat;
+  final String? variationOf;
   final List<KeyField> keyField;
 
   Map<String, String> contentMap;
@@ -30,11 +31,6 @@ class Song extends Insertable<Song> {
       final String? lyricsFromOpenSongField = _nonBlankString(json['opensong']);
       final String? lyricsContent =
           lyricsFromLyricsField ?? lyricsFromOpenSongField;
-      if (lyricsContent == null) {
-        throw Exception(
-          'Missing lyrics content (neither "lyrics" nor "opensong" field found)',
-        );
-      }
 
       // Infer format from lyrics when available, otherwise default to opensong.
       final LyricsFormat format = lyricsFromLyricsField != null
@@ -46,6 +42,7 @@ class Song extends Insertable<Song> {
           'Missing mandatory fields in: ${json['title']} (${json['uuid']})',
         );
       }
+      final variationOf = _nonBlankString(json['variation_of']);
 
       // Build contentMap excluding fields that have dedicated columns
       final contentMap = Map<String, String>.fromEntries(
@@ -59,6 +56,7 @@ class Song extends Insertable<Song> {
         title: json['title'],
         lyrics: lyricsContent,
         lyricsFormat: format,
+        variationOf: variationOf,
         keyField: KeyField.fromStringList(json['key']),
         contentMap: contentMap,
         sourceBank: sourceBank?.uuid,
@@ -73,15 +71,18 @@ class Song extends Insertable<Song> {
   Song({
     required this.uuid,
     required this.title,
-    required this.lyrics,
+    this.lyrics,
     this.lyricsFormat = LyricsFormat.opensong,
+    this.variationOf,
     required this.keyField,
     required this.contentMap,
     this.sourceBank,
   });
 
-  String get firstLine {
-    return LyricsParser.forFormat(lyricsFormat).getFirstLine(lyrics);
+  String? get firstLine {
+    return lyrics != null
+        ? LyricsParser.forFormat(lyricsFormat).getFirstLine(lyrics!)
+        : null;
   }
 
   KeyField? get primaryKeyField {
@@ -113,6 +114,7 @@ class Song extends Insertable<Song> {
       title: Value(title),
       lyrics: Value(lyrics),
       lyricsFormat: Value(lyricsFormat),
+      variationOf: Value(variationOf),
       keyField: Value(keyField),
     ).toColumns(nullToAbsent);
   }
@@ -125,6 +127,7 @@ const Set<String> _excludedFromContentMap = {
   'lyrics',
   'opensong', // legacy field name
   'lyricsFormat',
+  'variation_of',
   'key',
 };
 
@@ -132,6 +135,7 @@ const Set<String> _excludedFromContentMap = {
 const List<String> mandatoryFields = ['uuid', 'title'];
 
 @TableIndex(name: 'songs_uuid', columns: {#uuid}, unique: true)
+@TableIndex(name: 'songs_variation_of', columns: {#variationOf})
 @UseRowClass(Song)
 class Songs extends Table {
   IntColumn get id => integer().autoIncrement()();
@@ -139,10 +143,11 @@ class Songs extends Table {
   TextColumn get sourceBank => text().nullable().references(Banks, #uuid)();
   TextColumn get contentMap => text().map(const SongContentConverter())();
   TextColumn get title => text()();
-  TextColumn get lyrics => text()();
+  TextColumn get lyrics => text().nullable()();
   TextColumn get lyricsFormat => text()
       .withDefault(const Constant('opensong'))
       .map(const LyricsFormatConverter())();
+  TextColumn get variationOf => text().nullable()();
   TextColumn get keyField => text().map(const KeyFieldConverter())();
 }
 

@@ -3,6 +3,7 @@ import 'package:dart_opensong/dart_opensong.dart' as os;
 import 'package:fading_edge_scrollview/fading_edge_scrollview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sofarhangolo/data/song/extensions.dart';
 
 import '../../../data/cue/slide.dart';
 import '../../../data/song/lyrics/parser.dart';
@@ -63,7 +64,7 @@ class LyricsView extends ConsumerWidget {
           if (crossAxisCount > 1) cardWidth -= (30 / (crossAxisCount));
 
           //! Parse lyrics using format-specific parser
-          if (song.lyrics.isEmpty) {
+          if (!song.hasLyrics) {
             return Center(
               child: LErrorCard(
                 type: LErrorType.warning,
@@ -74,7 +75,7 @@ class LyricsView extends ConsumerWidget {
           }
 
           final parser = LyricsParser.forFormat(song.lyricsFormat);
-          final verses = parser.parse(song.lyrics);
+          final verses = parser.parse(song.lyrics!);
 
           return SingleChildScrollView(
             scrollDirection: crossAxisCount > 1

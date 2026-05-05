@@ -12,9 +12,9 @@ import '../../../../services/app_links/navigation.dart';
 import '../../../../services/connectivity/provider.dart';
 import '../../../../services/songs/filter.dart';
 import '../../../../services/ui/messenger_service.dart';
+import '../../../common/key_text.dart';
 import '../../../cue/session/session_provider.dart';
 import '../../../song/state.dart';
-import '../../../common/key_text.dart';
 
 const double _hideDownloadIndicatorsBelowWidth = 560;
 
@@ -36,6 +36,7 @@ class LSongResultTile extends ConsumerWidget {
         (sessionAsync) => sessionAsync.value != null,
       ),
     );
+    final firstLine = song.firstLine;
     return LayoutBuilder(
       builder: (context, constraints) {
         final hideSongFeatures =
@@ -99,15 +100,16 @@ class LSongResultTile extends ConsumerWidget {
             ),
           ),
           subtitle: result == null
-              ? song.firstLine
+              ? firstLine == null ||
+                        firstLine.isEmpty ||
+                        firstLine
                             .replaceAll(RegExp(r'[^a-zA-Z]'), '')
                             .startsWith(
                               song.title.replaceAll(RegExp(r'[^a-zA-Z]'), ''),
-                            ) ||
-                        song.firstLine.isEmpty
+                            )
                     ? null
                     : Text(
-                        song.firstLine,
+                        firstLine,
                         maxLines: 1,
                         softWrap: false,
                         overflow: TextOverflow.fade,
