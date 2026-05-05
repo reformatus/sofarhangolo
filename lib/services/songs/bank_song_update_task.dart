@@ -306,8 +306,17 @@ class BankSongUpdateTask extends BackgroundTask {
         await setAsUpdatedNow(bank);
       }
 
+      // Check circular dependency with this array
+      List<String> variationChain = [];
+
       // Copy values from variations
       Future<Song?> updateRecursive(Song song) async {
+        if (variationChain.contains(song.uuid)) {
+          throw Exception(
+            'Circular dependency in variation chain! Found at song: ${song.title} (uuid: ${song.uuid})',
+          );
+        }
+        variationChain.add(song.uuid);
         Song? parent;
         if (song.variationOf != null) {
           parent =
@@ -363,6 +372,7 @@ class BankSongUpdateTask extends BackgroundTask {
           in await (db.songs.select()
                 ..where((song) => song.variationOf.isNotNull()))
               .get()) {
+        variationChain.clear();
         await updateRecursive(song);
       }
 
