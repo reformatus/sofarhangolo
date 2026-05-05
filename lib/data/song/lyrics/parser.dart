@@ -72,10 +72,7 @@ class OpenSongParser extends LyricsParser {
       final firstVerse = verses.first;
       for (final part in firstVerse.parts) {
         if (part case os.VerseLine(:final segments)) {
-          return segments
-              .map((segment) => segment.lyrics)
-              .join()
-              .trim();
+          return segments.map((segment) => segment.lyrics).join().trim();
         }
       }
 
@@ -87,9 +84,21 @@ class OpenSongParser extends LyricsParser {
 
   @override
   String getText(String lyrics) {
-    // TODO: Implement proper plain text extraction
-    // Should strip chords, section markers, and formatting
-    throw UnimplementedError('OpenSongParser.getText() not yet implemented');
+    return lyrics
+        // Remove chord lines
+        .replaceAll(RegExp(r'(\r?\n|\r)?\..*'), '')
+        // Remove song part lines
+        .replaceAll(RegExp(r'(.*\[|.*\|).*'), '')
+        // Remove starting linebreak
+        .replaceAll(RegExp(r'^(\r?\n|\r)'), '')
+        // Remove multi linebreaks
+        .replaceAll(RegExp(r'(\r?\n|\r){3,}'), '\n\n')
+        // Remove starting space from text lines
+        .replaceAll(RegExp(r'^ +', multiLine: true), '')
+        // Merge multiple spaces
+        .replaceAll(RegExp(r' {2,}'), ' ')
+        // Remove special characters
+        .replaceAll(RegExp(r'_'), '');
   }
 }
 
