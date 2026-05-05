@@ -78,6 +78,7 @@ dependencies:
   flutter_test:
     sdk: flutter
   html_unescape: ^2.0.0
+  diacritic: ^0.1.6
 
 dev_dependencies:
   msix: ^3.16.9
