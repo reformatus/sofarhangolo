@@ -62,6 +62,7 @@ class SongPageAppBar extends ConsumerWidget implements PreferredSizeWidget {
             sharedTitle: song.title,
             sharedLink: getShareableLinkFor(song),
             sharedIcon: Icons.music_note,
+            song: song,
           ),
           icon: Icon(Icons.share),
           tooltip: 'Megosztási lehetőségek',
