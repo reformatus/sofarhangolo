@@ -8,11 +8,14 @@ import 'package:sofarhangolo/data/song/song.dart';
 import 'package:sofarhangolo/services/assets/get_song_asset.dart';
 
 Future<void> copyLyricsText(Song song) async {
-  await SharePlus.instance.share(
-    ShareParams(
-      text: LyricsParser.forFormat(song.lyricsFormat).getText(song.lyrics),
-    ),
-  );
+  final lyrics = song.lyrics;
+  if (lyrics != null) {
+    await SharePlus.instance.share(
+      ShareParams(
+        text: LyricsParser.forFormat(song.lyricsFormat).getText(lyrics),
+      ),
+    );
+  }
 }
 
 Future<void> copyLyrics(Song song) async {
