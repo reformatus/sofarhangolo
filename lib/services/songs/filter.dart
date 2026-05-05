@@ -1,3 +1,4 @@
+import 'package:diacritic/diacritic.dart';
 import 'package:drift/drift.dart';
 // ignore: experimental_member_use
 import 'package:drift/extensions/json1.dart';
@@ -158,24 +159,31 @@ Stream<List<SongResult>> filteredSongs(Ref ref) {
     return ((db.select(db.songs).addColumns([
                 subqueryExpression(downloadedAssetsSubquery),
               ])
-              ..orderBy([OrderingTerm.asc(db.songs.title)])
+              // Sort afterwards to handle diacritics
+              // ..orderBy([OrderingTerm.asc(db.songs.title)])
               ..where(filterExpression(db.songs)))
             .watch())
         .map(
-          (resultList) => resultList
-              .map(
-                (result) => SongResult(
-                  result.readTable(db.songs),
-                  downloadedAssets:
-                      (result.rawData.readNullableWithType(
-                        DriftSqlType.string,
-                        'c0',
-                      ))?.split(',') ??
-                      [],
+          (resultList) =>
+              resultList
+                  .map(
+                    (result) => SongResult(
+                      result.readTable(db.songs),
+                      downloadedAssets:
+                          (result.rawData.readNullableWithType(
+                            DriftSqlType.string,
+                            'c0',
+                          ))?.split(',') ??
+                          [],
+                    ),
+                  )
+                  .where((result) => matchesKeyFilters(result.song, keyFilters))
+                  .toList()
+                ..sort(
+                  (a, b) => removeDiacritics(
+                    a.song.title,
+                  ).compareTo(removeDiacritics(b.song.title)),
                 ),
-              )
-              .where((result) => matchesKeyFilters(result.song, keyFilters))
-              .toList(),
         );
   } else {
     return db
@@ -186,16 +194,22 @@ Stream<List<SongResult>> filteredSongs(Ref ref) {
         )
         .watch()
         .map(
-          (results) => results
-              .map(
-                (result) => SongResult(
-                  result.song,
-                  result: result,
-                  downloadedAssets: result.assets?.split(',') ?? [],
+          (results) =>
+              results
+                  .map(
+                    (result) => SongResult(
+                      result.song,
+                      result: result,
+                      downloadedAssets: result.assets?.split(',') ?? [],
+                    ),
+                  )
+                  .where((result) => matchesKeyFilters(result.song, keyFilters))
+                  .toList()
+                ..sort(
+                  (a, b) => removeDiacritics(
+                    a.song.title,
+                  ).compareTo(removeDiacritics(b.song.title)),
                 ),
-              )
-              .where((result) => matchesKeyFilters(result.song, keyFilters))
-              .toList(),
         );
   }
 }
