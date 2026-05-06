@@ -67,7 +67,7 @@ class _CueLoaderPageState extends ConsumerState<CueLoaderPage> {
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (error, stack) => Scaffold(
-        appBar: AppBar(title: const Text('Hiba')),
+        appBar: AppBar(title: const SelectableText('Hiba')),
         body: Center(
           child: LErrorCard.fromError(
             error: error,

@@ -56,7 +56,7 @@ class BaseFilterCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.max,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Text(title),
+            SelectableText(title),
             if (trailing != null) Expanded(child: trailing!),
           ],
         ),

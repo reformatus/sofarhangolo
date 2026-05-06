@@ -64,7 +64,7 @@ Future<void> addSongToActiveCue({
     messengerService.showSnackBarReplacingCurrent(
       SnackBar(
         showCloseIcon: true,
-        content: Text(
+        content: SelectableText(
           '${song.title} hozzáadva a listához: ${session.cue.title}',
         ),
         duration: const Duration(seconds: 4),
@@ -80,7 +80,7 @@ Future<void> addSongToActiveCue({
     messengerService.showSnackBarReplacingCurrent(
       const SnackBar(
         showCloseIcon: true,
-        content: Text('Nem sikerült hozzáadni dalt a listához.'),
+        content: SelectableText('Nem sikerült hozzáadni dalt a listához.'),
         duration: Duration(seconds: 4),
       ),
       forceHideAfter: const Duration(seconds: 4),

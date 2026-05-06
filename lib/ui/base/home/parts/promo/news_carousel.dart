@@ -62,7 +62,7 @@ class NewsCarousel extends ConsumerWidget {
       children: [
         Padding(
           padding: EdgeInsetsGeometry.only(left: 8, top: 8),
-          child: Text(
+          child: SelectableText(
             'AKTUÁLIS',
             style: Theme.of(context).textTheme.labelLarge,
           ),

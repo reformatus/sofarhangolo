@@ -15,7 +15,7 @@ class LogButton extends ConsumerWidget {
         showDialog(context: context, builder: (context) => LogViewDialog());
 
     return Badge(
-      label: Text(unreadLogCount.toString()),
+      label: SelectableText(unreadLogCount.toString()),
       isLabelVisible: unreadLogCount > 0,
       child: unreadLogCount > 0
           ? IconButton.outlined(

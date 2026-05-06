@@ -310,7 +310,7 @@ class _CuePresentMusicianPageState extends ConsumerState<CuePresentMusicianPage>
                                 horizontal: 10,
                                 vertical: 6,
                               ),
-                              child: Text(
+                              child: SelectableText(
                                 '${(slideIndex?.index ?? 0) + 1} / ${slideIndex?.total}',
                                 style: Theme.of(context).textTheme.bodyLarge,
                               ),

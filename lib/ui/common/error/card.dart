@@ -91,88 +91,98 @@ class LErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.all(10),
-      child: Card(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadiusGeometry.circular(18),
-        ),
-        color: Color.lerp(
-          switch (type) {
-            LErrorType.error => Colors.red,
-            LErrorType.warning => Colors.orange,
-            LErrorType.info => Colors.blue,
-          },
-          Theme.of(context).scaffoldBackgroundColor,
-          0.8,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            ListTile(
-              leading: Icon(
-                icon,
-                color: switch (type) {
-                  LErrorType.error => Colors.red,
-                  LErrorType.warning => Colors.orange,
-                  LErrorType.info => Colors.blue,
-                }.withAlpha(200),
-              ),
-              title: Text(
-                title,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
+    return SelectionArea(
+      child: Padding(
+        padding: EdgeInsets.all(10),
+        child: Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadiusGeometry.circular(18),
+          ),
+          color: Color.lerp(
+            switch (type) {
+              LErrorType.error => Colors.red,
+              LErrorType.warning => Colors.orange,
+              LErrorType.info => Colors.blue,
+            },
+            Theme.of(context).scaffoldBackgroundColor,
+            0.8,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              ListTile(
+                leading: Icon(
+                  icon,
+                  color: switch (type) {
+                    LErrorType.error => Colors.red,
+                    LErrorType.warning => Colors.orange,
+                    LErrorType.info => Colors.blue,
+                  }.withAlpha(200),
+                ),
+                title: Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
 
-              contentPadding: EdgeInsets.only(left: 13, right: 8),
-            ),
-            if (message != null || stack != null)
-              Padding(
-                padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (message != null) Text(message!),
-                    if (stack != null)
-                      ConstrainedBox(
-                        constraints: BoxConstraints(maxHeight: 100),
-                        child: SingleChildScrollView(
+                contentPadding: EdgeInsets.only(left: 13, right: 8),
+              ),
+              if (message != null || stack != null)
+                Padding(
+                  padding: const EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    bottom: 16,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (message != null) Text(message!),
+                      if (stack != null)
+                        ConstrainedBox(
+                          constraints: BoxConstraints(maxHeight: 100),
                           child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Text(
-                              stack!,
-                              style: TextStyle(
-                                fontFamily: 'Courier New',
-                              ), // todo is available on android?
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Text(
+                                stack!,
+                                style: TextStyle(
+                                  fontFamily: 'Courier New',
+                                ), // todo is available on android?
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                  ],
-                ),
-              ),
-            if (onRetry != null)
-              Padding(
-                padding: EdgeInsetsGeometry.only(left: 8, right: 8, bottom: 8),
-                child: FilledButton.icon(
-                  onPressed: onRetry,
-                  icon: Icon(Icons.refresh),
-                  label: Text(retryLabel ?? 'Újra'),
-                ),
-              ),
-            if (showReportButton)
-              Padding(
-                padding: EdgeInsetsGeometry.all(8),
-                child: FilledButton.icon(
-                  onPressed: () => sendFeedbackEmail(
-                    errorMessage: '$title ($message)',
-                    stackTrace: stack,
+                    ],
                   ),
-                  icon: Icon(Icons.feedback_outlined),
-                  label: Text('Hibajelentés'),
                 ),
-              ),
-          ],
+              if (onRetry != null)
+                Padding(
+                  padding: EdgeInsetsGeometry.only(
+                    left: 8,
+                    right: 8,
+                    bottom: 8,
+                  ),
+                  child: FilledButton.icon(
+                    onPressed: onRetry,
+                    icon: Icon(Icons.refresh),
+                    label: Text(retryLabel ?? 'Újra'),
+                  ),
+                ),
+              if (showReportButton)
+                Padding(
+                  padding: EdgeInsetsGeometry.all(8),
+                  child: FilledButton.icon(
+                    onPressed: () => sendFeedbackEmail(
+                      errorMessage: '$title ($message)',
+                      stackTrace: stack,
+                    ),
+                    icon: Icon(Icons.feedback_outlined),
+                    label: Text('Hibajelentés'),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
