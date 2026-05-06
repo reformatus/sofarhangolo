@@ -39,7 +39,7 @@ class _LogViewDialogState extends ConsumerState<LogViewDialog> {
         ),
         child: Scaffold(
           appBar: AppBar(
-            title: Text('Napló'),
+            title: SelectableText('Napló'),
             automaticallyImplyLeading: false,
             actions: [
               IconButton(onPressed: context.pop, icon: Icon(Icons.close)),
@@ -95,76 +95,78 @@ class LogMessageCard extends ConsumerWidget {
     final level = record.level;
     final color = colorForLogLevel(level);
 
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      child: Badge(
-        isLabelVisible: !message.isRead,
-        backgroundColor: color,
-        padding: EdgeInsets.all(3),
-        child: Card(
-          elevation: message.isRead ? 1 : 4,
-          color: Color.lerp(
-            color,
-            Theme.of(context).scaffoldBackgroundColor,
-            0.8,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ListTile(
-                leading: Icon(
-                  iconForLogLevel(level),
-                  color: color.withAlpha(200),
-                ),
-                title: Text(
-                  record.message,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                subtitle: Text(
-                  '${record.time.hour}:${record.time.minute.toString().padLeft(2, '0')}',
-                  style: TextStyle(fontSize: 12),
-                ),
-                trailing: !message.isRead
-                    ? IconButton(
-                        icon: Icon(Icons.check),
-                        tooltip: 'Olvasottnak jelölés',
-                        onPressed: () {
-                          ref
-                              .read(logMessagesProvider.notifier)
-                              .markAsRead(message);
-                        },
-                      )
-                    : null,
-              ),
-              if (record.error != null || record.stackTrace != null)
-                Padding(
-                  padding: const EdgeInsets.only(
-                    left: 16,
-                    right: 16,
-                    bottom: 16,
+    return SelectionArea(
+      child: Padding(
+        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Badge(
+          isLabelVisible: !message.isRead,
+          backgroundColor: color,
+          padding: EdgeInsets.all(3),
+          child: Card(
+            elevation: message.isRead ? 1 : 4,
+            color: Color.lerp(
+              color,
+              Theme.of(context).scaffoldBackgroundColor,
+              0.8,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ListTile(
+                  leading: Icon(
+                    iconForLogLevel(level),
+                    color: color.withAlpha(200),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (record.error != null) Text(record.error.toString()),
-                      if (record.stackTrace != null)
-                        ConstrainedBox(
-                          constraints: BoxConstraints(maxHeight: 100),
-                          child: SingleChildScrollView(
+                  title: Text(
+                    record.message,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  subtitle: Text(
+                    '${record.time.hour}:${record.time.minute.toString().padLeft(2, '0')}',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  trailing: !message.isRead
+                      ? IconButton(
+                          icon: Icon(Icons.check),
+                          tooltip: 'Olvasottnak jelölés',
+                          onPressed: () {
+                            ref
+                                .read(logMessagesProvider.notifier)
+                                .markAsRead(message);
+                          },
+                        )
+                      : null,
+                ),
+                if (record.error != null || record.stackTrace != null)
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      left: 16,
+                      right: 16,
+                      bottom: 16,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (record.error != null) Text(record.error.toString()),
+                        if (record.stackTrace != null)
+                          ConstrainedBox(
+                            constraints: BoxConstraints(maxHeight: 100),
                             child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Text(
-                                record.stackTrace.toString(),
-                                style: TextStyle(fontFamily: 'Courier New'),
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Text(
+                                  record.stackTrace.toString(),
+                                  style: TextStyle(fontFamily: 'Courier New'),
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

@@ -20,7 +20,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Sófár Hangoló'),
+        title: SelectableText('Sófár Hangoló'),
         actions: [
           LogButton(),
           IconButton(

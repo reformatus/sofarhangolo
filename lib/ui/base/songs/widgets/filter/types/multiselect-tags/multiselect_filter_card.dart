@@ -36,16 +36,18 @@ class MultiselectFilterCard extends ConsumerWidget {
       title: songFieldsMap[field]!['title_hu'] ?? "[Szűrő neve hiányzik]",
       isActive: isActive,
       onResetPressed: () => filterStateNotifier.resetFilterField(field),
-      trailing: Text(
-        "  $fieldPopulatedCount dalnál megadva",
-        maxLines: 1,
-        softWrap: false,
-        textAlign: TextAlign.end,
-        overflow: TextOverflow.fade,
-        style: TextStyle(
-          fontStyle: FontStyle.italic,
-          color: Theme.of(context).colorScheme.onSecondaryContainer,
-          fontSize: Theme.of(context).textTheme.bodySmall!.fontSize,
+      trailing: SelectionArea(
+        child: Text(
+          "  $fieldPopulatedCount dalnál megadva",
+          maxLines: 1,
+          softWrap: false,
+          textAlign: TextAlign.end,
+          overflow: TextOverflow.fade,
+          style: TextStyle(
+            fontStyle: FontStyle.italic,
+            color: Theme.of(context).colorScheme.onSecondaryContainer,
+            fontSize: Theme.of(context).textTheme.bodySmall!.fontSize,
+          ),
         ),
       ),
       child: AsyncChipRowHandlerOf<String>(

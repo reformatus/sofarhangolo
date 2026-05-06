@@ -9,10 +9,12 @@ class CenteredHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: alignment ?? Alignment.center,
-      child: IntrinsicWidth(
-        child: ListTile(leading: Icon(iconData), title: Text(title)),
+    return SelectionArea(
+      child: Align(
+        alignment: alignment ?? Alignment.center,
+        child: IntrinsicWidth(
+          child: ListTile(leading: Icon(iconData), title: Text(title)),
+        ),
       ),
     );
   }

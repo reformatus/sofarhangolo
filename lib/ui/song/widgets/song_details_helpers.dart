@@ -15,24 +15,26 @@ List<Widget> getDetailsSummaryContent(Song song, BuildContext context) {
   for (String field in fieldsToShowInDetailsSummary) {
     if (song.contentMap[field] != null && song.contentMap[field]!.isNotEmpty) {
       detailsSummary.add(
-        Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              songFieldsMap[field]!['icon'],
-              color: Theme.of(context).colorScheme.secondary,
-            ),
-            const SizedBox(width: 3),
-            Flexible(
-              fit: FlexFit.loose,
-              child: Text(
-                song.contentMap[field]!,
-                overflow: TextOverflow.ellipsis,
-                maxLines: 2,
-                softWrap: true,
+        SelectionArea(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                songFieldsMap[field]!['icon'],
+                color: Theme.of(context).colorScheme.secondary,
               ),
-            ),
-          ],
+              const SizedBox(width: 3),
+              Flexible(
+                fit: FlexFit.loose,
+                child: Text(
+                  song.contentMap[field]!,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 2,
+                  softWrap: true,
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -58,15 +60,17 @@ List<Widget> getDetailsContent(Song song, BuildContext context) {
     if (contentEntry.value.isNotEmpty) {
       if (songFieldsMap.containsKey(contentEntry.key)) {
         detailsContent.add(
-          ListTile(
-            visualDensity: VisualDensity.compact,
-            leading: Icon(songFieldsMap[contentEntry.key]!['icon']),
-            title: Text(
-              songFieldsMap[contentEntry.key]!['title_hu'],
-              style: Theme.of(context).primaryTextTheme.labelMedium,
+          SelectionArea(
+            child: ListTile(
+              visualDensity: VisualDensity.compact,
+              leading: Icon(songFieldsMap[contentEntry.key]!['icon']),
+              title: Text(
+                songFieldsMap[contentEntry.key]!['title_hu'],
+                style: Theme.of(context).primaryTextTheme.labelMedium,
+              ),
+              subtitle: Text(contentEntry.value),
+              subtitleTextStyle: Theme.of(context).listTileTheme.titleTextStyle,
             ),
-            subtitle: Text(contentEntry.value),
-            subtitleTextStyle: Theme.of(context).listTileTheme.titleTextStyle,
           ),
         );
       }

@@ -77,7 +77,7 @@ class _AddToCueSearchState extends ConsumerState<AddToCueSearch> {
       messengerService.showSnackBarReplacingCurrent(
         SnackBar(
           showCloseIcon: true,
-          content: Text(
+          content: SelectableText(
             '${widget.song.title} hozzáadva a listához: ${cue.title}',
           ),
           action: SnackBarAction(

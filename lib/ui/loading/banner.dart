@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../services/error/app_error.dart';
 import '../../services/connectivity/provider.dart';
+import '../../services/error/app_error.dart';
 import '../../services/songs/bank_song_update_task.dart';
 import '../../services/songs/update.dart';
 import '../../services/task/task_queue.dart';
@@ -179,11 +179,13 @@ class UpdatingBanner extends ConsumerWidget {
         LinearProgressIndicator(value: isLoading ? null : overallProgress),
         Padding(
           padding: EdgeInsets.only(left: 10, bottom: 5),
-          child: ListTile(
-            leading: leading,
-            title: Text(title, style: TextStyle(fontWeight: FontWeight.w500)),
-            subtitle: Text(message),
-            trailing: trailing,
+          child: SelectionArea(
+            child: ListTile(
+              leading: leading,
+              title: Text(title, style: TextStyle(fontWeight: FontWeight.w500)),
+              subtitle: Text(message),
+              trailing: trailing,
+            ),
           ),
         ),
       ],

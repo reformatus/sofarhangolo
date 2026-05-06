@@ -99,8 +99,9 @@ GoRouter createAppRouter({String? initialLocation}) {
       ),
       GoRoute(
         path: '/cue/:uuid/present',
-        builder: (context, state) =>
-            const Scaffold(body: Center(child: Text('Nincs megadva nézet'))),
+        builder: (context, state) => const Scaffold(
+          body: Center(child: SelectableText('Nincs megadva nézet')),
+        ),
         routes: [
           GoRoute(
             path: 'musician',

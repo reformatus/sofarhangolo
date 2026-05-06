@@ -77,229 +77,234 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    final linkShareWidget = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // Description if provided
-        if (widget.description != null) ...[
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 25, vertical: 15),
-            child: Text(widget.description!, style: theme.textTheme.bodyMedium),
-          ),
-        ],
+    final linkShareWidget = SelectionArea(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Description if provided
+          if (widget.description != null) ...[
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 25, vertical: 15),
+              child: Text(
+                widget.description!,
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+          ],
 
-        SingleChildScrollView(
-          child: Container(
-            padding: EdgeInsets.all(25),
-            child: Column(
-              children: [
-                // Shared item header
-                Row(
-                  children: [
-                    if (widget.sharedIcon != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(8),
+          SingleChildScrollView(
+            child: Container(
+              padding: EdgeInsets.all(25),
+              child: Column(
+                children: [
+                  // Shared item header
+                  Row(
+                    children: [
+                      if (widget.sharedIcon != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Icon(
+                            widget.sharedIcon,
+                            size: 24,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.sharedTitle,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            if (widget.sharedDescription != null)
+                              Text(
+                                widget.sharedDescription!,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 24),
+                  if (widget.sharedLink.toString().length < 2000)
+                    Hero(
+                      tag: 'ShareDialogQr',
+                      child: Container(
                         decoration: BoxDecoration(
-                          color: colorScheme.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: colorScheme.outline.withAlpha(60),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: colorScheme.shadow.withValues(alpha: 0.08),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Material(
+                          color: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadiusGeometry.circular(12),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          elevation: 0,
+                          child: Tooltip(
+                            message: 'Kód nagyítása',
+                            child: InkWell(
+                              onTap: () => _showFullscreenQr(context),
+                              child: Padding(
+                                padding: const EdgeInsets.all(12),
+                                child: SizedBox.square(
+                                  dimension: 200,
+                                  child: QrImageView(
+                                    data: widget.sharedLink.toString(),
+                                    version: QrVersions.auto,
+                                    gapless: true,
+                                    errorCorrectionLevel: QrErrorCorrectLevel.L,
+                                    errorStateBuilder: (context, error) {
+                                      return LErrorCard.fromError(
+                                        error:
+                                            error ??
+                                            StateError(
+                                              'A QR kód generálása sikertelen.',
+                                            ),
+                                        icon: Icons.qr_code,
+                                        title:
+                                            'Nem tudunk QR kódot mutatni - helyette küldd el a linket közvetlenül:',
+                                        showReportButton: false,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Text(
+                      'Ez a link túl hosszú QR kódos megosztáshoz. Helyette küldd tovább a linket közvetlenül:',
+                      style: TextStyle(fontStyle: FontStyle.italic),
+                    ),
+
+                  const SizedBox(height: 20),
+
+                  // Link text box with copy button
+                  Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: colorScheme.outline.withAlpha(80),
+                        width: 1,
+                      ),
+                      borderRadius: BorderRadius.circular(8),
+                      color: colorScheme.surface,
+                    ),
+                    child: IntrinsicHeight(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 12,
+                              ),
+                              child: SelectableText(
+                                widget.sharedLink.toString(),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurface,
+                                  height: 1.3,
+                                ),
+                                maxLines: 2,
+                                textAlign: TextAlign.left,
+                              ),
+                            ),
+                          ),
+                          Container(
+                            width: 1,
+                            color: colorScheme.outline.withAlpha(80),
+                          ),
+                          Material(
+                            color: Colors.transparent,
+                            child: Tooltip(
+                              message: 'Másolás',
+                              child: InkWell(
+                                onTap: () => _copyToClipboard(context),
+                                borderRadius: const BorderRadius.only(
+                                  topRight: Radius.circular(8),
+                                  bottomRight: Radius.circular(8),
+                                ),
+                                child: Container(
+                                  width: 48,
+                                  decoration: _copySuccess
+                                      ? BoxDecoration(
+                                          color: Colors.green.withValues(
+                                            alpha: 0.1,
+                                          ),
+                                          borderRadius: const BorderRadius.only(
+                                            topRight: Radius.circular(8),
+                                            bottomRight: Radius.circular(8),
+                                          ),
+                                        )
+                                      : null,
+                                  child: Icon(
+                                    _copySuccess ? Icons.check : Icons.copy,
+                                    size: 18,
+                                    color: _copySuccess
+                                        ? Colors.green
+                                        : colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  // Share button integrated into the dialog body
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: () => _shareLink(context),
+                      icon: const Icon(Icons.share, size: 20),
+                      label: const Text('Megosztás'),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Icon(
-                          widget.sharedIcon,
-                          size: 24,
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                    ],
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.sharedTitle,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          if (widget.sharedDescription != null)
-                            Text(
-                              widget.sharedDescription!,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 24),
-                if (widget.sharedLink.toString().length < 2000)
-                  Hero(
-                    tag: 'ShareDialogQr',
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: colorScheme.outline.withAlpha(60),
-                          width: 1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: colorScheme.shadow.withValues(alpha: 0.08),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Material(
-                        color: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadiusGeometry.circular(12),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        elevation: 0,
-                        child: Tooltip(
-                          message: 'Kód nagyítása',
-                          child: InkWell(
-                            onTap: () => _showFullscreenQr(context),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: SizedBox.square(
-                                dimension: 200,
-                                child: QrImageView(
-                                  data: widget.sharedLink.toString(),
-                                  version: QrVersions.auto,
-                                  gapless: true,
-                                  errorCorrectionLevel: QrErrorCorrectLevel.L,
-                                  errorStateBuilder: (context, error) {
-                                    return LErrorCard.fromError(
-                                      error:
-                                          error ??
-                                          StateError(
-                                            'A QR kód generálása sikertelen.',
-                                          ),
-                                      icon: Icons.qr_code,
-                                      title:
-                                          'Nem tudunk QR kódot mutatni - helyette küldd el a linket közvetlenül:',
-                                      showReportButton: false,
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  Text(
-                    'Ez a link túl hosszú QR kódos megosztáshoz. Helyette küldd tovább a linket közvetlenül:',
-                    style: TextStyle(fontStyle: FontStyle.italic),
-                  ),
-
-                const SizedBox(height: 20),
-
-                // Link text box with copy button
-                Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: colorScheme.outline.withAlpha(80),
-                      width: 1,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                    color: colorScheme.surface,
-                  ),
-                  child: IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 12,
-                            ),
-                            child: SelectableText(
-                              widget.sharedLink.toString(),
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurface,
-                                height: 1.3,
-                              ),
-                              maxLines: 2,
-                              textAlign: TextAlign.left,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          width: 1,
-                          color: colorScheme.outline.withAlpha(80),
-                        ),
-                        Material(
-                          color: Colors.transparent,
-                          child: Tooltip(
-                            message: 'Másolás',
-                            child: InkWell(
-                              onTap: () => _copyToClipboard(context),
-                              borderRadius: const BorderRadius.only(
-                                topRight: Radius.circular(8),
-                                bottomRight: Radius.circular(8),
-                              ),
-                              child: Container(
-                                width: 48,
-                                decoration: _copySuccess
-                                    ? BoxDecoration(
-                                        color: Colors.green.withValues(
-                                          alpha: 0.1,
-                                        ),
-                                        borderRadius: const BorderRadius.only(
-                                          topRight: Radius.circular(8),
-                                          bottomRight: Radius.circular(8),
-                                        ),
-                                      )
-                                    : null,
-                                child: Icon(
-                                  _copySuccess ? Icons.check : Icons.copy,
-                                  size: 18,
-                                  color: _copySuccess
-                                      ? Colors.green
-                                      : colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Share button integrated into the dialog body
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () => _shareLink(context),
-                    icon: const Icon(Icons.share, size: 20),
-                    label: const Text('Megosztás'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
 
     final List<Widget> shareWidgets = [];

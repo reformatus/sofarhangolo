@@ -77,34 +77,38 @@ class LyricsView extends ConsumerWidget {
           final parser = LyricsParser.forFormat(song.lyricsFormat);
           final verses = parser.parse(song.lyrics!);
 
-          return SingleChildScrollView(
-            scrollDirection: crossAxisCount > 1
-                ? Axis.horizontal
-                : Axis.vertical,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minWidth: constraints.maxWidth),
-              child: Wrap(
-                direction: Axis.vertical,
-                children: [
-                  if (transpose.capo != 0)
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: Text(
-                        'Capo: ${transpose.capo}',
-                        style: TextStyle(fontSize: lyricsViewStyle.chordsSize),
+          return SelectionArea(
+            child: SingleChildScrollView(
+              scrollDirection: crossAxisCount > 1
+                  ? Axis.horizontal
+                  : Axis.vertical,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                child: Wrap(
+                  direction: Axis.vertical,
+                  children: [
+                    if (transpose.capo != 0)
+                      Padding(
+                        padding: const EdgeInsets.all(8.0),
+                        child: Text(
+                          'Capo: ${transpose.capo}',
+                          style: TextStyle(
+                            fontSize: lyricsViewStyle.chordsSize,
+                          ),
+                        ),
+                      ),
+                    ...verses.map(
+                      (verse) => SizedBox(
+                        width: cardWidth,
+                        child: VerseCard(
+                          song,
+                          verse as OpenSongVerse,
+                          transpose: transpose,
+                        ),
                       ),
                     ),
-                  ...verses.map(
-                    (verse) => SizedBox(
-                      width: cardWidth,
-                      child: VerseCard(
-                        song,
-                        verse as OpenSongVerse,
-                        transpose: transpose,
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           );

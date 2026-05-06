@@ -12,8 +12,8 @@ import '../../../services/song/from_uuid.dart';
 import '../../cue/cue_page_type.dart';
 import '../../cue/session/cue_session.dart';
 import '../../cue/session/session_provider.dart';
-import '../../cue/widgets/slide_navigation_controls.dart';
 import '../../cue/widgets/slide_list.dart';
+import '../../cue/widgets/slide_navigation_controls.dart';
 import '../../song/cue_actions.dart';
 import '../../song/transpose/state.dart';
 
@@ -580,44 +580,46 @@ class _CuePanelAppBar extends StatelessWidget implements PreferredSizeWidget {
     final theme = Theme.of(context);
     final cueSubtitle = _cueSubtitleOf(session);
     final hasSubtitle = cueSubtitle.isNotEmpty;
-    return AppBar(
-      backgroundColor: backgroundColor,
-      title: hasSubtitle
-          ? Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  session.cue.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.appBarTheme.titleTextStyle,
-                ),
-                Text(
-                  cueSubtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            )
-          : Text(session.cue.title),
-      automaticallyImplyLeading: false,
-      leading: const Icon(Icons.list),
-      actions: [
-        IconButton.filledTonal(
-          tooltip: 'Lista szerkesztése',
-          onPressed: onOpenCueEditor,
-          icon: const Icon(Icons.open_in_new),
-        ),
-        if (onClose != null)
-          IconButton(
-            tooltip: 'Bezárás',
-            onPressed: onClose,
-            icon: const Icon(Icons.keyboard_arrow_down),
+    return SelectionArea(
+      child: AppBar(
+        backgroundColor: backgroundColor,
+        title: hasSubtitle
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    session.cue.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.appBarTheme.titleTextStyle,
+                  ),
+                  Text(
+                    cueSubtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              )
+            : Text(session.cue.title),
+        automaticallyImplyLeading: false,
+        leading: const Icon(Icons.list),
+        actions: [
+          IconButton.filledTonal(
+            tooltip: 'Lista szerkesztése',
+            onPressed: onOpenCueEditor,
+            icon: const Icon(Icons.open_in_new),
           ),
-        const SizedBox(width: 4),
-      ],
+          if (onClose != null)
+            IconButton(
+              tooltip: 'Bezárás',
+              onPressed: onClose,
+              icon: const Icon(Icons.keyboard_arrow_down),
+            ),
+          const SizedBox(width: 4),
+        ],
+      ),
     );
   }
 }

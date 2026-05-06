@@ -247,19 +247,21 @@ class _BankDownloadProgress extends StatelessWidget {
             ...bankTasks.map(
               (task) => Padding(
                 padding: const EdgeInsets.only(left: 20),
-                child: ListTile(
-                  leading: SizedBox.square(
-                    dimension: 32,
-                    child: task.logo != null
-                        ? Image.memory(task.logo!)
-                        : const Icon(Icons.library_music),
+                child: SelectionArea(
+                  child: ListTile(
+                    leading: SizedBox.square(
+                      dimension: 32,
+                      child: task.logo != null
+                          ? Image.memory(task.logo!)
+                          : const Icon(Icons.library_music),
+                    ),
+                    title: Text(
+                      task.title,
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    subtitle: Text(task.subtitle),
+                    trailing: buildTaskStatus(task),
                   ),
-                  title: Text(
-                    task.title,
-                    style: const TextStyle(fontWeight: FontWeight.w500),
-                  ),
-                  subtitle: Text(task.subtitle),
-                  trailing: buildTaskStatus(task),
                 ),
               ),
             ),
