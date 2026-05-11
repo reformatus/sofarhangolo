@@ -89,7 +89,7 @@ dev_dependencies:
   riverpod_lint: ^3.0.3
   drift_dev: ^2.26.1
   flutter_launcher_icons: ^0.14.1
-  rename_app: ^1.6.3
+  rename_app: ^1.6.6
   integration_test:
     sdk: flutter
 
