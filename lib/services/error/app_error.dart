@@ -98,6 +98,18 @@ class AppError implements Exception {
             stackTrace: stackTrace,
             originalError: error,
           );
+        case DioExceptionType.transformTimeout:
+          return AppError(
+            category: AppErrorCategory.frontend,
+            title: 'Feldolgozási hiba',
+            userMessage:
+                userMessage ??
+                'A küldött adat feldolgozása túl sokáig tartott.',
+            technicalMessage:
+                technicalMessage ?? error.message ?? error.error?.toString(),
+            stackTrace: stackTrace,
+            originalError: error,
+          );
         case DioExceptionType.unknown:
           break;
       }

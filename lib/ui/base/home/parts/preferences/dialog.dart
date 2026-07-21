@@ -172,7 +172,7 @@ class _SettingsDialogState extends ConsumerState<PreferencesDialog> {
                               ),
                             ),
                           ),
-                          onReorder: (oldIndex, newIndex) => ref
+                          onReorderItem: (oldIndex, newIndex) => ref
                               .read(songViewOrderPreferencesProvider.notifier)
                               .reorder(oldIndex, newIndex),
                         ),
