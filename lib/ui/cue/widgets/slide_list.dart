@@ -73,7 +73,7 @@ class _SlideListState extends ConsumerState<SlideList> {
       scrollController: _scrollController,
       itemCount: slideUuids.length,
       buildDefaultDragHandles: false,
-      onReorder: (int from, int to) {
+      onReorderItem: (int from, int to) {
         ref.read(activeCueSessionProvider.notifier).reorderSlides(from, to);
         _scheduleScrollToActiveSlide();
       },

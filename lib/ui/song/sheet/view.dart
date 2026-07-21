@@ -173,7 +173,9 @@ class _PdfSheetAssetViewState extends State<_PdfSheetAssetView> {
   PdfViewerParams _createViewerParams() {
     return PdfViewerParams(
       backgroundColor: Colors.transparent,
-      calculateInitialZoom: _calculatePdfInitialZoom,
+      sizeDelegateProvider: PdfViewerSizeDelegateProviderLegacy(
+        calculateInitialZoom: _calculatePdfInitialZoom,
+      ),
       loadingBannerBuilder: _buildPdfLoadingBanner,
       pageDropShadow: null,
       scrollByMouseWheel: null,

@@ -21,7 +21,7 @@ void showLyricAboutDialog(BuildContext context) async {
       ),
     ),
     children: [
-      Text('Telepítés forrása: ${packageInfo.installerStore ?? 'ismeretlen'}'),
+      SelectableText('Telepítés forrása: ${packageInfo.installerStore ?? 'ismeretlen'}'),
       Divider(),
       TextButton(
         child: Text('Hibajelentés'),

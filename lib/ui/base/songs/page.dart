@@ -1,21 +1,21 @@
 import 'package:fading_edge_scrollview/fading_edge_scrollview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../services/bank/banks.dart';
-import 'widgets/filter/types/bank/state.dart';
-import '../../../data/bank/bank.dart';
-import '../cue_shell_inset.dart';
-import '../../common/centered_hint.dart';
-import '../../common/key_text.dart';
 
 import '../../../config/config.dart';
+import '../../../data/bank/bank.dart';
+import '../../../services/bank/banks.dart';
 import '../../../services/songs/filter.dart';
+import '../../common/centered_hint.dart';
 import '../../common/error/card.dart';
+import '../../common/key_text.dart';
+import '../cue_shell_inset.dart';
+import 'widgets/filter/filters_column.dart';
+import 'widgets/filter/types/bank/state.dart';
 import 'widgets/filter/types/key/state.dart';
 import 'widgets/filter/types/multiselect-tags/state.dart';
 import 'widgets/filter/types/search/search_field_selector.dart';
 import 'widgets/filter/types/search/state.dart';
-import 'widgets/filter/filters_column.dart';
 import 'widgets/song_tile.dart';
 
 class SongsPage extends ConsumerStatefulWidget {
@@ -428,86 +428,88 @@ class FiltersTitle extends ConsumerWidget {
     return AnimatedSize(
       duration: Durations.medium1,
       curve: Curves.easeInOutCubicEmphasized,
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              (filterState.isEmpty && keyFilterState.isEmpty)
-                  ? 'Szűrők'
-                  : ([
-                      if (keyFilterState.isNotEmpty)
-                        [
-                          if (keyFilterState.keys.isNotEmpty)
-                            keyFilterState.keys
-                                .map(displayKeyField)
-                                .join(' vagy '),
-                          if (keyFilterState.pitches.isNotEmpty ||
-                              keyFilterState.modes.isNotEmpty)
-                            [
-                              if (keyFilterState.pitches.isNotEmpty)
-                                'alaphangja ${keyFilterState.pitches.map(displayKeyPitch).join(' vagy ')}',
-                              if (keyFilterState.modes.isNotEmpty)
-                                'hangsora ${keyFilterState.modes.map(displayKeyMode).join(' vagy ')}',
-                            ].join(' és '),
-                        ].join(', vagy '),
-                      if (filterState.isNotEmpty)
-                        filterState.values
-                            .map((e) => e.join(' vagy '))
-                            .join(', és '),
-                    ].join(', valamint ')),
-              style: TextStyle(
-                color: (filterState.isEmpty && keyFilterState.isEmpty)
-                    ? null
-                    : Theme.of(context).colorScheme.onSecondaryContainer,
-                fontSize: (filterState.isEmpty && keyFilterState.isEmpty)
-                    ? null
-                    : Theme.of(context).textTheme.bodyMedium!.fontSize,
+      child: SelectionArea(
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                (filterState.isEmpty && keyFilterState.isEmpty)
+                    ? 'Szűrők'
+                    : ([
+                        if (keyFilterState.isNotEmpty)
+                          [
+                            if (keyFilterState.keys.isNotEmpty)
+                              keyFilterState.keys
+                                  .map(displayKeyField)
+                                  .join(' vagy '),
+                            if (keyFilterState.pitches.isNotEmpty ||
+                                keyFilterState.modes.isNotEmpty)
+                              [
+                                if (keyFilterState.pitches.isNotEmpty)
+                                  'alaphangja ${keyFilterState.pitches.map(displayKeyPitch).join(' vagy ')}',
+                                if (keyFilterState.modes.isNotEmpty)
+                                  'hangsora ${keyFilterState.modes.map(displayKeyMode).join(' vagy ')}',
+                              ].join(' és '),
+                          ].join(', vagy '),
+                        if (filterState.isNotEmpty)
+                          filterState.values
+                              .map((e) => e.join(' vagy '))
+                              .join(', és '),
+                      ].join(', valamint ')),
+                style: TextStyle(
+                  color: (filterState.isEmpty && keyFilterState.isEmpty)
+                      ? null
+                      : Theme.of(context).colorScheme.onSecondaryContainer,
+                  fontSize: (filterState.isEmpty && keyFilterState.isEmpty)
+                      ? null
+                      : Theme.of(context).textTheme.bodyMedium!.fontSize,
+                ),
+                softWrap: true,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
               ),
-              softWrap: true,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
             ),
-          ),
-          ...banksFilterState
-              .map((i) => banks.firstWhere((b) => b.uuid == i))
-              .map(
-                (b) => b.tinyLogo != null
-                    ? Padding(
-                        padding: EdgeInsets.only(right: 5),
-                        child: Tooltip(
-                          message: b.name,
-                          child: SizedBox.square(
-                            dimension: 30,
-                            child: Image.memory(b.tinyLogo!),
+            ...banksFilterState
+                .map((i) => banks.firstWhere((b) => b.uuid == i))
+                .map(
+                  (b) => b.tinyLogo != null
+                      ? Padding(
+                          padding: EdgeInsets.only(right: 5),
+                          child: Tooltip(
+                            message: b.name,
+                            child: SizedBox.square(
+                              dimension: 30,
+                              child: Image.memory(b.tinyLogo!),
+                            ),
+                          ),
+                        )
+                      : ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: 50),
+                          child: Text(
+                            b.name,
+                            overflow: TextOverflow.fade,
+                            maxLines: 1,
+                            softWrap: false,
                           ),
                         ),
-                      )
-                    : ConstrainedBox(
-                        constraints: BoxConstraints(maxWidth: 50),
-                        child: Text(
-                          b.name,
-                          overflow: TextOverflow.fade,
-                          maxLines: 1,
-                          softWrap: false,
-                        ),
-                      ),
+                ),
+            if (banksFilterState.isNotEmpty) SizedBox(width: 10),
+            if (filterState.isNotEmpty ||
+                keyFilterState.isNotEmpty ||
+                banksFilterState.isNotEmpty)
+              IconButton(
+                icon: Icon(Icons.clear),
+                onPressed: () {
+                  // TODO move filter states to sealed superclass and iterate trough reset (??) || Or at least move this to a service.
+                  ref
+                      .read(multiselectTagsFilterStateProvider.notifier)
+                      .resetAllFilters();
+                  ref.read(keyFilterStateProvider.notifier).reset();
+                  ref.read(banksFilterStateProvider.notifier).reset();
+                },
               ),
-          if (banksFilterState.isNotEmpty) SizedBox(width: 10),
-          if (filterState.isNotEmpty ||
-              keyFilterState.isNotEmpty ||
-              banksFilterState.isNotEmpty)
-            IconButton(
-              icon: Icon(Icons.clear),
-              onPressed: () {
-                // TODO move filter states to sealed superclass and iterate trough reset (??) || Or at least move this to a service.
-                ref
-                    .read(multiselectTagsFilterStateProvider.notifier)
-                    .resetAllFilters();
-                ref.read(keyFilterStateProvider.notifier).reset();
-                ref.read(banksFilterStateProvider.notifier).reset();
-              },
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -219,7 +219,7 @@ class _ActiveCueQuickAddButtonState
       messengerService.showSnackBarReplacingCurrent(
         SnackBar(
           showCloseIcon: true,
-          content: Text(
+          content: SelectableText(
             '${widget.song.title} hozzáadva a listához: ${session.cue.title}',
           ),
           duration: const Duration(seconds: 4),
@@ -235,7 +235,7 @@ class _ActiveCueQuickAddButtonState
       messengerService.showSnackBarReplacingCurrent(
         const SnackBar(
           showCloseIcon: true,
-          content: Text('Nem sikerült hozzáadni dalt a listához.'),
+          content: SelectableText('Nem sikerült hozzáadni dalt a listához.'),
           duration: Duration(seconds: 4),
         ),
         forceHideAfter: const Duration(seconds: 4),

@@ -39,7 +39,7 @@ class LogMessages extends _$LogMessages {
                 color: colorForLogLevel(record.level),
               ),
               const SizedBox(width: 12),
-              Expanded(child: Text(record.message)),
+              Expanded(child: SelectableText(record.message)),
             ],
           ),
           action: SnackBarAction(

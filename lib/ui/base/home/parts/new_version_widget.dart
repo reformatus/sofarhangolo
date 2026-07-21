@@ -27,67 +27,69 @@ class NewVersionWidget extends ConsumerWidget {
                 Theme.of(context).scaffoldBackgroundColor,
                 0.8,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    title: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text('Új verzió elérhető: '),
-                        Text(
-                          newVersion.versionNumber,
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    subtitle: FutureBuilder(
-                      future: PackageInfo.fromPlatform(),
-                      builder: (context, packageInfo) {
-                        if (packageInfo.data != null) {
-                          return Text(
-                            'Jelenlegi: ${packageInfo.data!.version}\nTelepítés forrása: ${packageInfo.data!.installerStore}',
-                            style: TextStyle(fontStyle: FontStyle.italic),
-                          );
-                        } else {
-                          return Text('\n...');
-                        }
-                      },
-                    ),
-                  ),
-                  Divider(),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxHeight: 200),
-                    child: Markdown(
-                      data: newVersion.releaseNotesMd,
-                      shrinkWrap: true,
-                      onTapLink: (link, _, _) => launchUrl(Uri.parse(link)),
-                    ),
-                  ),
-                  Divider(),
-                  Padding(
-                    padding: EdgeInsets.all(15),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        ElevatedButton(
-                          onPressed: () =>
-                              launchUrl(newVersion.releaseInfoLink),
-                          child: Text('Részletek'),
-                        ),
-                        if (storeLinkForCurrentPlatform != null) ...[
-                          SizedBox(width: 5),
-                          FilledButton(
-                            onPressed: () => launchUrl(
-                              Uri.parse(storeLinkForCurrentPlatform!),
-                            ),
-                            child: Text('Frissítés'),
+              child: SelectionArea(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      title: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('Új verzió elérhető: '),
+                          Text(
+                            newVersion.versionNumber,
+                            style: TextStyle(fontWeight: FontWeight.bold),
                           ),
                         ],
-                      ],
+                      ),
+                      subtitle: FutureBuilder(
+                        future: PackageInfo.fromPlatform(),
+                        builder: (context, packageInfo) {
+                          if (packageInfo.data != null) {
+                            return Text(
+                              'Jelenlegi: ${packageInfo.data!.version}\nTelepítés forrása: ${packageInfo.data!.installerStore}',
+                              style: TextStyle(fontStyle: FontStyle.italic),
+                            );
+                          } else {
+                            return Text('\n...');
+                          }
+                        },
+                      ),
                     ),
-                  ),
-                ],
+                    Divider(),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(maxHeight: 200),
+                      child: Markdown(
+                        data: newVersion.releaseNotesMd,
+                        shrinkWrap: true,
+                        onTapLink: (link, _, _) => launchUrl(Uri.parse(link)),
+                      ),
+                    ),
+                    Divider(),
+                    Padding(
+                      padding: EdgeInsets.all(15),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          ElevatedButton(
+                            onPressed: () =>
+                                launchUrl(newVersion.releaseInfoLink),
+                            child: Text('Részletek'),
+                          ),
+                          if (storeLinkForCurrentPlatform != null) ...[
+                            SizedBox(width: 5),
+                            FilledButton(
+                              onPressed: () => launchUrl(
+                                Uri.parse(storeLinkForCurrentPlatform!),
+                              ),
+                              child: Text('Frissítés'),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

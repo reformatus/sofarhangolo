@@ -47,7 +47,7 @@ class _SettingsDialogState extends ConsumerState<PreferencesDialog> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             AppBar(
-              title: Text('Beállítások'),
+              title: SelectableText('Beállítások'),
               automaticallyImplyLeading: false,
               actions: [
                 IconButton(onPressed: context.pop, icon: Icon(Icons.close)),
@@ -106,13 +106,13 @@ class _SettingsDialogState extends ConsumerState<PreferencesDialog> {
                           padding: EdgeInsetsGeometry.only(bottom: 3, top: 15),
                           child: Row(
                             children: [
-                              Text(
+                              SelectableText(
                                 'KOTTA',
                                 style: Theme.of(context).textTheme.labelMedium,
                               ),
                               SizedBox(width: 4),
                               Badge(
-                                label: Text('Kísérleti'),
+                                label: SelectableText('Kísérleti'),
                                 backgroundColor: Theme.of(
                                   context,
                                 ).colorScheme.primary,
@@ -141,7 +141,7 @@ class _SettingsDialogState extends ConsumerState<PreferencesDialog> {
                         ),
                         Divider(height: 45, thickness: 2),
                         sectionTitle('Alapértelmezett nézet'),
-                        Text(
+                        SelectableText(
                           'Rendezd prioritási sorrendbe a dalnézeteket. Az első elérhető nézettel fog megnyílni minden dal első megnyitáskor.',
                         ),
                         SizedBox(height: 8),
@@ -172,7 +172,7 @@ class _SettingsDialogState extends ConsumerState<PreferencesDialog> {
                               ),
                             ),
                           ),
-                          onReorder: (oldIndex, newIndex) => ref
+                          onReorderItem: (oldIndex, newIndex) => ref
                               .read(songViewOrderPreferencesProvider.notifier)
                               .reorder(oldIndex, newIndex),
                         ),
@@ -258,14 +258,17 @@ class _SettingsDialogState extends ConsumerState<PreferencesDialog> {
   Widget sectionTitle(String title) {
     return Padding(
       padding: EdgeInsetsGeometry.only(bottom: 5),
-      child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+      child: SelectableText(
+        title,
+        style: Theme.of(context).textTheme.titleMedium,
+      ),
     );
   }
 
   Widget settingTitle(String title) {
     return Padding(
       padding: EdgeInsetsGeometry.only(bottom: 3, top: 12),
-      child: Text(
+      child: SelectableText(
         title.toUpperCase(),
         style: Theme.of(context).textTheme.labelMedium,
       ),
