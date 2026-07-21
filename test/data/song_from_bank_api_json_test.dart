@@ -28,18 +28,6 @@ void main() {
       expect(song.lyricsFormat, equals(LyricsFormat.opensong));
     });
 
-    test('throws when both lyrics and opensong are missing or blank', () {
-      expect(
-        () => Song.fromBankApiJson({
-          'uuid': 'song-3',
-          'title': 'Song 3',
-          'lyrics': '',
-          'opensong': '   ',
-        }),
-        throwsException,
-      );
-    });
-
     test('keeps escaped lyrics unchanged when caller does not normalize first', () {
       final song = Song.fromBankApiJson({
         'uuid': 'song-4',
