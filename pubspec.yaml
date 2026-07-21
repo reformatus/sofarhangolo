@@ -46,39 +46,38 @@ dependencies:
   path: ^1.9.0
   queue: ^3.1.0+2
   drift: ^2.26.1
-  drift_flutter: ^0.2.1
-  sqlite3_flutter_libs: ^0.5.26
-  sqlite3: ^2.4.7
+  drift_flutter: ^0.3.1
+  sqlite3_flutter_libs: ^0.6.0+eol
+  sqlite3: ^3.5.0
   flutter_svg: ^2.1.0
   package_info_plus: ^10.1.0
   uuid: ^4.5.1
   url_launcher: ^6.3.1
   msgpack_dart: ^1.0.1
   mailto: ^2.0.0
-  flutter_markdown: ^0.7.7+1
   dart_opensong: ^0.0.4
   chord_transposer:
     git:
       url: https://github.com/reformatus/dart_chord_transposer
       ref: main
   pdfrx: ^2.2.16
-  music_notes: ^0.24.0
+  music_notes: ^0.25.0
   logging: ^1.3.0
   flutter_fullscreen: ^1.2.0
   wtf_sliding_sheet: ^1.1.5
   app_links: ^7.0.0
   qr_flutter: ^4.1.0
   share_plus: ^13.1.0
-  dynamic_icons: ^1.0.1
-  font_awesome_flutter: 10.8.0
+  font_awesome_flutter: ^11.0.0
   xml: ^6.5.0
-  connectivity_plus: 7.1.1
+  connectivity_plus: ^7.3.0
   web: ^1.1.1
   cached_network_image: ^3.4.1 # TODO Replace with our implementation, as this uses sqflite
   flutter_test:
     sdk: flutter
   html_unescape: ^2.0.0
   diacritic: ^0.1.6
+  flutter_markdown_plus: ^1.0.12
 
 dev_dependencies:
   msix: ^3.16.9
