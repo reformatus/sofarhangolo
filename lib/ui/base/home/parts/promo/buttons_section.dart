@@ -1,9 +1,11 @@
-import 'package:dynamic_icons/dynamic_icons.dart';
 import 'package:fading_edge_scrollview/fading_edge_scrollview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../../services/home/promo/rss.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:sofarhangolo/ui/base/home/parts/promo/icon_map.dart';
 import 'package:url_launcher/url_launcher.dart';
+
+import '../../../../../services/home/promo/rss.dart';
 
 class ButtonsSection extends ConsumerStatefulWidget {
   const ButtonsSection({super.key});
@@ -98,10 +100,12 @@ class _ButtonItem extends StatelessWidget {
   Widget build(BuildContext context) {
     // Try to get icon from DynamicIcons
     Widget? iconWidget;
+
+    // TODO not a good practice to use dynamic icons based on name, these buttons should be fixed
     if (buttonItem.faIconName != null && buttonItem.faIconName!.isNotEmpty) {
-      iconWidget = DynamicIcons.getFaIconFromName(buttonItem.faIconName!);
+      iconWidget = FaIcon(fontAwesomeIcons[buttonItem.faIconName!]);
     } else if (buttonItem.iconName != null && buttonItem.iconName!.isNotEmpty) {
-      iconWidget = DynamicIcons.getIconFromName(buttonItem.iconName!);
+      iconWidget = Icon(materialIcons[buttonItem.iconName!]);
     }
 
     // If we have an icon, use FilledButton.tonalIcon, otherwise use FilledButton.tonal

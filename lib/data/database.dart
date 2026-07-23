@@ -81,10 +81,12 @@ class LyricDatabase extends _$LyricDatabase {
           );
         },
         from5To6: (m, schema) async {
-          await customStatement(
-            'ALTER TABLE songs ALTER COLUMN lyrics DROP NOT NULL',
-          );
           await m.addColumn(schema.songs, schema.songs.variationOf);
+          // ignore: experimental_member_use
+          await m.alterTable(TableMigration(songs));
+          await customStatement(
+            'CREATE INDEX songs_variation_of ON songs (variation_of);',
+          );
           await customStatement(
             "UPDATE banks SET last_updated = '1900-01-01T00:00:00'",
           );

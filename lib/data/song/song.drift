@@ -22,12 +22,12 @@ END;
 
 CREATE TRIGGER songs_ad AFTER DELETE ON songs BEGIN
   INSERT INTO songs_fts(songs_fts, rowid, title, lyrics)
-  VALUES ('delete', rowid, old.title, old.lyrics);
+  VALUES ('delete', old.id, old.title, old.lyrics);
 END;
 
 CREATE TRIGGER songs_au AFTER UPDATE ON songs BEGIN
   INSERT INTO songs_fts(songs_fts, rowid, title, lyrics)
-  VALUES ('delete', rowid, old.title, old.lyrics);
+  VALUES ('delete', old.id, old.title, old.lyrics);
   INSERT INTO songs_fts(rowid, title, lyrics)
   VALUES (new.id, new.title, new.lyrics);
 END;
