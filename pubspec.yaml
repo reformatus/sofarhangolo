@@ -4,7 +4,7 @@ description: "Minden kotta, mindig veled"
 publish_to: 'none'
 
 # Build number: Major, Minor (two digits), Patch (two digits), Build iteration (two digits)
-version: 1.1.5+1010500
+version: 1.2.0+001
 
 environment:
   sdk: '>=3.11.4 <4.0.0'
