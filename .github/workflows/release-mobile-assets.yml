@@ -9,6 +9,14 @@ on:
         description: Existing tag to attach mobile artifacts to
         required: true
         type: string
+      apk_url:
+        description: (Optional) Codemagic artifact URL for APK
+        required: false
+        type: string
+      ipa_url:
+        description: (Optional) Codemagic artifact URL for IPA
+        required: false
+        type: string
 
 concurrency:
   group: release-mobile-${{ github.event.client_payload.tag || inputs.release_tag }}
@@ -38,8 +46,8 @@ jobs:
             ipa_url="${{ github.event.client_payload.ipa_url }}"
           else
             release_tag="${{ inputs.release_tag }}"
-            apk_url=""
-            ipa_url=""
+            apk_url="${{ inputs.apk_url || '' }}"
+            ipa_url="${{ inputs.ipa_url || '' }}"
           fi
 
           release_sha="$(gh api "repos/$GITHUB_REPOSITORY/git/refs/tags/$release_tag" --jq '.object.sha')"
@@ -74,20 +82,31 @@ jobs:
       - name: Download mobile artifacts
         if: ${{ steps.meta.outputs.apk_url != '' || steps.meta.outputs.ipa_url != '' }}
         shell: bash
+        env:
+          CODEMAGIC_API_TOKEN: ${{ secrets.CODEMAGIC_API_TOKEN }}
         run: |
           mkdir -p dist/mobile
 
           apk_url="${{ steps.meta.outputs.apk_url }}"
           ipa_url="${{ steps.meta.outputs.ipa_url }}"
 
+          if [[ -z "${CODEMAGIC_API_TOKEN:-}" ]]; then
+            echo "CODEMAGIC_API_TOKEN is not set – cannot download Codemagic artifacts." >&2
+            exit 1
+          fi
+
           if [[ -n "$apk_url" ]]; then
             echo "Downloading APK..."
-            curl -fsSL -o "dist/mobile/sofar-hangolo-${{ steps.meta.outputs.release_tag }}.apk" "$apk_url"
+            curl -fsSL -H "x-auth-token: ${CODEMAGIC_API_TOKEN}" \
+              -o "dist/mobile/sofar-hangolo-${{ steps.meta.outputs.release_tag }}.apk" \
+              "$apk_url"
           fi
 
           if [[ -n "$ipa_url" ]]; then
             echo "Downloading IPA..."
-            curl -fsSL -o "dist/mobile/sofar-hangolo-${{ steps.meta.outputs.release_tag }}.ipa" "$ipa_url"
+            curl -fsSL -H "x-auth-token: ${CODEMAGIC_API_TOKEN}" \
+              -o "dist/mobile/sofar-hangolo-${{ steps.meta.outputs.release_tag }}.ipa" \
+              "$ipa_url"
           fi
 
       - name: Upload mobile artifacts to release

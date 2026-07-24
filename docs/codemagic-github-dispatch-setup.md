@@ -173,6 +173,11 @@ your repository:
    |---|---|---|
    | `CODEMAGIC_API_TOKEN` | Your Codemagic API token | Codemagic → Team → Personal Account → API access |
 
+   > This secret is used by **two** workflows:
+   > - `release.yml` (`trigger-codemagic` job) — to start the Codemagic build
+   > - `release-mobile-assets.yml` (`Download mobile artifacts` step) — to
+   >   download APK/IPA from Codemagic's artifact API
+
 3. Add the following **Repository variables** (under the **Variables** tab):
 
    | Variable name | Value | Where to find it |
