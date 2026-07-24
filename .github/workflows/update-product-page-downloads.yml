@@ -1,42 +1,23 @@
 name: Update Product Page Downloads
 
 on:
+  schedule:
+    - cron: '0 6 * * *'
   workflow_dispatch:
-    inputs:
-      release_tag:
-        description: Release tag that completed publishing
-        required: true
-        type: string
 
 permissions:
   contents: write
 
 concurrency:
-  group: product-page-downloads-${{ inputs.release_tag }}
+  group: product-page-downloads
   cancel-in-progress: false
 
 jobs:
   generate-shared-config:
     name: Generate shared config
     runs-on: ubuntu-latest
-    outputs:
-      release_tag: ${{ steps.meta.outputs.release_tag }}
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.release_tag }}
-          fetch-depth: 0
-          fetch-tags: true
-
-      - id: meta
-        run: echo "release_tag=${{ inputs.release_tag }}" >> "$GITHUB_OUTPUT"
-
-      - name: Ensure GitHub release exists
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
-        run: |
-          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
 
       - name: Generate product page shared config
         env:
@@ -59,8 +40,6 @@ jobs:
     needs: generate-shared-config
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ needs.generate-shared-config.outputs.release_tag }}
 
       - id: deploy-key-ready
         name: Check deploy key
@@ -100,4 +79,4 @@ jobs:
             reformatus/app.sofarhangolo.hu \
             main \
             docs/assets \
-            "Update product page downloads config for ${{ needs.generate-shared-config.outputs.release_tag }}"
+            "Update product page downloads config"

@@ -1,0 +1,105 @@
+name: Release Windows
+
+on:
+  workflow_call:
+    inputs:
+      release_tag:
+        required: true
+        type: string
+      release_ref:
+        required: true
+        type: string
+      build_name:
+        required: true
+        type: string
+      build_number:
+        required: true
+        type: string
+      release_date:
+        required: true
+        type: string
+      prerelease:
+        required: true
+        type: string
+
+jobs:
+  build-windows:
+    name: Build Windows installer and Store package
+    runs-on: windows-latest
+    env:
+      APP_VERSION: ${{ inputs.build_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_ref }}
+
+      - id: windows-store-ready
+        name: Check Microsoft Store credentials
+        shell: bash
+        env:
+          WINDOWS_STORE_TENANT_ID: ${{ secrets.WINDOWS_STORE_TENANT_ID }}
+          WINDOWS_STORE_SELLER_ID: ${{ secrets.WINDOWS_STORE_SELLER_ID }}
+          WINDOWS_STORE_CLIENT_ID: ${{ secrets.WINDOWS_STORE_CLIENT_ID }}
+          WINDOWS_STORE_CLIENT_SECRET: ${{ secrets.WINDOWS_STORE_CLIENT_SECRET }}
+        run: |
+          if [[ -n "${{ vars.WINDOWS_STORE_APP_ID }}" && -n "${{ vars.WINDOWS_STORE_BETA_FLIGHT_ID }}" && -n "$WINDOWS_STORE_TENANT_ID" && -n "$WINDOWS_STORE_SELLER_ID" && -n "$WINDOWS_STORE_CLIENT_ID" && -n "$WINDOWS_STORE_CLIENT_SECRET" ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Build Windows app
+        run: flutter build windows --release
+
+      - name: Build Microsoft Store MSIX
+        run: dart run msix:create --store --build-windows false --output-path build/windows/msix --output-name sofar-hangolo-${{ inputs.build_name }}-windows-store
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build native Windows installer
+        shell: powershell
+        run: |
+          $env:APP_VERSION = "${{ inputs.build_name }}"
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" "packaging\windows\sofar-hangolo.iss"
+
+      - name: Upload Windows release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-release-assets
+          path: |
+            build/windows/msix/*.msix
+            build/windows/installer/*.exe
+          if-no-files-found: error
+
+      - name: Install Microsoft Store Developer CLI
+        if: ${{ steps.windows-store-ready.outputs.ready == 'true' }}
+        shell: powershell
+        run: |
+          winget install Microsoft.DotNet.DesktopRuntime.9 --accept-package-agreements --accept-source-agreements --silent
+          winget install "Microsoft Store Developer CLI" --accept-package-agreements --accept-source-agreements --silent
+
+      - name: Publish Windows beta to Microsoft Store
+        if: ${{ steps.windows-store-ready.outputs.ready == 'true' }}
+        shell: powershell
+        env:
+          WINDOWS_STORE_TENANT_ID: ${{ secrets.WINDOWS_STORE_TENANT_ID }}
+          WINDOWS_STORE_SELLER_ID: ${{ secrets.WINDOWS_STORE_SELLER_ID }}
+          WINDOWS_STORE_CLIENT_ID: ${{ secrets.WINDOWS_STORE_CLIENT_ID }}
+          WINDOWS_STORE_CLIENT_SECRET: ${{ secrets.WINDOWS_STORE_CLIENT_SECRET }}
+        run: |
+          $storePackage = Get-ChildItem build/windows/msix/*.msix | Select-Object -First 1
+          msstore reconfigure --tenantId "$env:WINDOWS_STORE_TENANT_ID" --sellerId "$env:WINDOWS_STORE_SELLER_ID" --clientId "$env:WINDOWS_STORE_CLIENT_ID" --clientSecret "$env:WINDOWS_STORE_CLIENT_SECRET"
+          msstore publish . --inputFile "$($storePackage.FullName)" --appId "${{ vars.WINDOWS_STORE_APP_ID }}" --flightId "${{ vars.WINDOWS_STORE_BETA_FLIGHT_ID }}"

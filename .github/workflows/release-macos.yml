@@ -1,0 +1,273 @@
+name: Release macOS
+
+on:
+  workflow_call:
+    inputs:
+      release_tag:
+        required: true
+        type: string
+      release_ref:
+        required: true
+        type: string
+      build_name:
+        required: true
+        type: string
+      build_number:
+        required: true
+        type: string
+      release_date:
+        required: true
+        type: string
+      prerelease:
+        required: true
+        type: string
+    outputs:
+      app_store_ready:
+        description: Whether App Store credentials are configured
+        value: ${{ jobs.build-macos.outputs.app_store_ready }}
+
+jobs:
+  build-macos:
+    name: Build macOS DMG and App Store package
+    runs-on: macos-latest
+    outputs:
+      app_store_ready: ${{ steps.app-store-ready.outputs.ready }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_ref }}
+
+      - id: developer-id-ready
+        name: Check direct-distribution signing credentials
+        shell: bash
+        env:
+          MACOS_DEVELOPER_ID_P12_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 }}
+          MACOS_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_P12_PASSWORD }}
+          MACOS_DEVELOPER_ID_APPLICATION: ${{ secrets.MACOS_DEVELOPER_ID_APPLICATION }}
+        run: |
+          if [[ -n "$MACOS_DEVELOPER_ID_P12_BASE64" && -n "$MACOS_DEVELOPER_ID_P12_PASSWORD" && -n "$MACOS_DEVELOPER_ID_APPLICATION" ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - id: notary-ready
+        name: Check notarization credentials
+        shell: bash
+        env:
+          MACOS_NOTARY_API_KEY_ID: ${{ secrets.MACOS_NOTARY_API_KEY_ID }}
+          MACOS_NOTARY_API_ISSUER_ID: ${{ secrets.MACOS_NOTARY_API_ISSUER_ID }}
+          MACOS_NOTARY_API_KEY_BASE64: ${{ secrets.MACOS_NOTARY_API_KEY_BASE64 }}
+        run: |
+          if [[ "${{ steps.developer-id-ready.outputs.ready }}" == "true" && -n "$MACOS_NOTARY_API_KEY_ID" && -n "$MACOS_NOTARY_API_ISSUER_ID" && -n "$MACOS_NOTARY_API_KEY_BASE64" ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - id: app-store-ready
+        name: Check App Store credentials
+        shell: bash
+        env:
+          MACOS_APP_STORE_CERTIFICATES_P12_BASE64: ${{ secrets.MACOS_APP_STORE_CERTIFICATES_P12_BASE64 }}
+          MACOS_APP_STORE_CERTIFICATES_P12_PASSWORD: ${{ secrets.MACOS_APP_STORE_CERTIFICATES_P12_PASSWORD }}
+          MACOS_APP_STORE_PROVISIONING_PROFILE_BASE64: ${{ secrets.MACOS_APP_STORE_PROVISIONING_PROFILE_BASE64 }}
+          MACOS_APP_STORE_API_KEY_ID: ${{ secrets.MACOS_APP_STORE_API_KEY_ID }}
+          MACOS_APP_STORE_API_ISSUER_ID: ${{ secrets.MACOS_APP_STORE_API_ISSUER_ID }}
+          MACOS_APP_STORE_API_KEY_BASE64: ${{ secrets.MACOS_APP_STORE_API_KEY_BASE64 }}
+        run: |
+          if [[ -n "${{ vars.MACOS_APP_BUNDLE_ID }}" && -n "${{ vars.MACOS_APPLE_TEAM_ID }}" && -n "${{ vars.MACOS_APP_STORE_PROFILE_NAME }}" && -n "$MACOS_APP_STORE_CERTIFICATES_P12_BASE64" && -n "$MACOS_APP_STORE_CERTIFICATES_P12_PASSWORD" && -n "$MACOS_APP_STORE_PROVISIONING_PROFILE_BASE64" && -n "$MACOS_APP_STORE_API_KEY_ID" && -n "$MACOS_APP_STORE_API_ISSUER_ID" && -n "$MACOS_APP_STORE_API_KEY_BASE64" ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Install macOS CocoaPods dependencies
+        run: cd macos && pod install --repo-update
+
+      - name: Generate code
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Generate macOS build configuration
+        run: flutter build macos --config-only
+
+      - name: Build unsigned macOS app
+        shell: bash
+        run: |
+          xcodebuild \
+            -workspace macos/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -derivedDataPath build/macos/derived_data \
+            -destination 'platform=macOS' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+          mkdir -p build/macos/Build/Products
+          rm -rf build/macos/Build/Products/Release
+          cp -R build/macos/derived_data/Build/Products/Release build/macos/Build/Products/Release
+
+      - name: Import Developer ID certificate
+        if: ${{ steps.developer-id-ready.outputs.ready == 'true' }}
+        env:
+          DEV_ID_P12_BASE64: ${{ secrets.MACOS_DEVELOPER_ID_P12_BASE64 }}
+          DEV_ID_P12_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_P12_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/release.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          echo "KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          echo "KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> "$GITHUB_ENV"
+          echo "$DEV_ID_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/developer-id.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/developer-id.p12" -P "$DEV_ID_P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+      - name: Sign macOS app for direct distribution
+        if: ${{ steps.developer-id-ready.outputs.ready == 'true' }}
+        run: |
+          APP_PATH="$(find build/macos/Build/Products/Release -maxdepth 1 -name '*.app' -print -quit)"
+          codesign \
+            --deep \
+            --force \
+            --options runtime \
+            --entitlements macos/Runner/DirectDistribution.entitlements \
+            --sign "${{ secrets.MACOS_DEVELOPER_ID_APPLICATION }}" \
+            "$APP_PATH"
+
+      - name: Verify macOS direct-distribution entitlements
+        if: ${{ steps.developer-id-ready.outputs.ready == 'true' }}
+        run: |
+          APP_PATH="$(find build/macos/Build/Products/Release -maxdepth 1 -name '*.app' -print -quit)"
+          codesign -d --entitlements :- "$APP_PATH" > "$RUNNER_TEMP/direct-distribution-entitlements.plist"
+          grep -q 'applinks:app.sofarhangolo.hu' "$RUNNER_TEMP/direct-distribution-entitlements.plist"
+
+      - name: Build DMG
+        run: |
+          APP_PATH="$(find build/macos/Build/Products/Release -maxdepth 1 -name '*.app' -print -quit)"
+          bash tool/build_macos_dmg.sh "$APP_PATH" "build/macos/Sofar-Hangolo-${{ inputs.build_name }}-macos.dmg"
+
+      - name: Write notarization API key
+        if: ${{ steps.notary-ready.outputs.ready == 'true' }}
+        env:
+          NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_API_KEY_ID }}
+          NOTARY_KEY_BASE64: ${{ secrets.MACOS_NOTARY_API_KEY_BASE64 }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$NOTARY_KEY_BASE64" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_${NOTARY_KEY_ID}.p8"
+
+      - name: Notarize DMG
+        if: ${{ steps.notary-ready.outputs.ready == 'true' }}
+        env:
+          NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_API_KEY_ID }}
+          NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_API_ISSUER_ID }}
+        run: |
+          DMG_PATH="build/macos/Sofar-Hangolo-${{ inputs.build_name }}-macos.dmg"
+          xcrun notarytool submit "$DMG_PATH" \
+            --key "$HOME/.appstoreconnect/private_keys/AuthKey_${NOTARY_KEY_ID}.p8" \
+            --key-id "$NOTARY_KEY_ID" \
+            --issuer "$NOTARY_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "$DMG_PATH"
+
+      - name: Upload macOS release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-release-assets
+          path: build/macos/*.dmg
+          if-no-files-found: error
+
+      - name: Import App Store certificates
+        if: ${{ steps.app-store-ready.outputs.ready == 'true' }}
+        env:
+          APP_STORE_P12_BASE64: ${{ secrets.MACOS_APP_STORE_CERTIFICATES_P12_BASE64 }}
+          APP_STORE_P12_PASSWORD: ${{ secrets.MACOS_APP_STORE_CERTIFICATES_P12_PASSWORD }}
+        run: |
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-store.keychain-db"
+          KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
+          echo "APP_STORE_KEYCHAIN_PATH=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
+          echo "APP_STORE_KEYCHAIN_PASSWORD=$KEYCHAIN_PASSWORD" >> "$GITHUB_ENV"
+          echo "$APP_STORE_P12_BASE64" | base64 --decode > "$RUNNER_TEMP/app-store.p12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$RUNNER_TEMP/app-store.p12" -P "$APP_STORE_P12_PASSWORD" -A -t cert -f pkcs12 -k "$KEYCHAIN_PATH"
+          security list-keychains -d user -s "$KEYCHAIN_PATH" $(security list-keychains -d user | tr -d '"')
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+      - name: Install App Store provisioning profile
+        if: ${{ steps.app-store-ready.outputs.ready == 'true' }}
+        env:
+          APP_STORE_PROFILE_BASE64: ${{ secrets.MACOS_APP_STORE_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          echo "$APP_STORE_PROFILE_BASE64" | base64 --decode > "$HOME/Library/MobileDevice/Provisioning Profiles/${{ vars.MACOS_APP_BUNDLE_ID }}.provisionprofile"
+
+      - name: Write App Store Connect API key
+        if: ${{ steps.app-store-ready.outputs.ready == 'true' }}
+        env:
+          APP_STORE_API_KEY_ID: ${{ secrets.MACOS_APP_STORE_API_KEY_ID }}
+          APP_STORE_API_KEY_BASE64: ${{ secrets.MACOS_APP_STORE_API_KEY_BASE64 }}
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$APP_STORE_API_KEY_BASE64" | base64 --decode > "$HOME/.appstoreconnect/private_keys/AuthKey_${APP_STORE_API_KEY_ID}.p8"
+
+      - name: Archive macOS App Store build
+        if: ${{ steps.app-store-ready.outputs.ready == 'true' }}
+        run: |
+          bash tool/render_macos_appstore_export_options.sh \
+            "$RUNNER_TEMP/exportOptions.plist" \
+            "${{ vars.MACOS_APPLE_TEAM_ID }}" \
+            "${{ vars.MACOS_APP_BUNDLE_ID }}" \
+            "${{ vars.MACOS_APP_STORE_PROFILE_NAME }}"
+          xcodebuild \
+            -workspace macos/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
+            archive \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="${{ vars.MACOS_APPLE_TEAM_ID }}" \
+            PRODUCT_BUNDLE_IDENTIFIER="${{ vars.MACOS_APP_BUNDLE_ID }}" \
+            PROVISIONING_PROFILE_SPECIFIER="${{ vars.MACOS_APP_STORE_PROFILE_NAME }}"
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$RUNNER_TEMP/Runner.xcarchive" \
+            -exportOptionsPlist "$RUNNER_TEMP/exportOptions.plist" \
+            -exportPath "$RUNNER_TEMP/app-store"
+
+      - name: Verify macOS App Store entitlements
+        if: ${{ steps.app-store-ready.outputs.ready == 'true' }}
+        run: |
+          APP_PATH="$(find "$RUNNER_TEMP/Runner.xcarchive/Products/Applications" -maxdepth 1 -name '*.app' -print -quit)"
+          codesign -d --entitlements :- "$APP_PATH" > "$RUNNER_TEMP/app-store-entitlements.plist"
+          grep -q 'applinks:app.sofarhangolo.hu' "$RUNNER_TEMP/app-store-entitlements.plist"
+
+      - name: Upload App Store package artifact
+        if: ${{ steps.app-store-ready.outputs.ready == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-app-store-package
+          path: ${{ runner.temp }}/app-store/*.pkg
+          if-no-files-found: error
+
+      - name: Publish macOS beta to App Store Connect
+        if: ${{ steps.app-store-ready.outputs.ready == 'true' }}
+        env:
+          APP_STORE_API_KEY_ID: ${{ secrets.MACOS_APP_STORE_API_KEY_ID }}
+          APP_STORE_API_ISSUER_ID: ${{ secrets.MACOS_APP_STORE_API_ISSUER_ID }}
+        run: |
+          PKG_PATH="$(find "$RUNNER_TEMP/app-store" -maxdepth 1 -name '*.pkg' -print -quit)"
+          xcrun altool --upload-app --file "$PKG_PATH" --type osx --apiKey "$APP_STORE_API_KEY_ID" --apiIssuer "$APP_STORE_API_ISSUER_ID"
