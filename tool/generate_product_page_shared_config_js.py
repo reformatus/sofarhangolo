@@ -71,11 +71,9 @@ ASSET_TO_PLATFORM = {
 TRACK_META = {
     "stable": {
         "title": "Stabil kiadás",
-        "description": "Ajánlott a legtöbb felhasználónak.",
     },
     "prerelease": {
         "title": "Előzetes kiadás",
-        "description": "Új funkciók hamarabb, kisebb stabilitással.",
     },
 }
 
@@ -172,21 +170,33 @@ def main() -> int:
 
     repo = sys.argv[1]
     output_path = Path(sys.argv[2])
-    releases = run_gh_api(f"repos/{repo}/releases?per_page=20")
 
+    # Latest stable release (non-prerelease, non-draft).
     stable = None
-    prerelease = None
-    for release in releases:
-        simplified = simplify_release(release)
-        if simplified is None:
-            continue
+    try:
+        stable = simplify_release(
+            run_gh_api(f"repos/{repo}/releases/latest")
+        )
+    except subprocess.CalledProcessError:
+        pass
 
-        if simplified["id"] == "stable" and stable is None:
-            stable = simplified
-        if simplified["id"] == "prerelease" and prerelease is None:
-            prerelease = simplified
-        if stable is not None and prerelease is not None:
-            break
+    # The single most recent release of any kind.
+    # It is the prerelease only when it is marked as such AND
+    # differs from the stable release.
+    prerelease = None
+    try:
+        latest_any = run_gh_api(f"repos/{repo}/releases?per_page=1")
+        if latest_any:
+            latest_item = latest_any[0]
+            simplified = simplify_release(latest_item)
+            if (
+                simplified is not None
+                and simplified["id"] == "prerelease"
+                and (stable is None or simplified["release"]["tag"] != stable["release"]["tag"])
+            ):
+                prerelease = simplified
+    except subprocess.CalledProcessError:
+        pass
 
     payload = {
         "downloads": {

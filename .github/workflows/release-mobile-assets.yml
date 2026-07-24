@@ -10,10 +10,6 @@ on:
         required: true
         type: string
 
-permissions:
-  contents: write
-  actions: write
-
 concurrency:
   group: release-mobile-${{ github.event.client_payload.tag || inputs.release_tag }}
   cancel-in-progress: false
@@ -22,6 +18,8 @@ jobs:
   attach-mobile-assets:
     name: Attach mobile assets to GitHub release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       release_tag: ${{ steps.meta.outputs.release_tag }}
       release_sha: ${{ steps.meta.outputs.release_sha }}
@@ -112,10 +110,12 @@ jobs:
   trigger-product-page-downloads:
     name: Trigger product page downloads update
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
     needs: [attach-mobile-assets]
     if: >-
       ${{
-        always() &&
+        !cancelled() &&
         github.event_name == 'repository_dispatch' &&
         needs.attach-mobile-assets.result == 'success'
       }}

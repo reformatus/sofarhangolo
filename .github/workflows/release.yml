@@ -15,9 +15,6 @@ on:
         type: boolean
         default: false
 
-permissions:
-  contents: write
-
 concurrency:
   group: release-${{ github.ref_name || inputs.release_tag }}
   cancel-in-progress: false
@@ -26,6 +23,8 @@ jobs:
   release-context:
     name: Resolve release context
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     outputs:
       release_tag: ${{ steps.meta.outputs.release_tag }}
       release_ref: ${{ steps.meta.outputs.release_ref }}
@@ -180,8 +179,10 @@ jobs:
   upload-release-assets:
     name: Upload assets to GitHub release
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     needs: [release-context, build-linux, build-windows, build-macos]
-    if: ${{ always() && needs.release-context.result == 'success' }}
+    if: ${{ !cancelled() && needs.release-context.result == 'success' }}
     steps:
       - uses: actions/download-artifact@v4
         if: ${{ needs.build-linux.result == 'success' }}

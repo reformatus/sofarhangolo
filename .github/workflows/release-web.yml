@@ -94,7 +94,7 @@ jobs:
 
       - name: Load deploy key
         if: ${{ steps.deploy-key-ready.outputs.ready == 'true' }}
-        uses: webfactory/ssh-agent@v0.9.1
+        uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.APP_SOFARHANGOLO_HU_DEPLOY_KEY }}
 
@@ -102,7 +102,9 @@ jobs:
         if: ${{ steps.deploy-key-ready.outputs.ready == 'true' }}
         run: |
           mkdir -p ~/.ssh
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          curl -fsSL https://api.github.com/meta | jq -r '.ssh_keys[]' | while read -r key; do
+            echo "github.com $key" >> ~/.ssh/known_hosts
+          done
 
       - name: Clone target Pages repository
         if: ${{ steps.deploy-key-ready.outputs.ready == 'true' }}
