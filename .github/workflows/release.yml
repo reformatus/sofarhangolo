@@ -123,6 +123,56 @@ jobs:
       - name: Run tests
         run: flutter test test
 
+  trigger-codemagic:
+    name: Trigger Codemagic mobile build
+    runs-on: ubuntu-latest
+    needs: [release-context, verify]
+    if: ${{ needs.release-context.result == 'success' && needs.verify.result == 'success' }}
+    steps:
+      - name: Start Codemagic build via REST API
+        shell: bash
+        env:
+          CODEMAGIC_API_TOKEN: ${{ secrets.CODEMAGIC_API_TOKEN }}
+          CODEMAGIC_APP_ID: ${{ vars.CODEMAGIC_APP_ID }}
+          CODEMAGIC_WORKFLOW_ID: ${{ vars.CODEMAGIC_MOBILE_WORKFLOW_ID }}
+          RELEASE_TAG: ${{ needs.release-context.outputs.release_tag }}
+        run: |
+          set -euo pipefail
+
+          if [[ -z "${CODEMAGIC_API_TOKEN:-}" ]]; then
+            echo "CODEMAGIC_API_TOKEN secret is not set – skipping Codemagic trigger."
+            exit 0
+          fi
+          if [[ -z "${CODEMAGIC_APP_ID:-}" || -z "${CODEMAGIC_WORKFLOW_ID:-}" ]]; then
+            echo "CODEMAGIC_APP_ID or CODEMAGIC_MOBILE_WORKFLOW_ID variable is not set – skipping Codemagic trigger."
+            exit 0
+          fi
+
+          echo "Triggering Codemagic build for tag: ${RELEASE_TAG}"
+          response="$(curl -sS -w '\n%{http_code}' \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "x-auth-token: ${CODEMAGIC_API_TOKEN}" \
+            -d "$(jq -n \
+              --arg appId      "${CODEMAGIC_APP_ID}" \
+              --arg workflowId "${CODEMAGIC_WORKFLOW_ID}" \
+              --arg tag        "${RELEASE_TAG}" \
+              '{ appId: $appId, workflowId: $workflowId, tag: $tag }')" \
+            https://api.codemagic.io/builds)"
+
+          http_code="$(echo "${response}" | tail -n 1)"
+          body="$(echo "${response}" | sed '$d')"
+
+          if [[ "${http_code}" != "200" ]]; then
+            echo "Codemagic API returned HTTP ${http_code}: ${body}" >&2
+            exit 1
+          fi
+
+          build_id="$(echo "${body}" | jq -r '.buildId // empty')"
+          if [[ -n "${build_id}" ]]; then
+            echo "Codemagic build started: https://codemagic.io/app/${CODEMAGIC_APP_ID}/build/${build_id}"
+          fi
+
   build-linux:
     name: Build Linux Flatpak
     needs: [release-context, verify]

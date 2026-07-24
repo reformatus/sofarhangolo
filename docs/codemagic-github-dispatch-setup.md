@@ -1,7 +1,31 @@
-# Codemagic Setup: Trigger GitHub Action on Build Completion
+# Codemagic Setup: GitHub-triggered Mobile Builds
 
-This file contains the configuration needed on the Codemagic side to replace
-the 15-minute polling loop with an event-driven `repository_dispatch`.
+This file describes the configuration needed to integrate Codemagic mobile builds
+into the GitHub Actions release pipeline.
+
+**Architecture**: GitHub Actions is the **orchestrator**. When a release tag is
+pushed, the `release.yml` workflow first runs analysis and tests (`verify` job).
+Only after those pass does it **trigger Codemagic via the REST API**. Codemagic
+builds the mobile artifacts, then its post-publish script sends a
+`repository_dispatch` back to GitHub, where `release-mobile-assets.yml` attaches
+the APK/IPA to the release.
+
+This replaces the old model where Codemagic auto-triggered on every tag push,
+independently of whether the GitHub-side verify step passed.
+
+---
+
+## Step 0 — Disable automatic tag trigger in Codemagic
+
+Since GitHub Actions now triggers Codemagic explicitly, you must turn off the
+automatic tag trigger in Codemagic so builds don't start twice.
+
+1. Open your Codemagic app → **App settings** → **Build triggers**
+2. Under **Trigger on tag**, uncheck the tag trigger (or set it to **Never**)
+3. Save
+
+> The webhook URL stays active — it's still used by Codemagic internally.
+> We're only disabling the auto-trigger rule that fires on every tag push.
 
 ---
 
@@ -114,11 +138,13 @@ echo "Dispatch sent successfully."
 > environment group.
 
 
-## Step 4 — Test
+## Step 4 — Test the Codemagic → GitHub callback
 
-1. Push a new tag (e.g., `1.2.2+1020200`) that triggers both the Codemagic mobile build
-   and the main GitHub Release workflow
-2. Watch Codemagic — the build should start, complete, and the post-publish script should log:
+1. Push a new tag (e.g., `1.2.2+1020200`) — this triggers `release.yml`
+2. Watch `release.yml` — after `verify` passes, the `trigger-codemagic` job
+   should start a Codemagic build
+3. In Codemagic, the build should appear and complete. The post-publish script
+   should log:
    ```
    Dispatching codemagic-build-complete for tag: 1.2.2+1020200
    Sending repository_dispatch to reformatus/sofarhangolo...
@@ -133,24 +159,69 @@ echo "Dispatch sent successfully."
    - Attach to the release
    - Trigger the product page downloads update
 
-## How it works
+---
+
+## Step 5 — Add Codemagic secrets to GitHub Actions
+
+GitHub Actions needs credentials to call the Codemagic REST API. Add these to
+your repository:
+
+1. Go to **GitHub → repo Settings → Secrets and variables → Actions**
+2. Add the following **Repository secrets**:
+
+   | Secret name | Value | Where to find it |
+   |---|---|---|
+   | `CODEMAGIC_API_TOKEN` | Your Codemagic API token | Codemagic → Team → Personal Account → API access |
+
+3. Add the following **Repository variables** (under the **Variables** tab):
+
+   | Variable name | Value | Where to find it |
+   |---|---|---|
+   | `CODEMAGIC_APP_ID` | `6744e0650f756db2c37a8f81` | Codemagic app URL: `.../app/<APP_ID>` |
+   | `CODEMAGIC_MOBILE_WORKFLOW_ID` | `6744e0650f756db2c37a8f80` | Workflow key in Codemagic app settings |
+
+> **Note**: If these secrets/variables are not set, the `trigger-codemagic` job
+> will skip gracefully (exit 0) so the release pipeline is not blocked.
+
+---
+
+## Architecture
 
 ```
 Tag push (e.g. 1.2.1+1020100)
     │
-    ├──→ GitHub: release.yml starts
-    │       ├── release-context (creates GH release)
-    │       ├── verify
-    │       ├── build-linux / windows / macos / web
-    │       └── upload-release-assets
+    └──→ GitHub: release.yml starts
+            │
+            ├── release-context (creates GitHub release)
+            │
+            ├── verify (flutter analyze + flutter test)
+            │       │
+            │       └── (PASSES)
+            │              │
+            ├──────────────┤
+            │              │
+            ├── trigger-codemagic (NEW)
+            │       │
+            │       └── POST https://api.codemagic.io/builds
+            │              (appId + workflowId + tag)
+            │
+            ├── build-linux / windows / macos / web
+            │       (run in parallel with Codemagic)
+            │
+            └── upload-release-assets
+                    (desktop + web artifacts)
+
+Codemagic (no longer auto-triggers on tag)
     │
-    └──→ Codemagic: mobile build starts
+    └── Receives API call → starts mobile build
             │
             └── Build completes
                     │
                     └── Post-publish script runs
                             │
                             └── POST /repos/reformatus/sofarhangolo/dispatches
+                                    (event_type: codemagic-build-complete,
+                                     payload: tag + APK URL + IPA URL)
                                     │
                                     └── GitHub: release-mobile-assets.yml triggered
                                             ├── attach-mobile-assets
@@ -164,8 +235,13 @@ Tag push (e.g. 1.2.1+1020100)
                                                   └── Triggers update-product-page-downloads.yml
 ```
 
-Key benefits:
-- **No polling**: Codemagic pushes when ready, instead of GitHub pulling
-- **No Codemagic API token on GitHub**: artifact URLs come directly in the payload
-- **Quick**: GitHub runner time drops from ~15-20 min to ~1-2 min
-- **No tag encoding issues**: tags with `+` are passed as-is in JSON payload
+Key differences from the old model:
+- **Codemagic no longer auto-triggers on tag push** — GitHub Actions is the
+  single orchestrator
+- **Mobile builds only start after verify passes** — no wasted Codemagic
+  build minutes on broken code
+- **Desktop/web builds run in parallel with mobile** — no slower overall
+- **If Codemagic API token is missing, the job skips gracefully** — the
+  desktop/web release still proceeds
+- **Everything downstream is unchanged**: post-publish script, repository_dispatch,
+  release-mobile-assets.yml all work the same way
