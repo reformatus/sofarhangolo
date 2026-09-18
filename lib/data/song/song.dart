@@ -205,7 +205,8 @@ class Songs extends Table {
       .map(const LyricsFormatConverter())();
   TextColumn get variationOf => text().nullable()();
   TextColumn get keyField => text().map(const KeyFieldConverter())();
-  TextColumn get ownership => text().nullable().map(const SongOwnershipConverter())();
+  TextColumn get ownership =>
+      text().nullable().map(const SongOwnershipConverter())();
 }
 
 /// Which fields of a song come from its own bank data rather than being
@@ -224,8 +225,9 @@ class SongOwnership {
 
   factory SongOwnership.fromJson(Map<String, dynamic> json) {
     return SongOwnership(
-      contentKeys:
-          ((json['contentKeys'] as List?) ?? const []).cast<String>().toSet(),
+      contentKeys: ((json['contentKeys'] as List?) ?? const [])
+          .cast<String>()
+          .toSet(),
       keyField: json['keyField'] == true,
       lyrics: json['lyrics'] == true,
     );
