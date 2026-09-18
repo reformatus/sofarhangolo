@@ -7,6 +7,14 @@ analyzer:
     invalid_annotation_target: ignore
     invalid_use_of_internal_member: ignore
     provide_deprecation_message: ignore
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
   plugins:
     - custom_lint
 formatter:

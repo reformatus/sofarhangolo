@@ -15,8 +15,7 @@ import '../../harness/test_harness.dart';
 
 class _FakePresentationFullscreenController
     implements PresentationFullscreenController {
-  _FakePresentationFullscreenController({required bool isFullscreen})
-    : _isFullscreen = isFullscreen;
+  _FakePresentationFullscreenController({required this._isFullscreen});
 
   final _changes = StreamController<bool>.broadcast();
   bool _isFullscreen;

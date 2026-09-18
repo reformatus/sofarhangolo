@@ -1,6 +1,5 @@
 plugins {
     id "com.android.application"
-    id "org.jetbrains.kotlin.android"
     id "dev.flutter.flutter-gradle-plugin"
 }
 
@@ -38,10 +37,6 @@ android {
         targetCompatibility JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_17.toString()
-    }
-
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
     }
@@ -75,6 +70,14 @@ android {
         release {
             signingConfig signingConfigs.release
         }
+    }
+}
+
+// Built-in Kotlin (AGP 9): compiler options for the app's Kotlin sources.
+// See https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
 }
 
