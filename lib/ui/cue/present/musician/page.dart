@@ -310,7 +310,7 @@ class _CuePresentMusicianPageState extends ConsumerState<CuePresentMusicianPage>
                                 horizontal: 10,
                                 vertical: 6,
                               ),
-                              child: SelectableText(
+                              child: Text(
                                 '${(slideIndex?.index ?? 0) + 1} / ${slideIndex?.total}',
                                 style: Theme.of(context).textTheme.bodyLarge,
                               ),
@@ -322,7 +322,7 @@ class _CuePresentMusicianPageState extends ConsumerState<CuePresentMusicianPage>
                   ],
                 );
               },
-              child: const SlideView(),
+              child: const SlideView(enableTextActions: false),
             ),
           ),
         ),

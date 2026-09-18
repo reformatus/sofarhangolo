@@ -68,33 +68,31 @@ class _KeyFilterCardState extends ConsumerState<KeyFilterCard> {
               AnimatedOpacity(
                 duration: Durations.medium1,
                 opacity: state.keys.isEmpty ? 1 : 0,
-                child: SelectionArea(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    mainAxisSize: MainAxisSize.max,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text('Hangnem'),
-                      Expanded(
-                        child: Text(
-                          "  ${widget.fieldPopulatedCount} dalnál megadva",
-                          maxLines: 1,
-                          softWrap: false,
-                          textAlign: TextAlign.end,
-                          overflow: TextOverflow.fade,
-                          style: TextStyle(
-                            fontStyle: FontStyle.italic,
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSecondaryContainer,
-                            fontSize: Theme.of(
-                              context,
-                            ).textTheme.bodySmall!.fontSize,
-                          ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  mainAxisSize: MainAxisSize.max,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text('Hangnem'),
+                    Expanded(
+                      child: Text(
+                        "  ${widget.fieldPopulatedCount} dalnál megadva",
+                        maxLines: 1,
+                        softWrap: false,
+                        textAlign: TextAlign.end,
+                        overflow: TextOverflow.fade,
+                        style: TextStyle(
+                          fontStyle: FontStyle.italic,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.onSecondaryContainer,
+                          fontSize: Theme.of(
+                            context,
+                          ).textTheme.bodySmall!.fontSize,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
               if (state.keys.isNotEmpty)

@@ -404,7 +404,7 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
                                                         EdgeInsetsGeometry.only(
                                                           left: 5,
                                                         ),
-                                                    child: SelectableText('Offline'),
+                                                    child: Text('Offline'),
                                                   ),
                                               ],
                                             ),
@@ -572,7 +572,7 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
                                 top: 8,
                                 bottom: 8,
                               ),
-                              child: SelectableText('Offline'),
+                              child: Text('Offline'),
                             ),
                           ],
                         ],

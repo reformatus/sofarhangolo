@@ -77,6 +77,7 @@ class _CueEditPageState extends ConsumerState<CueEditPage> {
       contextTitle: widget.session.cue.title,
       child: AdaptivePage(
         title: widget.session.cue.title,
+        selectableTitle: true,
         subtitle: widget.session.cue.description.isNotEmpty
             ? widget.session.cue.description
             : null,

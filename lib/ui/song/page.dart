@@ -9,6 +9,7 @@ import '../../services/song/from_uuid.dart';
 import '../common/browser_title.dart';
 import '../common/error/card.dart';
 import 'widgets/content.dart';
+import 'widgets/song_details_helpers.dart';
 
 // TODO refactor into adaptive_page
 
@@ -153,7 +154,11 @@ class _SongPageState extends ConsumerState<SongPage> {
           );
         },
         builder: (context, state) {
-          return Material(child: Column(children: detailsContent));
+          // One selection area over the whole list so selections can span
+          // detail items; the invisible line breaks keep copied text readable.
+          return Material(
+            child: SelectableDetailsList(children: detailsContent),
+          );
         },
       ),
       useRootNavigator: false,

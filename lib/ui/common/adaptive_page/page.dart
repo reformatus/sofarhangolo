@@ -13,6 +13,7 @@ class AdaptivePage extends StatefulWidget {
     required this.title,
     required this.body,
     this.subtitle,
+    this.selectableTitle = false,
     this.leftDrawer,
     this.leftDrawerIcon,
     this.leftDrawerTooltip,
@@ -27,6 +28,11 @@ class AdaptivePage extends StatefulWidget {
 
   final String title;
   final String? subtitle;
+
+  /// Whether the app bar title (and subtitle) should be selectable. Enable
+  /// for pages whose title is content-driven (e.g. cue titles), not for
+  /// pages with static page names.
+  final bool selectableTitle;
   final Widget? leftDrawer;
   final IconData? leftDrawerIcon;
   final String? leftDrawerTooltip;
@@ -275,188 +281,191 @@ class _AdaptivePageState extends State<AdaptivePage>
         }
 
         return ClipRect(
-          child: SelectionArea(
-            child: Scaffold(
-              appBar: AppBar(
-                title: widget.subtitle != null && widget.subtitle!.isNotEmpty
-                    ? Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.title,
-                            style: Theme.of(context).appBarTheme.titleTextStyle,
-                          ),
-                          Text(
-                            widget.subtitle!,
-                            style: Theme.of(context).textTheme.bodySmall
-                                ?.copyWith(
-                                  color: Theme.of(context)
-                                      .appBarTheme
-                                      .foregroundColor
-                                      ?.withValues(alpha: 0.7),
-                                ),
-                          ),
-                        ],
-                      )
-                    : Text(widget.title),
-                leading: BackButton(),
-                automaticallyImplyLeading: false,
-                actions: [
-                  SizedBox.shrink(),
-                  ...widget.appBarActions ?? [],
-                  SizedBox(width: 8),
-                ],
-              ),
-              drawer: tabletOrBigger || widget.leftDrawer == null
-                  ? null
-                  : Drawer(child: SafeArea(child: widget.leftDrawer!)),
-              endDrawer: tabletOrBigger || widget.rightDrawer == null
-                  ? null
-                  : Drawer(child: SafeArea(child: widget.rightDrawer!)),
-              body: Builder(
+          child: Scaffold(
+            appBar: AppBar(
+              title: Builder(
                 builder: (context) {
-                  return Container(
-                    color: Theme.of(context).colorScheme.surfaceContainer,
-                    child: Stack(
-                      children: [
-                        Row(
+                  final Widget title =
+                      widget.subtitle != null && widget.subtitle!.isNotEmpty
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (widget.leftDrawer != null && tabletOrBigger)
-                              AnimatedBuilder(
-                                animation: leftDrawerAnimation,
-                                builder: (context, _) {
-                                  return SizedBox(
-                                    width:
-                                        drawerWidth * leftDrawerAnimation.value,
-                                  );
-                                },
-                              ),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: [
-                                  if (!tabletOrBigger) _buildBody(),
-                                  Container(
-                                    height: 50,
-                                    padding: EdgeInsets.symmetric(vertical: 4),
-                                    child: Row(
-                                      children: [
-                                        if (widget.leftDrawer != null)
-                                          AdaptivePageDrawerButton(
-                                            onPressed: tabletOrBigger
-                                                ? leftDrawerController.toggle
-                                                : Scaffold.of(
-                                                    context,
-                                                  ).openDrawer,
-                                            animation: leftDrawerAnimation,
-                                            drawerIcon: widget.leftDrawerIcon,
-                                            tooltip: widget.leftDrawerTooltip,
-                                          ),
-                                        Expanded(
-                                          child: Padding(
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal: 5,
-                                            ),
-                                            child: ListView(
-                                              scrollDirection: Axis.horizontal,
-                                              children:
-                                                  widget.actionBarChildren ??
-                                                  [],
-                                            ),
-                                          ),
-                                        ),
-                                        if (widget.rightDrawer != null)
-                                          AdaptivePageDrawerButton(
-                                            onPressed: tabletOrBigger
-                                                ? rightDrawerController.toggle
-                                                : Scaffold.of(
-                                                    context,
-                                                  ).openEndDrawer,
-                                            animation: rightDrawerAnimation,
-                                            drawerIcon: widget.rightDrawerIcon,
-                                            tooltip: widget.rightDrawerTooltip,
-                                            endDrawer: true,
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (tabletOrBigger) _buildBody(),
-                                ],
-                              ),
+                            Text(
+                              widget.title,
+                              style: Theme.of(
+                                context,
+                              ).appBarTheme.titleTextStyle,
                             ),
-
-                            if (widget.rightDrawer != null && tabletOrBigger)
-                              AnimatedBuilder(
-                                animation: rightDrawerAnimation,
-                                builder: (context, _) {
-                                  return SizedBox(
-                                    width:
-                                        drawerWidth *
-                                        rightDrawerAnimation.value,
-                                  );
-                                },
-                              ),
+                            Text(
+                              widget.subtitle!,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .appBarTheme
+                                        .foregroundColor
+                                        ?.withValues(alpha: 0.7),
+                                  ),
+                            ),
                           ],
-                        ),
-                        if (widget.leftDrawer != null &&
-                            (tabletOrBigger || showMobileLeftPreview))
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: AnimatedBuilder(
-                              animation: leftDrawerAnimation,
-                              builder: (context, _) {
-                                return FractionalTranslation(
-                                  translation: Tween<Offset>(
-                                    begin: Offset(-1, 0),
-                                    end: Offset.zero,
-                                  ).animate(leftDrawerAnimation).value,
-                                  child: SizedBox(
-                                    width: drawerWidth,
-                                    child: Drawer(
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.only(
-                                          topRight: Radius.circular(15),
-                                        ),
-                                      ),
-                                      child: widget.leftDrawer,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        if (widget.rightDrawer != null && tabletOrBigger)
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: AnimatedBuilder(
-                              animation: rightDrawerAnimation,
-                              builder: (context, _) {
-                                return FractionalTranslation(
-                                  translation: Tween<Offset>(
-                                    begin: Offset(1, 0),
-                                    end: Offset.zero,
-                                  ).animate(rightDrawerAnimation).value,
-                                  child: SizedBox(
-                                    width: drawerWidth,
-                                    child: Drawer(
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.only(
-                                          topLeft: Radius.circular(15),
-                                        ),
-                                      ),
-                                      child: widget.rightDrawer,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                      ],
-                    ),
-                  );
+                        )
+                      : Text(widget.title);
+                  if (!widget.selectableTitle) return title;
+                  return SelectionArea(child: title);
                 },
               ),
+              leading: BackButton(),
+              automaticallyImplyLeading: false,
+              actions: [
+                SizedBox.shrink(),
+                ...widget.appBarActions ?? [],
+                SizedBox(width: 8),
+              ],
+            ),
+            drawer: tabletOrBigger || widget.leftDrawer == null
+                ? null
+                : Drawer(child: SafeArea(child: widget.leftDrawer!)),
+            endDrawer: tabletOrBigger || widget.rightDrawer == null
+                ? null
+                : Drawer(child: SafeArea(child: widget.rightDrawer!)),
+            body: Builder(
+              builder: (context) {
+                return Container(
+                  color: Theme.of(context).colorScheme.surfaceContainer,
+                  child: Stack(
+                    children: [
+                      Row(
+                        children: [
+                          if (widget.leftDrawer != null && tabletOrBigger)
+                            AnimatedBuilder(
+                              animation: leftDrawerAnimation,
+                              builder: (context, _) {
+                                return SizedBox(
+                                  width:
+                                      drawerWidth * leftDrawerAnimation.value,
+                                );
+                              },
+                            ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (!tabletOrBigger) _buildBody(),
+                                Container(
+                                  height: 50,
+                                  padding: EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(
+                                    children: [
+                                      if (widget.leftDrawer != null)
+                                        AdaptivePageDrawerButton(
+                                          onPressed: tabletOrBigger
+                                              ? leftDrawerController.toggle
+                                              : Scaffold.of(context).openDrawer,
+                                          animation: leftDrawerAnimation,
+                                          drawerIcon: widget.leftDrawerIcon,
+                                          tooltip: widget.leftDrawerTooltip,
+                                        ),
+                                      Expanded(
+                                        child: Padding(
+                                          padding: EdgeInsets.symmetric(
+                                            horizontal: 5,
+                                          ),
+                                          child: ListView(
+                                            scrollDirection: Axis.horizontal,
+                                            children:
+                                                widget.actionBarChildren ?? [],
+                                          ),
+                                        ),
+                                      ),
+                                      if (widget.rightDrawer != null)
+                                        AdaptivePageDrawerButton(
+                                          onPressed: tabletOrBigger
+                                              ? rightDrawerController.toggle
+                                              : Scaffold.of(
+                                                  context,
+                                                ).openEndDrawer,
+                                          animation: rightDrawerAnimation,
+                                          drawerIcon: widget.rightDrawerIcon,
+                                          tooltip: widget.rightDrawerTooltip,
+                                          endDrawer: true,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                                if (tabletOrBigger) _buildBody(),
+                              ],
+                            ),
+                          ),
+
+                          if (widget.rightDrawer != null && tabletOrBigger)
+                            AnimatedBuilder(
+                              animation: rightDrawerAnimation,
+                              builder: (context, _) {
+                                return SizedBox(
+                                  width:
+                                      drawerWidth * rightDrawerAnimation.value,
+                                );
+                              },
+                            ),
+                        ],
+                      ),
+                      if (widget.leftDrawer != null &&
+                          (tabletOrBigger || showMobileLeftPreview))
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: AnimatedBuilder(
+                            animation: leftDrawerAnimation,
+                            builder: (context, _) {
+                              return FractionalTranslation(
+                                translation: Tween<Offset>(
+                                  begin: Offset(-1, 0),
+                                  end: Offset.zero,
+                                ).animate(leftDrawerAnimation).value,
+                                child: SizedBox(
+                                  width: drawerWidth,
+                                  child: Drawer(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.only(
+                                        topRight: Radius.circular(15),
+                                      ),
+                                    ),
+                                    child: widget.leftDrawer,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      if (widget.rightDrawer != null && tabletOrBigger)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: AnimatedBuilder(
+                            animation: rightDrawerAnimation,
+                            builder: (context, _) {
+                              return FractionalTranslation(
+                                translation: Tween<Offset>(
+                                  begin: Offset(1, 0),
+                                  end: Offset.zero,
+                                ).animate(rightDrawerAnimation).value,
+                                child: SizedBox(
+                                  width: drawerWidth,
+                                  child: Drawer(
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.only(
+                                        topLeft: Radius.circular(15),
+                                      ),
+                                    ),
+                                    child: widget.rightDrawer,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              },
             ),
           ),
         );

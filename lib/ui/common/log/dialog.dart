@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import '../../../config/config.dart';
 import '../../../data/log/level_style.dart';
 import '../../../data/log/provider.dart';
+import '../../../services/text_export/diagnostics.dart';
+import '../../../services/ui/messenger_service.dart';
 import '../centered_hint.dart';
 
 class LogViewDialog extends ConsumerStatefulWidget {
@@ -42,6 +44,23 @@ class _LogViewDialogState extends ConsumerState<LogViewDialog> {
             title: SelectableText('Napló'),
             automaticallyImplyLeading: false,
             actions: [
+              IconButton(
+                onPressed: () => messengerService.copyToClipboard(
+                  messages
+                      .map(
+                        (m) => formatLogEntry(
+                          level: m.record.level.name,
+                          time: m.record.time,
+                          message: m.record.message,
+                          error: m.record.error,
+                          stackTrace: m.record.stackTrace,
+                        ),
+                      )
+                      .join('\n\n'),
+                ),
+                icon: Icon(Icons.copy_all),
+                tooltip: 'Összes másolása',
+              ),
               IconButton(onPressed: context.pop, icon: Icon(Icons.close)),
             ],
             actionsPadding: EdgeInsets.only(right: 8),

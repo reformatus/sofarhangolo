@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../services/error/app_error.dart';
+import '../../../services/text_export/diagnostics.dart';
+import '../../../services/ui/messenger_service.dart';
 import '../../base/home/parts/feedback/send_mail.dart';
 
 class LErrorCard extends StatelessWidget {
@@ -156,29 +158,45 @@ class LErrorCard extends StatelessWidget {
                     ],
                   ),
                 ),
-              if (onRetry != null)
+              if (onRetry != null || stack != null || showReportButton)
                 Padding(
-                  padding: EdgeInsetsGeometry.only(
-                    left: 8,
-                    right: 8,
-                    bottom: 8,
-                  ),
-                  child: FilledButton.icon(
-                    onPressed: onRetry,
-                    icon: Icon(Icons.refresh),
-                    label: Text(retryLabel ?? 'Újra'),
-                  ),
-                ),
-              if (showReportButton)
-                Padding(
-                  padding: EdgeInsetsGeometry.all(8),
-                  child: FilledButton.icon(
-                    onPressed: () => sendFeedbackEmail(
-                      errorMessage: '$title ($message)',
-                      stackTrace: stack,
-                    ),
-                    icon: Icon(Icons.feedback_outlined),
-                    label: Text('Hibajelentés'),
+                  padding: EdgeInsets.only(left: 8, right: 8, bottom: 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    spacing: 8,
+                    children: [
+                      if (onRetry != null)
+                        FilledButton.icon(
+                          onPressed: onRetry,
+                          icon: Icon(Icons.refresh),
+                          label: Text(retryLabel ?? 'Újra'),
+                        ),
+                      // Only offer copying for real errors that carry a stack
+                      // trace (see AppError.shouldShowTechnicalDetails);
+                      // benign, already handled warnings have nothing worth
+                      // copying.
+                      if (stack != null)
+                        TextButton.icon(
+                          onPressed: () => messengerService.copyToClipboard(
+                            formatDiagnostics(
+                              title: title,
+                              message: message,
+                              stack: stack,
+                            ),
+                          ),
+                          icon: Icon(Icons.copy),
+                          label: Text('Részletek másolása'),
+                        ),
+                      if (showReportButton)
+                        FilledButton.icon(
+                          onPressed: () => sendFeedbackEmail(
+                            errorMessage: '$title ($message)',
+                            stackTrace: stack,
+                          ),
+                          icon: Icon(Icons.feedback_outlined),
+                          label: Text('Hibajelentés'),
+                        ),
+                    ],
                   ),
                 ),
             ],

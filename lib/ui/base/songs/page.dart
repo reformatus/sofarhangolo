@@ -428,88 +428,86 @@ class FiltersTitle extends ConsumerWidget {
     return AnimatedSize(
       duration: Durations.medium1,
       curve: Curves.easeInOutCubicEmphasized,
-      child: SelectionArea(
-        child: Row(
-          children: [
-            Expanded(
-              child: Text(
-                (filterState.isEmpty && keyFilterState.isEmpty)
-                    ? 'Szűrők'
-                    : ([
-                        if (keyFilterState.isNotEmpty)
-                          [
-                            if (keyFilterState.keys.isNotEmpty)
-                              keyFilterState.keys
-                                  .map(displayKeyField)
-                                  .join(' vagy '),
-                            if (keyFilterState.pitches.isNotEmpty ||
-                                keyFilterState.modes.isNotEmpty)
-                              [
-                                if (keyFilterState.pitches.isNotEmpty)
-                                  'alaphangja ${keyFilterState.pitches.map(displayKeyPitch).join(' vagy ')}',
-                                if (keyFilterState.modes.isNotEmpty)
-                                  'hangsora ${keyFilterState.modes.map(displayKeyMode).join(' vagy ')}',
-                              ].join(' és '),
-                          ].join(', vagy '),
-                        if (filterState.isNotEmpty)
-                          filterState.values
-                              .map((e) => e.join(' vagy '))
-                              .join(', és '),
-                      ].join(', valamint ')),
-                style: TextStyle(
-                  color: (filterState.isEmpty && keyFilterState.isEmpty)
-                      ? null
-                      : Theme.of(context).colorScheme.onSecondaryContainer,
-                  fontSize: (filterState.isEmpty && keyFilterState.isEmpty)
-                      ? null
-                      : Theme.of(context).textTheme.bodyMedium!.fontSize,
-                ),
-                softWrap: true,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              (filterState.isEmpty && keyFilterState.isEmpty)
+                  ? 'Szűrők'
+                  : ([
+                      if (keyFilterState.isNotEmpty)
+                        [
+                          if (keyFilterState.keys.isNotEmpty)
+                            keyFilterState.keys
+                                .map(displayKeyField)
+                                .join(' vagy '),
+                          if (keyFilterState.pitches.isNotEmpty ||
+                              keyFilterState.modes.isNotEmpty)
+                            [
+                              if (keyFilterState.pitches.isNotEmpty)
+                                'alaphangja ${keyFilterState.pitches.map(displayKeyPitch).join(' vagy ')}',
+                              if (keyFilterState.modes.isNotEmpty)
+                                'hangsora ${keyFilterState.modes.map(displayKeyMode).join(' vagy ')}',
+                            ].join(' és '),
+                        ].join(', vagy '),
+                      if (filterState.isNotEmpty)
+                        filterState.values
+                            .map((e) => e.join(' vagy '))
+                            .join(', és '),
+                    ].join(', valamint ')),
+              style: TextStyle(
+                color: (filterState.isEmpty && keyFilterState.isEmpty)
+                    ? null
+                    : Theme.of(context).colorScheme.onSecondaryContainer,
+                fontSize: (filterState.isEmpty && keyFilterState.isEmpty)
+                    ? null
+                    : Theme.of(context).textTheme.bodyMedium!.fontSize,
               ),
+              softWrap: true,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
             ),
-            ...banksFilterState
-                .map((i) => banks.firstWhere((b) => b.uuid == i))
-                .map(
-                  (b) => b.tinyLogo != null
-                      ? Padding(
-                          padding: EdgeInsets.only(right: 5),
-                          child: Tooltip(
-                            message: b.name,
-                            child: SizedBox.square(
-                              dimension: 30,
-                              child: Image.memory(b.tinyLogo!),
-                            ),
-                          ),
-                        )
-                      : ConstrainedBox(
-                          constraints: BoxConstraints(maxWidth: 50),
-                          child: Text(
-                            b.name,
-                            overflow: TextOverflow.fade,
-                            maxLines: 1,
-                            softWrap: false,
+          ),
+          ...banksFilterState
+              .map((i) => banks.firstWhere((b) => b.uuid == i))
+              .map(
+                (b) => b.tinyLogo != null
+                    ? Padding(
+                        padding: EdgeInsets.only(right: 5),
+                        child: Tooltip(
+                          message: b.name,
+                          child: SizedBox.square(
+                            dimension: 30,
+                            child: Image.memory(b.tinyLogo!),
                           ),
                         ),
-                ),
-            if (banksFilterState.isNotEmpty) SizedBox(width: 10),
-            if (filterState.isNotEmpty ||
-                keyFilterState.isNotEmpty ||
-                banksFilterState.isNotEmpty)
-              IconButton(
-                icon: Icon(Icons.clear),
-                onPressed: () {
-                  // TODO move filter states to sealed superclass and iterate trough reset (??) || Or at least move this to a service.
-                  ref
-                      .read(multiselectTagsFilterStateProvider.notifier)
-                      .resetAllFilters();
-                  ref.read(keyFilterStateProvider.notifier).reset();
-                  ref.read(banksFilterStateProvider.notifier).reset();
-                },
+                      )
+                    : ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: 50),
+                        child: Text(
+                          b.name,
+                          overflow: TextOverflow.fade,
+                          maxLines: 1,
+                          softWrap: false,
+                        ),
+                      ),
               ),
-          ],
-        ),
+          if (banksFilterState.isNotEmpty) SizedBox(width: 10),
+          if (filterState.isNotEmpty ||
+              keyFilterState.isNotEmpty ||
+              banksFilterState.isNotEmpty)
+            IconButton(
+              icon: Icon(Icons.clear),
+              onPressed: () {
+                // TODO move filter states to sealed superclass and iterate trough reset (??) || Or at least move this to a service.
+                ref
+                    .read(multiselectTagsFilterStateProvider.notifier)
+                    .resetAllFilters();
+                ref.read(keyFilterStateProvider.notifier).reset();
+                ref.read(banksFilterStateProvider.notifier).reset();
+              },
+            ),
+        ],
       ),
     );
   }
