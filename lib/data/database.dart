@@ -34,7 +34,7 @@ class LyricDatabase extends _$LyricDatabase {
     : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration {
@@ -83,10 +83,27 @@ class LyricDatabase extends _$LyricDatabase {
         from5To6: (m, schema) async {
           await m.addColumn(schema.songs, schema.songs.variationOf);
           // ignore: experimental_member_use
-          await m.alterTable(TableMigration(songs));
+          await m.alterTable(TableMigration(schema.songs));
           await customStatement(
             'CREATE INDEX songs_variation_of ON songs (variation_of);',
           );
+          await customStatement(
+            "UPDATE banks SET last_updated = '1900-01-01T00:00:00'",
+          );
+        },
+        from6To7: (m, schema) async {
+          await m.addColumn(schema.songs, schema.songs.ownership);
+          // Recreate the FTS triggers: drift_dev now exports their SQL with a
+          // different (equivalent) rowid rendering, so recreate them from the
+          // current schema to keep migrated databases consistent with it.
+          await m.drop(schema.songsAd);
+          await m.drop(schema.songsAu);
+          await m.drop(schema.songsAi);
+          await m.createTrigger(schema.songsAd);
+          await m.createTrigger(schema.songsAu);
+          await m.createTrigger(schema.songsAi);
+          // Force a full refetch so every song gets its ownership metadata
+          // populated from the bank.
           await customStatement(
             "UPDATE banks SET last_updated = '1900-01-01T00:00:00'",
           );
