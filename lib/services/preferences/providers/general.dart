@@ -16,6 +16,7 @@ class GeneralPreferences extends _$GeneralPreferences {
       appBrightness: ThemeMode.system,
       sheetBrightness: ThemeMode.light,
       oledBlackBackground: false,
+      testingMode: false,
     );
   }
 
@@ -44,6 +45,11 @@ class GeneralPreferences extends _$GeneralPreferences {
 
   void setOledBlackBackground(bool newValue) {
     state.oledBlackBackground = newValue;
+    go();
+  }
+
+  void setTestingMode(bool newValue) {
+    state.testingMode = newValue;
     go();
   }
 }
