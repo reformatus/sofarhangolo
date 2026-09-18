@@ -1,25 +1,26 @@
-import 'dart:async';
-
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:sofarhangolo/data/log/logger.dart';
-import 'package:sofarhangolo/data/song/lyrics/parser.dart';
+import 'package:sofarhangolo/data/song/extensions.dart';
 import 'package:sofarhangolo/data/song/song.dart';
 import 'package:sofarhangolo/services/assets/get_song_asset.dart';
+import 'package:sofarhangolo/services/text_export/song_lyrics.dart';
 
-Future<void> copyLyricsText(Song song) async {
-  final lyrics = song.lyrics;
-  if (lyrics != null) {
-    await SharePlus.instance.share(
-      ShareParams(
-        text: LyricsParser.forFormat(song.lyricsFormat).getText(lyrics),
-      ),
-    );
-  }
+/// Shares the song's lyrics in the user-friendly text representation
+/// (pretty verse headers, no chords) via the system share sheet.
+Future<void> shareLyricsText(Song song) async {
+  if (!song.hasLyrics) return;
+  await SharePlus.instance.share(
+    ShareParams(text: friendlySongLyricsOf(song).text),
+  );
 }
 
-Future<void> copyLyrics(Song song) async {
-  await SharePlus.instance.share(ShareParams(text: song.lyrics));
+/// Shares the song's lyrics in their original, unprocessed source format
+/// via the system share sheet.
+Future<void> shareRawLyrics(Song song) async {
+  final lyrics = song.lyrics;
+  if (lyrics == null || lyrics.isEmpty) return;
+  await SharePlus.instance.share(ShareParams(text: lyrics));
 }
 
 Future<void> getPDF(Song song, WidgetRef ref) async {
@@ -42,8 +43,9 @@ Future<void> getPDF(Song song, WidgetRef ref) async {
         } catch (error, stackTrace) {
           log.warning('Letöltés közben hiba lépett fel', error, stackTrace);
         }
+      } else {
+        log.warning('Üres file');
       }
-      log.warning('Üres file');
     case AsyncLoading():
   }
 }

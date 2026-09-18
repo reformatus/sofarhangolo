@@ -322,7 +322,7 @@ class _CuePresentMusicianPageState extends ConsumerState<CuePresentMusicianPage>
                   ],
                 );
               },
-              child: const SlideView(),
+              child: const SlideView(enableTextActions: false),
             ),
           ),
         ),

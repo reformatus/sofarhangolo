@@ -582,26 +582,28 @@ class _CuePanelAppBar extends StatelessWidget implements PreferredSizeWidget {
     final hasSubtitle = cueSubtitle.isNotEmpty;
     return AppBar(
       backgroundColor: backgroundColor,
-      title: hasSubtitle
-          ? Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  session.cue.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.appBarTheme.titleTextStyle,
-                ),
-                Text(
-                  cueSubtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            )
-          : Text(session.cue.title),
+      title: SelectionArea(
+        child: hasSubtitle
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    session.cue.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.appBarTheme.titleTextStyle,
+                  ),
+                  Text(
+                    cueSubtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ],
+              )
+            : Text(session.cue.title),
+      ),
       automaticallyImplyLeading: false,
       leading: const Icon(Icons.list),
       actions: [

@@ -13,6 +13,7 @@ class AdaptivePage extends StatefulWidget {
     required this.title,
     required this.body,
     this.subtitle,
+    this.selectableTitle = false,
     this.leftDrawer,
     this.leftDrawerIcon,
     this.leftDrawerTooltip,
@@ -27,6 +28,11 @@ class AdaptivePage extends StatefulWidget {
 
   final String title;
   final String? subtitle;
+
+  /// Whether the app bar title (and subtitle) should be selectable. Enable
+  /// for pages whose title is content-driven (e.g. cue titles), not for
+  /// pages with static page names.
+  final bool selectableTitle;
   final Widget? leftDrawer;
   final IconData? leftDrawerIcon;
   final String? leftDrawerTooltip;
@@ -277,28 +283,37 @@ class _AdaptivePageState extends State<AdaptivePage>
         return ClipRect(
           child: Scaffold(
             appBar: AppBar(
-              title: widget.subtitle != null && widget.subtitle!.isNotEmpty
-                  ? Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.title,
-                          style: Theme.of(context).appBarTheme.titleTextStyle,
-                        ),
-                        Text(
-                          widget.subtitle!,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Theme.of(context)
-                                    .appBarTheme
-                                    .foregroundColor
-                                    ?.withValues(alpha: 0.7),
-                              ),
-                        ),
-                      ],
-                    )
-                  : Text(widget.title),
+              title: Builder(
+                builder: (context) {
+                  final Widget title =
+                      widget.subtitle != null && widget.subtitle!.isNotEmpty
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.title,
+                              style: Theme.of(
+                                context,
+                              ).appBarTheme.titleTextStyle,
+                            ),
+                            Text(
+                              widget.subtitle!,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: Theme.of(context)
+                                        .appBarTheme
+                                        .foregroundColor
+                                        ?.withValues(alpha: 0.7),
+                                  ),
+                            ),
+                          ],
+                        )
+                      : Text(widget.title);
+                  if (!widget.selectableTitle) return title;
+                  return SelectionArea(child: title);
+                },
+              ),
               leading: BackButton(),
               automaticallyImplyLeading: false,
               actions: [

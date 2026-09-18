@@ -24,7 +24,12 @@ SlideViewBuildLogger? debugSlideViewBuildLogger;
 SlideViewTransitionLogger? debugSlideViewTransitionLogger;
 
 class SlideView extends ConsumerStatefulWidget {
-  const SlideView({super.key});
+  const SlideView({this.enableTextActions = true, super.key});
+
+  /// Passed through to lyrics slides: whether the lyrics text actions (menu,
+  /// selection dialog, hover highlight) are installed. Disabled in the
+  /// presenter view, where stray taps must not open dialogs.
+  final bool enableTextActions;
 
   @override
   ConsumerState<SlideView> createState() => _SlideViewState();
@@ -169,6 +174,7 @@ class _SlideViewState extends ConsumerState<SlideView>
         key: ValueKey('retained-slide/$cueUuid/$slideUuid'),
         slideUuid: slideUuid,
         cueUuid: cueUuid,
+        enableTextActions: widget.enableTextActions,
       ),
     );
   }
@@ -499,56 +505,49 @@ class _SlideViewState extends ConsumerState<SlideView>
               )
             : currentSlideUuid == null
             ? const SizedBox.shrink()
-            : // SelectionArea sits ABOVE the swipe surface so the adapter's
-              // horizontal drag recognizer joins the gesture arena first and
-              // swipes navigate slides on every platform. Below it (e.g. on
-              // the lyrics) SelectableRegion eagerly claims horizontal drags
-              // on all non-iOS platforms and navigation would never fire.
-              SelectionArea(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    dragViewportWidth = constraints.maxWidth;
-                    final targetSlideUuid = transitionTargetSlideUuid;
-                    final showTransition = targetSlideUuid != null;
-                    final hiddenSlideUuids = _retainedSlideWidgets.keys.where(
-                      (slideUuid) =>
-                          slideUuid != currentSlideUuid &&
-                          slideUuid != targetSlideUuid,
-                    );
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  dragViewportWidth = constraints.maxWidth;
+                  final targetSlideUuid = transitionTargetSlideUuid;
+                  final showTransition = targetSlideUuid != null;
+                  final hiddenSlideUuids = _retainedSlideWidgets.keys.where(
+                    (slideUuid) =>
+                        slideUuid != currentSlideUuid &&
+                        slideUuid != targetSlideUuid,
+                  );
 
-                    return CueSlideGestureAdapter(
-                      enabled: slideUuids.length > 1,
-                      onHorizontalDragStart: handleHorizontalDragStart,
-                      onHorizontalDragUpdate: handleHorizontalDragUpdate,
-                      onHorizontalDragEnd: handleHorizontalDragEnd,
-                      onHorizontalDragCancel: handleHorizontalDragCancel,
-                      child: ClipRect(
-                        child: Stack(
-                          fit: StackFit.expand,
-                          children: [
-                            for (final slideUuid in hiddenSlideUuids)
-                              buildSlideSlot(
-                                slideUuid: slideUuid,
-                                visible: false,
-                                dx: 0,
-                              ),
-                            if (showTransition)
-                              buildSlideSlot(
-                                slideUuid: targetSlideUuid,
-                                visible: true,
-                                dx: slideOffsetFor(transitionDirection),
-                              ),
+                  return CueSlideGestureAdapter(
+                    enabled: slideUuids.length > 1,
+                    onHorizontalDragStart: handleHorizontalDragStart,
+                    onHorizontalDragUpdate: handleHorizontalDragUpdate,
+                    onHorizontalDragEnd: handleHorizontalDragEnd,
+                    onHorizontalDragCancel: handleHorizontalDragCancel,
+                    child: ClipRect(
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          for (final slideUuid in hiddenSlideUuids)
                             buildSlideSlot(
-                              slideUuid: currentSlideUuid,
-                              visible: true,
-                              dx: showTransition ? slideOffsetFor(0) : 0,
+                              slideUuid: slideUuid,
+                              visible: false,
+                              dx: 0,
                             ),
-                          ],
-                        ),
+                          if (showTransition)
+                            buildSlideSlot(
+                              slideUuid: targetSlideUuid,
+                              visible: true,
+                              dx: slideOffsetFor(transitionDirection),
+                            ),
+                          buildSlideSlot(
+                            slideUuid: currentSlideUuid,
+                            visible: true,
+                            dx: showTransition ? slideOffsetFor(0) : 0,
+                          ),
+                        ],
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  );
+                },
               ),
       ),
     );
@@ -588,11 +587,13 @@ class _RetainedSlidePage extends ConsumerWidget {
   const _RetainedSlidePage({
     required this.slideUuid,
     required this.cueUuid,
+    required this.enableTextActions,
     super.key,
   });
 
   final String slideUuid;
   final String cueUuid;
+  final bool enableTextActions;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -606,7 +607,11 @@ class _RetainedSlidePage extends ConsumerWidget {
 
     return RepaintBoundary(
       child: switch (slide) {
-        SongSlide songSlide => SongSlideView(songSlide, cueUuid),
+        SongSlide songSlide => SongSlideView(
+          songSlide,
+          cueUuid,
+          enableTextActions: enableTextActions,
+        ),
         UnknownTypeSlide unknownSlide => UnknownTypeSlideView(unknownSlide),
       },
     );

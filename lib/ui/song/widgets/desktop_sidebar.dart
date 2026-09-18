@@ -7,6 +7,7 @@ import '../state.dart';
 import '../transpose/state.dart';
 import '../transpose/widget.dart';
 import 'report_song_button.dart';
+import 'song_details_helpers.dart';
 
 class DesktopSidebar extends ConsumerWidget {
   const DesktopSidebar({
@@ -51,7 +52,7 @@ class DesktopSidebar extends ConsumerWidget {
               SizedBox(height: 10),
               ReportSongButton(song),
               const Divider(),
-              ...detailsContent,
+              SelectableDetailsList(children: detailsContent),
             ],
           ),
         ),

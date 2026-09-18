@@ -34,11 +34,6 @@ sealed class LyricsParser {
   ///
   /// Used for displaying a preview/subtitle of the song.
   String getFirstLine(String lyrics);
-
-  /// Get plain text content without chords or section markers.
-  ///
-  /// Used for text-only display or export.
-  String getText(String lyrics);
 }
 
 /// OpenSong format parser using the dart_opensong package.
@@ -81,25 +76,6 @@ class OpenSongParser extends LyricsParser {
       return '';
     }
   }
-
-  @override
-  String getText(String lyrics) {
-    return lyrics
-        // Remove chord lines
-        .replaceAll(RegExp(r'(\r?\n|\r)?\..*'), '')
-        // Remove song part lines
-        .replaceAll(RegExp(r'(.*\[|.*\|).*'), '')
-        // Remove starting linebreak
-        .replaceAll(RegExp(r'^(\r?\n|\r)'), '')
-        // Remove multi linebreaks
-        .replaceAll(RegExp(r'(\r?\n|\r){3,}'), '\n\n')
-        // Remove starting space from text lines
-        .replaceAll(RegExp(r'^ +', multiLine: true), '')
-        // Merge multiple spaces
-        .replaceAll(RegExp(r' {2,}'), ' ')
-        // Remove special characters
-        .replaceAll(RegExp(r'_'), '');
-  }
 }
 
 /// Abstract representation of a parsed verse.
@@ -121,6 +97,11 @@ sealed class ParsedVerse {
   /// The parsed content parts of this verse.
   /// The concrete type depends on the format parser.
   List<dynamic> get parts;
+
+  /// User-facing lyric text without chords or markers (lines joined by \n).
+  ///
+  /// Used by the lyrics copy/selection features.
+  String get lyrics;
 }
 
 /// Verse implementation wrapping dart_opensong's Verse type.
@@ -140,6 +121,9 @@ class OpenSongVerse extends ParsedVerse {
 
   @override
   List<os.VersePart> get parts => _verse.parts;
+
+  @override
+  String get lyrics => _verse.lyrics;
 
   /// Access the underlying opensong verse for format-specific operations.
   os.Verse get raw => _verse;

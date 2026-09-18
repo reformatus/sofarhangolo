@@ -58,10 +58,19 @@ class SongSlideTile extends StatelessWidget {
 }
 
 class SongSlideView extends ConsumerWidget {
-  const SongSlideView(this.songSlide, this.cueId, {super.key});
+  const SongSlideView(
+    this.songSlide,
+    this.cueId, {
+    this.enableTextActions = true,
+    super.key,
+  });
 
   final SongSlide songSlide;
   final String? cueId;
+
+  /// Whether lyrics slides install the text actions (menu, selection dialog,
+  /// hover highlight).
+  final bool enableTextActions;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -79,7 +88,7 @@ class SongSlideView extends ConsumerWidget {
         currentSlide.song,
         songSlide: currentSlide,
         forceSingleColumnLayout: true,
-        selectable: false,
+        textActionsEnabled: enableTextActions,
       ),
     };
   }

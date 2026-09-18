@@ -72,6 +72,9 @@ class ShareDialog extends ConsumerStatefulWidget {
 
 class _ShareDialogState extends ConsumerState<ShareDialog> {
   bool _copySuccess = false;
+  // TODO: expose the original/raw OpenSong lyrics format here (e.g. a
+  // "Eredeti formátum másolása" action for power users). Decided 2026-09-18:
+  // lyrics copy actions use the user-friendly format instead.
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -324,24 +327,27 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
           SizedBox(
             width: double.infinity,
             child: TextButton(
-              onPressed: () => copyLyricsText(song),
+              onPressed: () => shareLyricsText(song),
               child: const Text('Dalszöveg'),
             ),
           ),
         );
-      }
-
-      // TODO copy transposed
-      if (song.hasChords) {
+        // The raw source doubles as the original-format export; the label
+        // notes whether it includes chords.
         shareWidgets.add(
           SizedBox(
             width: double.infinity,
             child: TextButton(
-              onPressed: () => copyLyrics(song),
-              child: const Text('Akkordos dalszöveg'),
+              onPressed: () => shareRawLyrics(song),
+              child: Text(
+                song.hasChords
+                    ? 'Dalszöveg (eredeti formátum akkordokkal)'
+                    : 'Dalszöveg (eredeti formátum)',
+              ),
             ),
           ),
         );
+        // TODO copy transposed
       }
     }
 

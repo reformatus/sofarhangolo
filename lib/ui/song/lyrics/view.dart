@@ -1,6 +1,7 @@
 import 'package:chord_transposer/chord_transposer.dart';
 import 'package:dart_opensong/dart_opensong.dart' as os;
 import 'package:fading_edge_scrollview/fading_edge_scrollview.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:sofarhangolo/data/song/extensions.dart';
@@ -15,13 +16,16 @@ import '../../../services/song/verse_tag_pretty.dart';
 import '../../common/error/card.dart';
 import '../../cue/session/session_provider.dart';
 import '../transpose/state.dart';
+import 'text_actions/lyrics_actions_menu.dart';
+import 'text_actions/lyrics_selection_dialog.dart';
+import 'text_actions/lyrics_text_actions.dart';
 
 class LyricsView extends ConsumerWidget {
   LyricsView(
     this.song, {
     this.songSlide,
     this.forceSingleColumnLayout = false,
-    this.selectable = true,
+    this.textActionsEnabled = true,
     super.key,
   });
 
@@ -30,10 +34,10 @@ class LyricsView extends ConsumerWidget {
   // TODO this is a stopgap for in-cue scroll consistency. We have to redesign lyrics view so that it scrolls vertically, or cues to scroll vertically.
   final bool forceSingleColumnLayout;
 
-  /// Wrap lyrics in a [SelectionArea]. Disabled inside the cue slide view,
-  /// where an ancestor selection area must stay above the swipe surface so
-  /// horizontal drags keep navigating slides instead of selecting text.
-  final bool selectable;
+  /// Whether the lyrics text actions (long-press context menu, click-to-select
+  /// dialog, hover highlight) are installed. Disabled in the presenter view,
+  /// where stray taps must not open dialogs.
+  final bool textActionsEnabled;
 
   final ChordTransposer transposer = ChordTransposer(
     notation: NoteNotation.germanWithAccidentals, // TODO configurable
@@ -100,13 +104,14 @@ class LyricsView extends ConsumerWidget {
                         style: TextStyle(fontSize: lyricsViewStyle.chordsSize),
                       ),
                     ),
-                  ...verses.map(
-                    (verse) => SizedBox(
+                  ...verses.indexed.map(
+                    (entry) => SizedBox(
                       width: cardWidth,
                       child: VerseCard(
                         song,
-                        verse as OpenSongVerse,
+                        entry.$2 as OpenSongVerse,
                         transpose: transpose,
+                        verseIndex: entry.$1,
                       ),
                     ),
                   ),
@@ -115,8 +120,11 @@ class LyricsView extends ConsumerWidget {
             ),
           );
 
-          if (!selectable) return scrollable;
-          return SelectionArea(child: scrollable);
+          return LyricsTextActions(
+            song: song,
+            enabled: textActionsEnabled,
+            child: scrollable,
+          );
         },
       ),
     );
@@ -124,11 +132,20 @@ class LyricsView extends ConsumerWidget {
 }
 
 class VerseCard extends ConsumerStatefulWidget {
-  const VerseCard(this.song, this.verse, {required this.transpose, super.key});
+  const VerseCard(
+    this.song,
+    this.verse, {
+    required this.transpose,
+    required this.verseIndex,
+    super.key,
+  });
 
   final OpenSongVerse verse;
   final Song song;
   final SongTranspose transpose;
+
+  /// Index of [verse] in the parsed verse list, used for preselection.
+  final int verseIndex;
 
   @override
   ConsumerState<VerseCard> createState() => _VerseCardState();
@@ -136,6 +153,7 @@ class VerseCard extends ConsumerStatefulWidget {
 
 class _VerseCardState extends ConsumerState<VerseCard> {
   late final ScrollController cardController;
+  bool _hovered = false;
 
   @override
   void initState() {
@@ -147,83 +165,121 @@ class _VerseCardState extends ConsumerState<VerseCard> {
   Widget build(BuildContext context) {
     final lyricsViewStyle = ref.watch(lyricsViewStylePreferencesProvider);
 
-    return FadingEdgeScrollView.fromSingleChildScrollView(
-      child: SingleChildScrollView(
-        controller: cardController,
-        child: Padding(
-          padding: EdgeInsets.only(top: 5, left: 5, right: 5),
-          child: Card(
-            elevation: 0,
-            color: Theme.of(context).colorScheme.onPrimary,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (widget.verse.tag.isNotEmpty)
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(5),
-                        bottomRight: Radius.circular(5),
+    return MouseRegion(
+      cursor: SystemMouseCursors.text,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.deferToChild,
+        // Only mouse clicks open the dialog; touch and stylus users get the
+        // long-press context menu instead.
+        onTapUp: (details) {
+          if (details.kind == PointerDeviceKind.mouse) {
+            showLyricsSelectionDialog(
+              context,
+              song: widget.song,
+              initialVerseIndex: widget.verseIndex,
+            );
+          }
+        },
+        onSecondaryTapUp: (details) => showLyricsTextActionsMenu(
+          context,
+          song: widget.song,
+          verse: widget.verse,
+          verseIndex: widget.verseIndex,
+          position: details.globalPosition,
+        ),
+        onLongPressStart: (details) => showLyricsTextActionsMenu(
+          context,
+          song: widget.song,
+          verse: widget.verse,
+          verseIndex: widget.verseIndex,
+          position: details.globalPosition,
+        ),
+        child: FadingEdgeScrollView.fromSingleChildScrollView(
+          child: SingleChildScrollView(
+            controller: cardController,
+            child: Padding(
+              padding: EdgeInsets.only(top: 5, left: 5, right: 5),
+              child: Card(
+                elevation: 0,
+                color: Theme.of(context).colorScheme.onPrimary,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.verse.tag.isNotEmpty)
+                      Container(
+                        padding: EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.only(
+                            topLeft: Radius.circular(5),
+                            bottomRight: Radius.circular(5),
+                          ),
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        child: Text(
+                          getPrettyVerseTagFrom(
+                            widget.verse.type,
+                            widget.verse.index,
+                          ),
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onPrimary,
+                            fontSize: lyricsViewStyle.verseTagSize,
+                          ),
+                        ),
                       ),
-                      color: Theme.of(context).colorScheme.primary,
+                    Padding(
+                      padding: EdgeInsets.only(
+                        top: 5,
+                        left: 10,
+                        right: 10,
+                        bottom: 10,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: widget.verse.raw.parts
+                            .map(
+                              (versePart) => switch (versePart) {
+                                os.VerseLine(:final segments) => Wrap(
+                                  alignment: WrapAlignment.start,
+                                  crossAxisAlignment: WrapCrossAlignment.start,
+                                  children: segments
+                                      .map(
+                                        (segment) => LyricsSegment(
+                                          song: widget.song,
+                                          transpose: widget.transpose,
+                                          segments: segments,
+                                          segment: segment,
+                                          highlightLyrics: _hovered,
+                                        ),
+                                      )
+                                      .toList(),
+                                ),
+                                os.CommentLine(:final comment) => Text(
+                                  comment,
+                                  style: TextStyle(fontStyle: FontStyle.italic),
+                                ),
+                                os.NewSlide() => Divider(),
+                                os.EmptyLine() => Text(''),
+                                os.UnsupportedLine(:final original) =>
+                                  LErrorCard(
+                                    type: LErrorType.info,
+                                    title: 'Ismeretlen sortípus',
+                                    message: original,
+                                    icon: Icons.question_mark,
+                                  ),
+                              },
+                            )
+                            .toList(),
+                      ),
                     ),
-                    child: Text(
-                      getPrettyVerseTagFrom(
-                        widget.verse.type,
-                        widget.verse.index,
-                      ),
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.onPrimary,
-                        fontSize: lyricsViewStyle.verseTagSize,
-                      ),
-                    ),
-                  ),
-                Padding(
-                  padding: EdgeInsets.only(
-                    top: 5,
-                    left: 10,
-                    right: 10,
-                    bottom: 10,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: widget.verse.raw.parts
-                        .map(
-                          (versePart) => switch (versePart) {
-                            os.VerseLine(:final segments) => Wrap(
-                              alignment: WrapAlignment.start,
-                              crossAxisAlignment: WrapCrossAlignment.start,
-                              children: segments
-                                  .map(
-                                    (segment) => LyricsSegment(
-                                      song: widget.song,
-                                      transpose: widget.transpose,
-                                      segments: segments,
-                                      segment: segment,
-                                    ),
-                                  )
-                                  .toList(),
-                            ),
-                            os.CommentLine(:final comment) => Text(
-                              comment,
-                              style: TextStyle(fontStyle: FontStyle.italic),
-                            ),
-                            os.NewSlide() => Divider(),
-                            os.EmptyLine() => Text(''),
-                            os.UnsupportedLine(:final original) => LErrorCard(
-                              type: LErrorType.info,
-                              title: 'Ismeretlen sortípus',
-                              message: original,
-                              icon: Icons.question_mark,
-                            ),
-                          },
-                        )
-                        .toList(),
-                  ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
@@ -239,12 +295,16 @@ class LyricsSegment extends ConsumerWidget {
     required this.transpose,
     required this.segments,
     required this.segment,
+    this.highlightLyrics = false,
   });
 
   final List<os.VerseLineSegment> segments;
   final os.VerseLineSegment segment;
   final Song song;
   final SongTranspose transpose;
+
+  /// Draws a dotted underline under the lyric line (hover affordance).
+  final bool highlightLyrics;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -310,7 +370,13 @@ class LyricsSegment extends ConsumerWidget {
                     constraints: BoxConstraints(maxWidth: constraints.maxWidth),
                     child: Text(
                       segment.lyrics,
-                      style: TextStyle(fontSize: lyricsViewStyle.lyricsSize),
+                      style: TextStyle(
+                        fontSize: lyricsViewStyle.lyricsSize,
+                        decoration: highlightLyrics
+                            ? TextDecoration.underline
+                            : null,
+                        decorationStyle: TextDecorationStyle.dotted,
+                      ),
                     ),
                   )
                 else
