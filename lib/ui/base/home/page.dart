@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../common/log/button.dart';
+import '../../../services/preferences/providers/general.dart';
 import 'parts/banks/bank_chooser.dart';
 import 'parts/new_version_widget.dart';
 import 'parts/preferences/dialog.dart';
@@ -18,9 +19,34 @@ class HomePage extends ConsumerStatefulWidget {
 class _HomePageState extends ConsumerState<HomePage> {
   @override
   Widget build(BuildContext context) {
+    final testingMode = ref.watch(generalPreferencesProvider).testingMode;
+
     return Scaffold(
       appBar: AppBar(
-        title: SelectableText('Sófár Hangoló'),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SelectableText('Sófár Hangoló'),
+            if (testingMode) ...[
+              SizedBox(width: 10),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.secondaryContainer,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  child: Text(
+                    'Teszt mód',
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
         actions: [
           LogButton(),
           IconButton(

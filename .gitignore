@@ -109,3 +109,4 @@ google-services.json
 
 ### Android Patch ###
 gen-external-apklibs
+.vscode/settings.json

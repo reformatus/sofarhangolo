@@ -238,6 +238,19 @@ class _SettingsDialogState extends ConsumerState<PreferencesDialog> {
                           max: 700,
                         ),
                         Divider(height: 45, thickness: 2),
+                        sectionTitle('Kísérleti'),
+                        CheckboxListTile(
+                          value: general.testingMode,
+                          onChanged: (newValue) => ref
+                              .read(generalPreferencesProvider.notifier)
+                              .setTestingMode(newValue ?? false),
+                          title: Text('Teszt mód'),
+                          subtitle: Text(
+                            'Teszt daltárlistát és GitHub teszt kiadásokat használ.',
+                          ),
+                          contentPadding: EdgeInsets.zero,
+                        ),
+                        Divider(height: 45, thickness: 2),
                         TextButton.icon(
                           onPressed: () => showLyricAboutDialog(context),
                           label: Text('Névjegy'),

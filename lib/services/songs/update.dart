@@ -4,6 +4,7 @@ import '../../data/database.dart';
 import '../../data/log/logger.dart';
 import '../bank/update.dart';
 import '../http/dio_provider.dart';
+import '../preferences/providers/general.dart';
 import '../task/task_queue.dart';
 import 'bank_song_update_task.dart';
 
@@ -90,7 +91,11 @@ class BankSongUpdateScheduler extends Notifier<AsyncValue<void>> {
 
     try {
       final dio = ref.read(dioProvider);
-      final availableBankUuids = await updateBanks(dio);
+      final testingMode = ref.read(generalPreferencesProvider).testingMode;
+      final availableBankUuids = await updateBanks(
+        dio,
+        testingMode: testingMode,
+      );
 
       final enabledBanks = await (db.select(
         db.banks,

@@ -9,11 +9,15 @@ import '../../data/log/logger.dart';
 import '../error/app_error.dart';
 import 'from_uuid.dart';
 
-Future<Set<String>> updateBanks(Dio dio) async {
+Uri _bankIndexUri({required bool testingMode}) {
+  return Uri.parse('${appConfig.apiRoot}/banks/');
+}
+
+Future<Set<String>> updateBanks(Dio dio, {required bool testingMode}) async {
   late List protoBanks;
   try {
     protoBanks = (await dio.getUri<List>(
-      Uri.parse('${appConfig.apiRoot}/banks/'),
+      _bankIndexUri(testingMode: testingMode),
     )).data!;
   } catch (e, s) {
     throw AppError.from(
@@ -31,7 +35,8 @@ Future<Set<String>> updateBanks(Dio dio) async {
 
     try {
       details = (await dio.getUri<Map>(
-        Uri.parse('${protoBank['api']}/about/'),
+        // Uri.parse('${protoBank['api']}/about/'),
+        Uri.parse('${(protoBank['api'] as String).replaceAll('/v2', '')}')
       )).data!;
     } catch (e, s) {
       log.warning(

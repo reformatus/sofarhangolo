@@ -89,10 +89,11 @@ class _LoadingPageState extends ConsumerState<LoadingPage> {
   void initState() {
     super.initState();
 
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(() async {
+      await preferenceLoader;
       if (!mounted) return;
       _requestInitialRefresh();
-    });
+    }());
 
     ref.listenManual(hasEverUpdatedAnythingProvider, (previous, next) {
       _checkAndNavigateIfReady();

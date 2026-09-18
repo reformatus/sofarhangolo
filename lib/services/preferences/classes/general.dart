@@ -13,11 +13,13 @@ class GeneralPreferencesClass
   ThemeMode appBrightness;
   ThemeMode sheetBrightness;
   bool oledBlackBackground;
+  bool testingMode;
 
   GeneralPreferencesClass({
     required this.appBrightness,
     required this.sheetBrightness,
     required this.oledBlackBackground,
+    required this.testingMode,
   }) : super('generalPreferences');
 
   @override
@@ -28,6 +30,7 @@ class GeneralPreferencesClass
       sheetBrightness:
           ThemeMode.values[json?['sheetBrightness'] ?? ThemeMode.light.index],
       oledBlackBackground: json?['oledBlackBackground'] ?? false,
+      testingMode: json?['testingMode'] ?? false,
     );
   }
 
@@ -37,6 +40,7 @@ class GeneralPreferencesClass
       'appBrightness': appBrightness.index,
       'sheetBrightness': sheetBrightness.index,
       'oledBlackBackground': oledBlackBackground,
+      'testingMode': testingMode,
     };
   }
 }
