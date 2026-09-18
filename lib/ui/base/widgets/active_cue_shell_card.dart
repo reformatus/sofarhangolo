@@ -580,46 +580,44 @@ class _CuePanelAppBar extends StatelessWidget implements PreferredSizeWidget {
     final theme = Theme.of(context);
     final cueSubtitle = _cueSubtitleOf(session);
     final hasSubtitle = cueSubtitle.isNotEmpty;
-    return SelectionArea(
-      child: AppBar(
-        backgroundColor: backgroundColor,
-        title: hasSubtitle
-            ? Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    session.cue.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.appBarTheme.titleTextStyle,
-                  ),
-                  Text(
-                    cueSubtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall,
-                  ),
-                ],
-              )
-            : Text(session.cue.title),
-        automaticallyImplyLeading: false,
-        leading: const Icon(Icons.list),
-        actions: [
-          IconButton.filledTonal(
-            tooltip: 'Lista szerkesztése',
-            onPressed: onOpenCueEditor,
-            icon: const Icon(Icons.open_in_new),
+    return AppBar(
+      backgroundColor: backgroundColor,
+      title: hasSubtitle
+          ? Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  session.cue.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.appBarTheme.titleTextStyle,
+                ),
+                Text(
+                  cueSubtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            )
+          : Text(session.cue.title),
+      automaticallyImplyLeading: false,
+      leading: const Icon(Icons.list),
+      actions: [
+        IconButton.filledTonal(
+          tooltip: 'Lista szerkesztése',
+          onPressed: onOpenCueEditor,
+          icon: const Icon(Icons.open_in_new),
+        ),
+        if (onClose != null)
+          IconButton(
+            tooltip: 'Bezárás',
+            onPressed: onClose,
+            icon: const Icon(Icons.keyboard_arrow_down),
           ),
-          if (onClose != null)
-            IconButton(
-              tooltip: 'Bezárás',
-              onPressed: onClose,
-              icon: const Icon(Icons.keyboard_arrow_down),
-            ),
-          const SizedBox(width: 4),
-        ],
-      ),
+        const SizedBox(width: 4),
+      ],
     );
   }
 }

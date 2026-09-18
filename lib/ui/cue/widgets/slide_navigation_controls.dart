@@ -34,14 +34,12 @@ class CueSlideNavigationControls extends ConsumerWidget {
           tooltip: 'Következő dia',
         ),
         const SizedBox(width: 12),
-        SelectionArea(
-          child: Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.end,
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.end,
+          style: Theme.of(context).textTheme.bodyMedium,
         ),
       ],
     );

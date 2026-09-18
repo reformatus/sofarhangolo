@@ -37,7 +37,7 @@ class SongPageAppBar extends ConsumerWidget implements PreferredSizeWidget {
         icon: const Icon(Icons.arrow_back),
         onPressed: () => Navigator.of(context).pop(),
       ),
-      title: SelectableText(song.title),
+      title: Text(song.title),
       actions: [
         if (isDesktop)
           ViewChooser(song: song, songSlide: null, useDropdown: false),
