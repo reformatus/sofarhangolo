@@ -1,5 +1,3 @@
-  
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sofarhangolo/data/database.dart';
@@ -29,7 +27,7 @@ void main() {
     // I've commented out the offending tests, as it seems difficult to investigate the bug without intimate knowledge of the cue session system
     // And so we can release the unrelated essential features
 
-/*     testWidgets(
+    testWidgets(
       'successive swipes update the rest of the cue UI without rebuilding the active slide tree',
       (tester) async {
         final cue = await insertCueHarnessCue(
@@ -80,8 +78,8 @@ void main() {
         expect(cueHarness.session.currentSlideUuid, 'slide-3');
         expect(find.text('Gamma line'), findsOneWidget);
       },
-    ); */
-/*       testWidgets(
+    );
+    testWidgets(
       'partial horizontal drag previews the adjacent slide before release',
       (tester) async {
         final cue = await insertCueHarnessCue(
@@ -125,9 +123,9 @@ void main() {
 
         expect(cueHarness.session.currentSlideUuid, 'slide-1');
       },
-    ); */
+    );
 
-    /* testWidgets('dragging reuses retained slide trees after first warm-up', (
+    testWidgets('dragging reuses retained slide trees after first warm-up', (
       tester,
     ) async {
       final buildCounts = <String, int>{};
@@ -193,9 +191,9 @@ void main() {
 
       await gesture.up();
       await tester.pumpAndSettle();
-    }); */
+    });
 
-    /* testWidgets(
+    testWidgets(
       'full-width drag commits once and ignores further movement in the same gesture',
       (tester) async {
         final cue = await insertCueHarnessCue(
@@ -251,9 +249,9 @@ void main() {
         expect(cueHarness.session.currentSlideUuid, 'slide-2');
         expect(find.text('Beta line'), findsOneWidget);
       },
-    ); */
+    );
 
-    /* testWidgets(
+    testWidgets(
       'changing drag direction can cross through zero and preview the opposite neighbor',
       (tester) async {
         final cue = await insertCueHarnessCue(
@@ -317,7 +315,7 @@ void main() {
 
         expect(cueHarness.session.currentSlideUuid, 'slide-2');
       },
-    ); */
+    );
 
     testWidgets(
       'vertical drags stay on the current slide so cue lyrics can scroll',
@@ -358,7 +356,7 @@ void main() {
       },
     );
 
-    /* testWidgets('two-finger gestures do not trigger cue slide navigation', (
+    testWidgets('two-finger gestures do not trigger cue slide navigation', (
       tester,
     ) async {
       configureCueHarnessSvgResponse(harness, svgLabel: 'Cue SVG');
@@ -409,7 +407,7 @@ void main() {
 
       expect(cueHarness.session.currentSlideUuid, 'slide-1');
       expect(find.text('current:slide-1'), findsOneWidget);
-    }); */
+    });
 
     testWidgets('outside trigger animates when advancing', (tester) async {
       ({
@@ -475,7 +473,7 @@ void main() {
       expect(cueHarness.session.currentSlideUuid, 'slide-2');
     });
 
-    /* testWidgets('releasing an advancing drag continues the forward animation', (
+    testWidgets('releasing an advancing drag continues the forward animation', (
       tester,
     ) async {
       ({
@@ -552,7 +550,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(cueHarness.session.currentSlideUuid, 'slide-2');
-    }); */
+    });
 
     testWidgets(
       'outside jump buttons move the active slide without rebuilding the slide tree',

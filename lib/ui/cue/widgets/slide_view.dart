@@ -499,49 +499,56 @@ class _SlideViewState extends ConsumerState<SlideView>
               )
             : currentSlideUuid == null
             ? const SizedBox.shrink()
-            : LayoutBuilder(
-                builder: (context, constraints) {
-                  dragViewportWidth = constraints.maxWidth;
-                  final targetSlideUuid = transitionTargetSlideUuid;
-                  final showTransition = targetSlideUuid != null;
-                  final hiddenSlideUuids = _retainedSlideWidgets.keys.where(
-                    (slideUuid) =>
-                        slideUuid != currentSlideUuid &&
-                        slideUuid != targetSlideUuid,
-                  );
+            : // SelectionArea sits ABOVE the swipe surface so the adapter's
+              // horizontal drag recognizer joins the gesture arena first and
+              // swipes navigate slides on every platform. Below it (e.g. on
+              // the lyrics) SelectableRegion eagerly claims horizontal drags
+              // on all non-iOS platforms and navigation would never fire.
+              SelectionArea(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    dragViewportWidth = constraints.maxWidth;
+                    final targetSlideUuid = transitionTargetSlideUuid;
+                    final showTransition = targetSlideUuid != null;
+                    final hiddenSlideUuids = _retainedSlideWidgets.keys.where(
+                      (slideUuid) =>
+                          slideUuid != currentSlideUuid &&
+                          slideUuid != targetSlideUuid,
+                    );
 
-                  return CueSlideGestureAdapter(
-                    enabled: slideUuids.length > 1,
-                    onHorizontalDragStart: handleHorizontalDragStart,
-                    onHorizontalDragUpdate: handleHorizontalDragUpdate,
-                    onHorizontalDragEnd: handleHorizontalDragEnd,
-                    onHorizontalDragCancel: handleHorizontalDragCancel,
-                    child: ClipRect(
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          for (final slideUuid in hiddenSlideUuids)
+                    return CueSlideGestureAdapter(
+                      enabled: slideUuids.length > 1,
+                      onHorizontalDragStart: handleHorizontalDragStart,
+                      onHorizontalDragUpdate: handleHorizontalDragUpdate,
+                      onHorizontalDragEnd: handleHorizontalDragEnd,
+                      onHorizontalDragCancel: handleHorizontalDragCancel,
+                      child: ClipRect(
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            for (final slideUuid in hiddenSlideUuids)
+                              buildSlideSlot(
+                                slideUuid: slideUuid,
+                                visible: false,
+                                dx: 0,
+                              ),
+                            if (showTransition)
+                              buildSlideSlot(
+                                slideUuid: targetSlideUuid,
+                                visible: true,
+                                dx: slideOffsetFor(transitionDirection),
+                              ),
                             buildSlideSlot(
-                              slideUuid: slideUuid,
-                              visible: false,
-                              dx: 0,
-                            ),
-                          if (showTransition)
-                            buildSlideSlot(
-                              slideUuid: targetSlideUuid,
+                              slideUuid: currentSlideUuid,
                               visible: true,
-                              dx: slideOffsetFor(transitionDirection),
+                              dx: showTransition ? slideOffsetFor(0) : 0,
                             ),
-                          buildSlideSlot(
-                            slideUuid: currentSlideUuid,
-                            visible: true,
-                            dx: showTransition ? slideOffsetFor(0) : 0,
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ),
-                  );
-                },
+                    );
+                  },
+                ),
               ),
       ),
     );

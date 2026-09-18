@@ -79,6 +79,7 @@ class SongSlideView extends ConsumerWidget {
         currentSlide.song,
         songSlide: currentSlide,
         forceSingleColumnLayout: true,
+        selectable: false,
       ),
     };
   }

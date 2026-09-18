@@ -21,6 +21,7 @@ class LyricsView extends ConsumerWidget {
     this.song, {
     this.songSlide,
     this.forceSingleColumnLayout = false,
+    this.selectable = true,
     super.key,
   });
 
@@ -28,6 +29,11 @@ class LyricsView extends ConsumerWidget {
   final SongSlide? songSlide;
   // TODO this is a stopgap for in-cue scroll consistency. We have to redesign lyrics view so that it scrolls vertically, or cues to scroll vertically.
   final bool forceSingleColumnLayout;
+
+  /// Wrap lyrics in a [SelectionArea]. Disabled inside the cue slide view,
+  /// where an ancestor selection area must stay above the swipe surface so
+  /// horizontal drags keep navigating slides instead of selecting text.
+  final bool selectable;
 
   final ChordTransposer transposer = ChordTransposer(
     notation: NoteNotation.germanWithAccidentals, // TODO configurable
@@ -77,41 +83,40 @@ class LyricsView extends ConsumerWidget {
           final parser = LyricsParser.forFormat(song.lyricsFormat);
           final verses = parser.parse(song.lyrics!);
 
-          return SelectionArea(
-            child: SingleChildScrollView(
-              scrollDirection: crossAxisCount > 1
-                  ? Axis.horizontal
-                  : Axis.vertical,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minWidth: constraints.maxWidth),
-                child: Wrap(
-                  direction: Axis.vertical,
-                  children: [
-                    if (transpose.capo != 0)
-                      Padding(
-                        padding: const EdgeInsets.all(8.0),
-                        child: Text(
-                          'Capo: ${transpose.capo}',
-                          style: TextStyle(
-                            fontSize: lyricsViewStyle.chordsSize,
-                          ),
-                        ),
-                      ),
-                    ...verses.map(
-                      (verse) => SizedBox(
-                        width: cardWidth,
-                        child: VerseCard(
-                          song,
-                          verse as OpenSongVerse,
-                          transpose: transpose,
-                        ),
+          final scrollable = SingleChildScrollView(
+            scrollDirection: crossAxisCount > 1
+                ? Axis.horizontal
+                : Axis.vertical,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minWidth: constraints.maxWidth),
+              child: Wrap(
+                direction: Axis.vertical,
+                children: [
+                  if (transpose.capo != 0)
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Text(
+                        'Capo: ${transpose.capo}',
+                        style: TextStyle(fontSize: lyricsViewStyle.chordsSize),
                       ),
                     ),
-                  ],
-                ),
+                  ...verses.map(
+                    (verse) => SizedBox(
+                      width: cardWidth,
+                      child: VerseCard(
+                        song,
+                        verse as OpenSongVerse,
+                        transpose: transpose,
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           );
+
+          if (!selectable) return scrollable;
+          return SelectionArea(child: scrollable);
         },
       ),
     );
