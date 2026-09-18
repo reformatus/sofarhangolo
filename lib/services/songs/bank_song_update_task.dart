@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:queue/queue.dart';
-import 'package:sofarhangolo/data/song/extensions.dart';
 
 import '../../data/bank/bank.dart';
 import '../../data/database.dart';
@@ -13,6 +12,7 @@ import '../bank/bank_api.dart';
 import '../bank/bank_updated.dart';
 import '../task/background_task.dart';
 import 'delete_for_song.dart';
+import 'variation_resolver.dart';
 
 class BankSongUpdateTask extends BackgroundTask {
   BankSongUpdateTask({required this.bank, required this.dio});
@@ -303,78 +303,73 @@ class BankSongUpdateTask extends BackgroundTask {
         }
 
         await persistBankState();
-        await setAsUpdatedNow(bank);
       }
-
-      // Check circular dependency with this array
-      List<String> variationChain = [];
 
       // Copy values from variations
-      Future<Song?> updateRecursive(Song song) async {
-        if (variationChain.contains(song.uuid)) {
-          throw Exception(
-            'Circular dependency in variation chain! Found at song: ${song.title} (uuid: ${song.uuid})',
-          );
-        }
-        variationChain.add(song.uuid);
-        Song? parent;
-        if (song.variationOf != null) {
-          parent =
-              await (db.songs.select()..where(
-                    (songRecord) => songRecord.uuid.equals(song.variationOf!),
-                  ))
-                  .getSingleOrNull();
-        }
-        if (parent == null) {
-          if (toUpdate.any((protoSong) => protoSong.uuid == song.uuid)) {
-            return song;
-          }
-        } else {
-          final updatedParent = await updateRecursive(parent);
-          if (updatedParent != null) {
-            final originalSong = (await bankApi.getDetailsForSongs(bank, [
-              song.uuid,
-            ]))[0];
-            song = Song(
-              contentMap: updatedParent.contentMap.map((key, value) {
-                final orginalValue = originalSong.contentMap[key];
-                if (orginalValue != null && orginalValue.isNotEmpty) {
-                  return MapEntry(key, orginalValue);
-                } else {
-                  return MapEntry(key, value);
-                }
-              }),
-              keyField: updatedParent.keyField.isNotEmpty
-                  ? originalSong.keyField
-                  : updatedParent.keyField,
-              title: originalSong.title,
-              uuid: originalSong.uuid,
-              lyrics: originalSong.hasLyrics
-                  ? originalSong.lyrics
-                  : updatedParent.lyrics,
-              lyricsFormat: originalSong.lyricsFormat,
-              sourceBank: originalSong.sourceBank,
-              variationOf: originalSong.variationOf,
-            );
-            upsertSong(song);
-            return song;
-          } else {
-            if (toUpdate.any((protoSong) => protoSong.uuid == song.uuid)) {
-              return song;
-            }
-          }
-        }
-        return null;
+      final variationRoots =
+          await (db.songs.select()
+                ..where((song) => song.variationOf.isNotNull()))
+              .get();
+
+      Future<Song?> lookupParent(String uuid) {
+        return (db.songs.select()
+              ..where((songRecord) => songRecord.uuid.equals(uuid)))
+            .getSingleOrNull();
       }
 
-      // Process variations
-      for (var song
-          in await (db.songs.select()
-                ..where((song) => song.variationOf.isNotNull()))
-              .get()) {
-        variationChain.clear();
-        await updateRecursive(song);
+      for (final song in variationRoots) {
+        try {
+          final chain = await resolveVariationChain(
+            song: song,
+            lookupParent: lookupParent,
+          );
+          if (chain == null) {
+            log.warning(
+              'Cirkuláris vagy túl mély variációlánc, kihagyva: ${song.uuid}',
+            );
+            continue;
+          }
+
+          final updatedAncestorIndex = chain.lastIndexWhere(
+            (chainSong) =>
+                toUpdate.any((protoSong) => protoSong.uuid == chainSong.uuid),
+          );
+          if (updatedAncestorIndex < 0) continue;
+
+          var updatedAncestor = chain[updatedAncestorIndex];
+          for (var i = updatedAncestorIndex - 1; i >= 0; i--) {
+            final chainSong = chain[i];
+            final details = await bankApi.getDetailsForSongs(bank, [
+              chainSong.uuid,
+            ]);
+            if (details.isEmpty) {
+              log.warning(
+                '"${chainSong.title}" variáció-összevonása kihagyva, mert a válaszban nem szerepelt a dal.',
+                'UUID: ${chainSong.uuid}',
+              );
+              break;
+            }
+
+            final mergedSong = resolveVariation(
+              own: details.first,
+              parent: updatedAncestor,
+            );
+            await upsertSong(mergedSong);
+            updatedAncestor = mergedSong;
+          }
+        } catch (error, stackTrace) {
+          hadErrors = true;
+          _songsWithErrors++;
+          notifyListeners();
+          log.warning(
+            'Nem sikerült a "${song.title}" dal variációit frissíteni',
+            'UUID: ${song.uuid}, hiba: $error',
+            stackTrace,
+          );
+        }
       }
+
+      await setAsUpdatedNow(bank);
 
       if (!hadErrors) {
         log.info('Minden dal frissítve: ${bank.name}');
