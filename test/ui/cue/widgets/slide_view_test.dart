@@ -23,9 +23,6 @@ void main() {
       harness.dispose();
       await testDb.close();
     });
-    // TODO since flutter update tests expecting sliding to next cue fail, but it works manually
-    // I've commented out the offending tests, as it seems difficult to investigate the bug without intimate knowledge of the cue session system
-    // And so we can release the unrelated essential features
 
     testWidgets(
       'successive swipes update the rest of the cue UI without rebuilding the active slide tree',
