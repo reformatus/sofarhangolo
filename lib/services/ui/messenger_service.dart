@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'messenger_service.g.dart';
@@ -37,6 +38,12 @@ class MessengerService {
         state?.hideCurrentSnackBar(reason: SnackBarClosedReason.timeout);
       });
     }
+  }
+
+  /// Copies [text] to the clipboard and confirms with a snackbar.
+  Future<void> copyToClipboard(String text) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    showSnackBar(const SnackBar(content: Text('Vágólapra másolva')));
   }
 
   void clearBanners() {

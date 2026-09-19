@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 class CueSlideGestureAdapter extends StatefulWidget {
@@ -93,6 +94,11 @@ class _CueSlideGestureAdapterState extends State<CueSlideGestureAdapter> {
       onPointerCancel: _handlePointerFinished,
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
+        // Report the pointer-down position as the drag origin so the delta
+        // accumulated while the gesture arena resolves (e.g. against an
+        // ancestor SelectionArea) is delivered as the first drag update
+        // instead of being discarded with DragStartBehavior.start.
+        dragStartBehavior: DragStartBehavior.down,
         onHorizontalDragStart: _handleHorizontalDragStart,
         onHorizontalDragUpdate: _handleHorizontalDragUpdate,
         onHorizontalDragEnd: _handleHorizontalDragEnd,

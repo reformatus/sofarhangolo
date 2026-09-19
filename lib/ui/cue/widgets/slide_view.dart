@@ -24,7 +24,12 @@ SlideViewBuildLogger? debugSlideViewBuildLogger;
 SlideViewTransitionLogger? debugSlideViewTransitionLogger;
 
 class SlideView extends ConsumerStatefulWidget {
-  const SlideView({super.key});
+  const SlideView({this.enableTextActions = true, super.key});
+
+  /// Passed through to lyrics slides: whether the lyrics text actions (menu,
+  /// selection dialog, hover highlight) are installed. Disabled in the
+  /// presenter view, where stray taps must not open dialogs.
+  final bool enableTextActions;
 
   @override
   ConsumerState<SlideView> createState() => _SlideViewState();
@@ -169,6 +174,7 @@ class _SlideViewState extends ConsumerState<SlideView>
         key: ValueKey('retained-slide/$cueUuid/$slideUuid'),
         slideUuid: slideUuid,
         cueUuid: cueUuid,
+        enableTextActions: widget.enableTextActions,
       ),
     );
   }
@@ -581,11 +587,13 @@ class _RetainedSlidePage extends ConsumerWidget {
   const _RetainedSlidePage({
     required this.slideUuid,
     required this.cueUuid,
+    required this.enableTextActions,
     super.key,
   });
 
   final String slideUuid;
   final String cueUuid;
+  final bool enableTextActions;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -599,7 +607,11 @@ class _RetainedSlidePage extends ConsumerWidget {
 
     return RepaintBoundary(
       child: switch (slide) {
-        SongSlide songSlide => SongSlideView(songSlide, cueUuid),
+        SongSlide songSlide => SongSlideView(
+          songSlide,
+          cueUuid,
+          enableTextActions: enableTextActions,
+        ),
         UnknownTypeSlide unknownSlide => UnknownTypeSlideView(unknownSlide),
       },
     );

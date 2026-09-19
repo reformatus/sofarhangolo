@@ -580,10 +580,10 @@ class _CuePanelAppBar extends StatelessWidget implements PreferredSizeWidget {
     final theme = Theme.of(context);
     final cueSubtitle = _cueSubtitleOf(session);
     final hasSubtitle = cueSubtitle.isNotEmpty;
-    return SelectionArea(
-      child: AppBar(
-        backgroundColor: backgroundColor,
-        title: hasSubtitle
+    return AppBar(
+      backgroundColor: backgroundColor,
+      title: SelectionArea(
+        child: hasSubtitle
             ? Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -603,23 +603,23 @@ class _CuePanelAppBar extends StatelessWidget implements PreferredSizeWidget {
                 ],
               )
             : Text(session.cue.title),
-        automaticallyImplyLeading: false,
-        leading: const Icon(Icons.list),
-        actions: [
-          IconButton.filledTonal(
-            tooltip: 'Lista szerkesztése',
-            onPressed: onOpenCueEditor,
-            icon: const Icon(Icons.open_in_new),
-          ),
-          if (onClose != null)
-            IconButton(
-              tooltip: 'Bezárás',
-              onPressed: onClose,
-              icon: const Icon(Icons.keyboard_arrow_down),
-            ),
-          const SizedBox(width: 4),
-        ],
       ),
+      automaticallyImplyLeading: false,
+      leading: const Icon(Icons.list),
+      actions: [
+        IconButton.filledTonal(
+          tooltip: 'Lista szerkesztése',
+          onPressed: onOpenCueEditor,
+          icon: const Icon(Icons.open_in_new),
+        ),
+        if (onClose != null)
+          IconButton(
+            tooltip: 'Bezárás',
+            onPressed: onClose,
+            icon: const Icon(Icons.keyboard_arrow_down),
+          ),
+        const SizedBox(width: 4),
+      ],
     );
   }
 }
