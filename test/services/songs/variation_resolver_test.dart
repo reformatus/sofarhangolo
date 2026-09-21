@@ -12,7 +12,7 @@ Song _song(
   Map<String, String> contentMap = const {},
   LyricsFormat lyricsFormat = LyricsFormat.opensong,
   String? sourceBank,
-  SongOwnership? ownership,
+  SongFieldOwnership? ownership,
 }) {
   return Song(
     uuid: uuid,
@@ -27,12 +27,12 @@ Song _song(
   );
 }
 
-SongOwnership _owns({
+SongFieldOwnership _owns({
   Iterable<String> content = const [],
   bool keyField = false,
   bool lyrics = false,
 }) {
-  return SongOwnership(
+  return SongFieldOwnership(
     contentKeys: Set.of(content),
     keyField: keyField,
     lyrics: lyrics,
@@ -156,184 +156,186 @@ void main() {
     });
   });
 
-  group('mergeAllVariations', () {
-    test('reports no writes when stored rows are already merged', () {
+  group('resolveVariationChain', () {
+    Future<Song?> Function(String) loaderOf(Map<String, Song> songs) {
+      return (uuid) async => songs[uuid];
+    }
+
+    test('merges a single-level variation against its parent', () async {
       final parent = _fullParent();
       final own = _song('own', variationOf: 'parent', ownership: _owns());
-      final merged = resolveVariation(own: own, parent: parent);
+      final db = {'own': own, 'parent': parent};
 
-      final result = mergeAllVariations([parent, merged]);
+      final (resolved, error) = await resolveVariationChain(own, loaderOf(db));
 
-      expect(result.songsToWrite, isEmpty);
-      expect(result.errors, isEmpty);
+      expect(error, isNull);
+      expect(resolved.lyrics, 'parent lyrics');
+      expect(resolved.keyField, parent.keyField);
+      expect(resolved.contentMap['svg'], 'parent-svg');
+      expect(resolved.variationOf, 'parent');
     });
 
-    test('writes only the merged song when it differs from storage', () {
+    test('already-merged songs resolve to their stored content', () async {
       final parent = _fullParent();
       final own = _song(
         'own',
         variationOf: 'parent',
-        contentMap: {'lyrics': ''},
-        lyrics: null,
+        lyrics: 'parent lyrics',
+        keyField: parent.keyField,
+        contentMap: {'lyrics': 'parent-lyrics', 'svg': 'parent-svg'},
         ownership: _owns(),
       );
+      final db = {'own': own, 'parent': parent};
 
-      final result = mergeAllVariations([parent, own]);
+      final (resolved, error) = await resolveVariationChain(own, loaderOf(db));
 
-      expect(result.songsToWrite, hasLength(1));
-      expect(result.songsToWrite.single.uuid, 'own');
-      expect(result.songsToWrite.single.lyrics, 'parent lyrics');
-      expect(result.songsToWrite.single.contentMap, {
-        'lyrics': 'parent-lyrics',
-        'svg': 'parent-svg',
-      });
+      expect(error, isNull);
+      expect(resolved.sameMergeableContentAs(own), isTrue);
     });
 
-    test('never writes non-variation songs', () {
-      final plain = _song('plain', lyrics: 'raw lyrics');
+    test('missing parent keeps the stored song and reports no error', () async {
+      final own = _song('own', variationOf: 'ghost', ownership: _owns());
 
-      final result = mergeAllVariations([plain]);
+      final (resolved, error) = await resolveVariationChain(own, loaderOf({}));
 
-      expect(result.songsToWrite, isEmpty);
-      expect(result.errors, isEmpty);
+      expect(error, isNull);
+      expect(identical(resolved, own), isTrue);
     });
 
-    test('resolves multi-level chains', () {
-      final grandParent = _fullParent(uuid: 'grand');
+    test('inherits through multi-level chains from the chain root', () async {
+      final grandParent = _fullParent(uuid: 'grandparent');
       final parent = _song(
         'parent',
-        variationOf: 'grand',
-        keyField: [KeyField('D', 'major')],
-        ownership: _owns(keyField: true),
-      );
-      final child = _song(
-        'child',
-        variationOf: 'parent',
-        contentMap: {'lyrics': ''},
+        variationOf: 'grandparent',
         ownership: _owns(),
       );
+      final child = _song('child', variationOf: 'parent', ownership: _owns());
+      final db = {'child': child, 'parent': parent, 'grandparent': grandParent};
 
-      final result = mergeAllVariations([grandParent, parent, child]);
-
-      expect(result.errors, isEmpty);
-      expect(result.songsToWrite.map((s) => s.uuid).toSet(), {
-        'parent',
-        'child',
-      });
-      final mergedChild = result.songsToWrite.singleWhere(
-        (s) => s.uuid == 'child',
+      final (resolved, error) = await resolveVariationChain(
+        child,
+        loaderOf(db),
       );
-      expect(mergedChild.keyField, [KeyField('D', 'major')]);
-      expect(mergedChild.lyrics, 'parent lyrics');
+
+      expect(error, isNull);
+      expect(resolved.lyrics, 'parent lyrics');
+      expect(resolved.keyField, grandParent.keyField);
+      expect(resolved.contentMap['svg'], 'parent-svg');
     });
 
-    test('merges each chain node exactly once (no duplicate errors)', () {
+    test('reports cyclic chains on the node closing the cycle', () async {
       final a = _song('a', variationOf: 'b', ownership: _owns());
       final b = _song('b', variationOf: 'a', ownership: _owns());
-      final c = _song('c', variationOf: 'b', ownership: _owns());
+      final db = {'a': a, 'b': b};
 
-      final result = mergeAllVariations([a, b, c]);
+      final (resolved, error) = await resolveVariationChain(a, loaderOf(db));
 
-      // The a<->b cycle is reachable from roots 'a', 'b' and 'c'; without
-      // memoization it would be reported once per root. The error lands on
-      // 'b', the node whose variationOf closes the cycle.
-      expect(result.errors, hasLength(1));
-      expect(result.errors.single.kind, VariationMergeErrorKind.cyclicChain);
-      expect(result.errors.single.song.uuid, 'b');
+      expect(error, isNotNull);
+      expect(error!.kind, VariationMergeErrorKind.cyclicChain);
+      expect(error.song.uuid, 'b');
+      expect(identical(resolved, a), isTrue);
     });
 
-    test('reports cyclic chains as errors and keeps stored data', () {
-      final a = _song(
-        'a',
-        variationOf: 'b',
-        lyrics: 'a lyrics',
-        ownership: _owns(lyrics: true),
-      );
-      final b = _song(
-        'b',
-        variationOf: 'a',
-        lyrics: 'b lyrics',
-        ownership: _owns(lyrics: true),
-      );
-
-      final result = mergeAllVariations([a, b]);
-
-      expect(result.songsToWrite, isEmpty);
-      expect(result.errors, hasLength(1));
-      expect(result.errors.single.kind, VariationMergeErrorKind.cyclicChain);
-      expect(result.errors.single.song.uuid, 'b');
-    });
-
-    test('reports self-referencing songs as cyclic', () {
+    test('reports self-referencing variations', () async {
       final a = _song('a', variationOf: 'a', ownership: _owns());
 
-      final result = mergeAllVariations([a]);
-
-      expect(result.errors, hasLength(1));
-      expect(result.errors.single.kind, VariationMergeErrorKind.cyclicChain);
-    });
-
-    test('reports over-deep chains as errors', () {
-      final songs = <Song>[
-        for (var i = 0; i < 10; i++)
-          _song('song-$i', variationOf: 'song-${i + 1}', ownership: _owns()),
-        _song('song-10', ownership: _owns()),
-      ];
-
-      final result = mergeAllVariations(songs, maxDepth: 5);
-
-      expect(
-        result.errors.map((e) => e.kind),
-        everyElement(VariationMergeErrorKind.tooDeep),
-      );
-      // Depths 0..4 resolve; 'song-5' is the first node past the cap.
-      expect(result.errors.single.song.uuid, 'song-5');
-    });
-
-    test('resolves a chain of exactly maxDepth songs', () {
-      final songs = <Song>[
-        for (var i = 0; i < defaultMaxVariationDepth; i++)
-          _song('song-$i', variationOf: 'song-${i + 1}', ownership: _owns()),
-        _song('song-$defaultMaxVariationDepth', ownership: _owns()),
-      ];
-
-      final result = mergeAllVariations(songs);
-
-      expect(result.errors, isEmpty);
-      expect(result.songsToWrite, isEmpty);
-    });
-
-    test('keeps songs whose parent is missing from the bank data', () {
-      final own = _song(
-        'own',
-        variationOf: 'missing',
-        lyrics: 'own lyrics',
-        ownership: _owns(lyrics: true),
+      final (resolved, error) = await resolveVariationChain(
+        a,
+        loaderOf({'a': a}),
       );
 
-      final result = mergeAllVariations([own]);
-
-      expect(result.errors, isEmpty);
-      expect(result.songsToWrite, isEmpty);
+      expect(error, isNotNull);
+      expect(error!.kind, VariationMergeErrorKind.cyclicChain);
+      expect(error.song.uuid, 'a');
+      expect(identical(resolved, a), isTrue);
     });
 
-    test('merges against the stored parent when the parent is frozen', () {
+    test('reports over-deep chains on the first node past the cap', () async {
+      final root = _fullParent(uuid: 'song-10');
+      final songs = <String, Song>{'song-10': root};
+      for (var i = 9; i >= 0; i--) {
+        songs['song-$i'] = _song(
+          'song-$i',
+          variationOf: 'song-${i + 1}',
+          ownership: _owns(),
+        );
+      }
+
+      final (resolved, error) = await resolveVariationChain(
+        songs['song-0']!,
+        loaderOf(songs),
+        maxDepth: 5,
+      );
+
+      expect(error, isNotNull);
+      expect(error!.kind, VariationMergeErrorKind.tooDeep);
+      expect(error.song.uuid, 'song-5');
+      expect(identical(resolved, songs['song-0']), isTrue);
+    });
+
+    test('chains up to the depth cap resolve without error', () async {
+      final root = _fullParent(uuid: 'song-4');
+      final songs = <String, Song>{'song-4': root};
+      for (var i = 3; i >= 0; i--) {
+        songs['song-$i'] = _song(
+          'song-$i',
+          variationOf: 'song-${i + 1}',
+          ownership: _owns(),
+        );
+      }
+
+      final (resolved, error) = await resolveVariationChain(
+        songs['song-0']!,
+        loaderOf(songs),
+        maxDepth: 5,
+      );
+
+      expect(error, isNull);
+      expect(resolved.lyrics, 'parent lyrics');
+      expect(resolved.contentMap['svg'], 'parent-svg');
+    });
+
+    test(
+      'frozen ancestors cut the chain, children merge from stored values',
+      () async {
+        final grandParent = _fullParent(uuid: 'grandparent');
+        final frozenParent = _song(
+          'parent',
+          variationOf: 'grandparent',
+          lyrics: 'frozen lyrics',
+          ownership: null,
+        );
+        final child = _song('child', variationOf: 'parent', ownership: _owns());
+        final db = {
+          'child': child,
+          'parent': frozenParent,
+          'grandparent': grandParent,
+        };
+
+        final (resolved, error) = await resolveVariationChain(
+          child,
+          loaderOf(db),
+        );
+
+        expect(error, isNull);
+        expect(resolved.lyrics, 'frozen lyrics');
+        // The frozen parent was never re-merged itself, so its stored row
+        // (without 'svg') is what the child inherits from; grandparent values
+        // do not pass through the frozen node.
+        expect(resolved.contentMap.containsKey('svg'), isFalse);
+      },
+    );
+
+    test('songs without ownership metadata stay frozen', () async {
       final parent = _fullParent();
-      // Strip ownership from a copy to simulate a legacy row.
-      final legacyParent = _song(
-        'parent',
-        keyField: [KeyField('C', 'major')],
-        lyrics: 'parent lyrics',
-        contentMap: {'lyrics': 'parent-lyrics', 'svg': 'parent-svg'},
-      );
-      final own = _song('own', variationOf: 'parent', ownership: _owns());
+      final own = _song('own', variationOf: 'parent', lyrics: 'old lyrics');
+      final db = {'own': own, 'parent': parent};
 
-      final result = mergeAllVariations([legacyParent, own]);
+      final (resolved, error) = await resolveVariationChain(own, loaderOf(db));
 
-      expect(result.errors, isEmpty);
-      expect(result.songsToWrite.single.uuid, 'own');
-      expect(result.songsToWrite.single.lyrics, 'parent lyrics');
-      expect(parent, isNotNull);
+      expect(error, isNull);
+      expect(identical(resolved, own), isTrue);
+      expect(resolved.lyrics, 'old lyrics');
     });
   });
 }

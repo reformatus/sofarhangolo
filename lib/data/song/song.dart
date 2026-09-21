@@ -27,19 +27,11 @@ class Song extends Insertable<Song> {
   /// Null only for rows written before this column existed. Such rows are
   /// treated as frozen by the variation merge: they are never re-merged
   /// locally, and recover their metadata on the next full bank refetch.
-  final SongOwnership? ownership;
+  final SongFieldOwnership? ownership;
 
   static String? _nonBlankString(dynamic value) {
     if (value is! String) return null;
     return value.trim().isEmpty ? null : value;
-  }
-
-  /// Whether a raw JSON value counts as content the song owns: present,
-  /// non-blank, and not a JSON null (whose toString would be 'null').
-  static bool _isOwnedJsonValue(dynamic value) {
-    if (value == null) return false;
-    final asString = value.toString();
-    return asString.trim().isNotEmpty && asString != 'null';
   }
 
   factory Song.fromBankApiJson(Map<String, dynamic> json, {Bank? sourceBank}) {
@@ -69,8 +61,13 @@ class Song extends Insertable<Song> {
       final ownedContentKeys = <String>{};
       for (final e in json.entries) {
         if (_excludedFromContentMap.contains(e.key)) continue;
-        contentMap[e.key] = e.value.toString();
-        if (_isOwnedJsonValue(e.value)) ownedContentKeys.add(e.key);
+        final rawValue = e.value.toString();
+        contentMap[e.key] = rawValue;
+        if (e.value != null &&
+            rawValue.trim().isNotEmpty &&
+            rawValue != 'null') {
+          ownedContentKeys.add(e.key);
+        }
       }
 
       final keyField = KeyField.fromStringList(json['key']);
@@ -84,7 +81,7 @@ class Song extends Insertable<Song> {
         keyField: keyField,
         contentMap: contentMap,
         sourceBank: sourceBank?.uuid,
-        ownership: SongOwnership(
+        ownership: SongFieldOwnership(
           contentKeys: ownedContentKeys,
           keyField: keyField.isNotEmpty,
           lyrics: lyricsContent?.trim().isNotEmpty ?? false,
@@ -206,25 +203,25 @@ class Songs extends Table {
   TextColumn get variationOf => text().nullable()();
   TextColumn get keyField => text().map(const KeyFieldConverter())();
   TextColumn get ownership =>
-      text().nullable().map(const SongOwnershipConverter())();
+      text().nullable().map(const SongFieldOwnershipConverter())();
 }
 
 /// Which fields of a song come from its own bank data rather than being
 /// inherited from a variation parent.
-class SongOwnership {
+class SongFieldOwnership {
   /// Content keys present with non-blank values in the song's own data.
   final Set<String> contentKeys;
   final bool keyField;
   final bool lyrics;
 
-  const SongOwnership({
+  const SongFieldOwnership({
     required this.contentKeys,
     required this.keyField,
     required this.lyrics,
   });
 
-  factory SongOwnership.fromJson(Map<String, dynamic> json) {
-    return SongOwnership(
+  factory SongFieldOwnership.fromJson(Map<String, dynamic> json) {
+    return SongFieldOwnership(
       contentKeys: ((json['contentKeys'] as List?) ?? const [])
           .cast<String>()
           .toSet(),
@@ -243,7 +240,7 @@ class SongOwnership {
 
   @override
   bool operator ==(Object other) {
-    if (other is! SongOwnership) return false;
+    if (other is! SongFieldOwnership) return false;
     return keyField == other.keyField &&
         lyrics == other.lyrics &&
         contentKeys.length == other.contentKeys.length &&
@@ -255,16 +252,19 @@ class SongOwnership {
       Object.hash(Object.hashAllUnordered(contentKeys), keyField, lyrics);
 }
 
-class SongOwnershipConverter extends TypeConverter<SongOwnership, String> {
-  const SongOwnershipConverter();
+class SongFieldOwnershipConverter
+    extends TypeConverter<SongFieldOwnership, String> {
+  const SongFieldOwnershipConverter();
 
   @override
-  SongOwnership fromSql(String fromDb) {
-    return SongOwnership.fromJson(jsonDecode(fromDb) as Map<String, dynamic>);
+  SongFieldOwnership fromSql(String fromDb) {
+    return SongFieldOwnership.fromJson(
+      jsonDecode(fromDb) as Map<String, dynamic>,
+    );
   }
 
   @override
-  String toSql(SongOwnership value) {
+  String toSql(SongFieldOwnership value) {
     return jsonEncode(value.toJson());
   }
 }

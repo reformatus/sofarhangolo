@@ -22,12 +22,13 @@ class BankSongUpdateTask extends BackgroundTask {
 
   int _toUpdateCount = 0;
   int _updatedCount = 0;
-  int _variationUpdates = 0;
   bool _hasResolvedWorkload = false;
 
   // Per-run state, re-initialized in [execute].
   bool _hadErrors = false;
   final Map<String, String> _failedSongsByUuid = {};
+  final Set<String> _writtenUuids = {};
+  final Set<String> _writtenVariationUuids = {};
 
   int get _songsWithErrors => _failedSongsByUuid.length;
 
@@ -39,9 +40,6 @@ class BankSongUpdateTask extends BackgroundTask {
 
   @override
   String get title => bank.name;
-
-  String get _variationSuffix =>
-      _variationUpdates > 0 ? ' · $_variationUpdates variáció frissítve' : '';
 
   @override
   String get subtitle {
@@ -56,13 +54,10 @@ class BankSongUpdateTask extends BackgroundTask {
     }
 
     if (_toUpdateCount == 0) {
-      return isFailed
-          ? 'A frissítés megszakadt.$_variationSuffix'
-          : 'Minden friss.$_variationSuffix';
+      return isFailed ? 'A frissítés megszakadt.' : 'Minden friss.';
     }
 
-    return '$_updatedCount ($_songsWithErrors hiba) / $_toUpdateCount frissítve'
-        '$_variationSuffix';
+    return '$_updatedCount ($_songsWithErrors hiba) / $_toUpdateCount frissítve';
   }
 
   @override
@@ -90,7 +85,6 @@ class BankSongUpdateTask extends BackgroundTask {
     super.resetProgress();
     _toUpdateCount = 0;
     _updatedCount = 0;
-    _variationUpdates = 0;
     _hasResolvedWorkload = false;
   }
 
@@ -109,17 +103,15 @@ class BankSongUpdateTask extends BackgroundTask {
     );
   }
 
-  Future<void> _upsertSong(Song song, {bool isVariation = false}) async {
+  Future<void> _upsertSong(Song song) async {
     try {
       await db.into(db.songs).insert(song, mode: InsertMode.insertOrReplace);
 
       await deleteAssetsForSong(song);
 
-      if (isVariation) {
-        _variationUpdates++;
-      } else {
-        _updatedCount++;
-      }
+      _updatedCount++;
+      _writtenUuids.add(song.uuid);
+      if (song.variationOf != null) _writtenVariationUuids.add(song.uuid);
       notifyListeners();
     } catch (error, stackTrace) {
       _markFailed(song.uuid, song.title);
@@ -169,37 +161,63 @@ class BankSongUpdateTask extends BackgroundTask {
     return (toUpdate, totalSongsInBank);
   }
 
-  /// Recomputes every variation chain locally and writes back only the songs
-  /// whose merged content changed. Never accesses the API.
+  /// Re-merges the variation chains affected by this run's writes and writes
+  /// back the songs whose merged content changed. Never accesses the API.
   Future<void> _mergeVariations() async {
-    final allSongs = await db.songs.select().get();
-    final result = mergeAllVariations(allSongs);
+    if (_writtenUuids.isEmpty) return;
 
-    for (final error in result.errors) {
-      _markFailed(error.song.uuid, error.song.title);
-      switch (error.kind) {
-        case VariationMergeErrorKind.cyclicChain:
-          log.warning(
-            'Cirkuláris variációlánc, a dal helyben nem egyesíthető:',
-            '"${error.song.title}" (UUID: ${error.song.uuid})',
-          );
-        case VariationMergeErrorKind.tooDeep:
-          log.warning(
-            'Túl mély variációlánc, a dal helyben nem egyesíthető:',
-            '"${error.song.title}" (UUID: ${error.song.uuid})',
-          );
+    // Every variation below a written song may inherit its values, so
+    // collect the affected chains level by level in the database.
+    var frontier = _writtenUuids.toSet();
+    final affected = <String>{};
+    while (frontier.isNotEmpty) {
+      final children =
+          await (db.songs.select()
+                ..where((song) => song.variationOf.isIn(frontier)))
+              .get();
+      frontier = {
+        for (final child in children)
+          if (affected.add(child.uuid)) child.uuid,
+      };
+    }
+
+    // Written variations were stored raw this run and need re-merging too.
+    final workset = affected..addAll(_writtenVariationUuids);
+    final reportedFailures = <String>{};
+
+    for (final uuid in workset.toList()..sort()) {
+      final stored = await _loadSong(uuid);
+      // Rows without ownership metadata are frozen and never re-merged.
+      if (stored == null || stored.ownership == null) continue;
+
+      final (resolved, error) = await resolveVariationChain(stored, _loadSong);
+      if (error != null) {
+        if (reportedFailures.add(resolved.uuid)) {
+          _markFailed(resolved.uuid, resolved.title);
+          switch (error.kind) {
+            case VariationMergeErrorKind.cyclicChain:
+              log.warning(
+                'Cirkuláris variációlánc, a dal helyben nem egyesíthető:',
+                '"${resolved.title}" (UUID: ${resolved.uuid})',
+              );
+            case VariationMergeErrorKind.tooDeep:
+              log.warning(
+                'Túl mély variációlánc, a dal helyben nem egyesíthető:',
+                '"${resolved.title}" (UUID: ${resolved.uuid})',
+              );
+          }
+        }
+        continue;
+      }
+      if (!resolved.sameMergeableContentAs(stored)) {
+        await _upsertSong(resolved);
       }
     }
+  }
 
-    for (final song in result.songsToWrite) {
-      await _upsertSong(song, isVariation: true);
-    }
-    if (_variationUpdates > 0) {
-      log.info(
-        '$_variationUpdates dal variáció-összevonása frissítve: ${bank.name}',
-      );
-      notifyListeners();
-    }
+  Future<Song?> _loadSong(String uuid) {
+    return (db.songs.select()..where((song) => song.uuid.equals(uuid)))
+        .getSingleOrNull();
   }
 
   @override
@@ -207,6 +225,8 @@ class BankSongUpdateTask extends BackgroundTask {
     try {
       _hadErrors = false;
       _failedSongsByUuid.clear();
+      _writtenUuids.clear();
+      _writtenVariationUuids.clear();
 
       final bankApi = BankApi(dio);
 
@@ -346,11 +366,13 @@ class BankSongUpdateTask extends BackgroundTask {
             '${bank.name} tárból $_songsWithErrors dal frissítése sikertelen volt!',
           );
         }
-
-        await _persistBankState(totalSongsInBank);
       }
 
       await _mergeVariations();
+
+      // Persisted unconditionally so variation-merge failures and old
+      // last-updated state survive as well, not only download failures.
+      await _persistBankState(totalSongsInBank);
 
       await setAsUpdatedNow(bank);
 
