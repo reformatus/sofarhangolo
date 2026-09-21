@@ -30,7 +30,6 @@ class BankSongUpdateTask extends BackgroundTask {
   final Set<String> _writtenUuids = {};
   final Set<String> _writtenVariationUuids = {};
   final Set<String> _listedUpdateUuids = {};
-  bool _merging = false;
 
   int get _songsWithErrors => _failedSongsByUuid.length;
 
@@ -111,16 +110,11 @@ class BankSongUpdateTask extends BackgroundTask {
 
       await deleteAssetsForSong(song);
 
-      if (_merging) {
-        _updatedCount++;
-        // Songs the bank did not list grow the workload here; listed ones
-        // were already counted when the workload was resolved.
-        if (_listedUpdateUuids.add(song.uuid)) _toUpdateCount++;
-      } else if (song.variationOf == null) {
-        // Variation rows are stored raw here and settled by the merge phase,
-        // so they are counted there instead.
-        _updatedCount++;
-      }
+      _updatedCount++;
+      // Songs the bank did not list (merge-phase descendants) grow the
+      // workload here; listed ones were already counted when the workload
+      // was resolved, so their merge rewrites do not re-count.
+      if (_listedUpdateUuids.add(song.uuid)) _toUpdateCount++;
       _writtenUuids.add(song.uuid);
       if (song.variationOf != null) _writtenVariationUuids.add(song.uuid);
       notifyListeners();
@@ -176,7 +170,6 @@ class BankSongUpdateTask extends BackgroundTask {
   /// back the songs whose merged content changed. Never accesses the API.
   Future<void> _mergeVariations() async {
     if (_writtenUuids.isEmpty) return;
-    _merging = true;
 
     // Every variation below a written song may inherit its values, so
     // collect the affected chains level by level in the database.
@@ -225,7 +218,6 @@ class BankSongUpdateTask extends BackgroundTask {
         await _upsertSong(resolved);
       }
     }
-    _merging = false;
   }
 
   Future<Song?> _loadSong(String uuid) {
@@ -241,7 +233,6 @@ class BankSongUpdateTask extends BackgroundTask {
       _writtenUuids.clear();
       _writtenVariationUuids.clear();
       _listedUpdateUuids.clear();
-      _merging = false;
 
       final bankApi = BankApi(dio);
 
