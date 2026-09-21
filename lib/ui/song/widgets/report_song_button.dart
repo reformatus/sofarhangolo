@@ -20,9 +20,10 @@ class ReportSongButton extends ConsumerWidget {
 
     return bank.when(
       data: (bank) {
-        if (bank.contactEmail != null && bank.contactEmail!.isNotEmpty) {
+        final contactEmail = bank?.contactEmail;
+        if (contactEmail != null && contactEmail.isNotEmpty) {
           return TextButton.icon(
-            onPressed: () => bank.sendReportEmail(song),
+            onPressed: () => bank?.sendReportEmail(song),
             label: Text('Hibajelentés'),
             icon: Icon(Icons.textsms_outlined),
           );

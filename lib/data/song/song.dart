@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
+import 'package:uuid/v4.dart';
 
 import '../bank/bank.dart';
 import '../database.dart';
@@ -115,7 +116,53 @@ class Song extends Insertable<Song> {
     required this.contentMap,
     this.sourceBank,
     this.ownership,
+    this.originalSongUuid,
+    this.originalContentHash,
   });
+
+  /// Creates a new local (bank-independent) song with a fresh uuid.
+  factory Song.local({
+    required String title,
+    String? lyrics,
+    LyricsFormat lyricsFormat = LyricsFormat.opensong,
+    List<KeyField> keyField = const [],
+    Map<String, String> contentMap = const {},
+  }) {
+    return Song(
+      uuid: UuidV4().generate(),
+      title: title,
+      lyrics: lyrics,
+      lyricsFormat: lyricsFormat,
+      keyField: keyField,
+      contentMap: contentMap,
+    );
+  }
+
+  Song copyWith({
+    String? uuid,
+    String? sourceBank,
+    String? title,
+    String? lyrics,
+    LyricsFormat? lyricsFormat,
+    String? variationOf,
+    List<KeyField>? keyField,
+    Map<String, String>? contentMap,
+    String? originalSongUuid,
+    String? originalContentHash,
+  }) {
+    return Song(
+      uuid: uuid ?? this.uuid,
+      sourceBank: sourceBank ?? this.sourceBank,
+      title: title ?? this.title,
+      lyrics: lyrics ?? this.lyrics,
+      lyricsFormat: lyricsFormat ?? this.lyricsFormat,
+      variationOf: variationOf ?? this.variationOf,
+      keyField: keyField ?? this.keyField,
+      contentMap: contentMap ?? this.contentMap,
+      originalSongUuid: originalSongUuid ?? this.originalSongUuid,
+      originalContentHash: originalContentHash ?? this.originalContentHash,
+    );
+  }
 
   String? get firstLine {
     return lyrics != null
@@ -192,6 +239,25 @@ class Song extends Insertable<Song> {
     return true;
   }
 
+  /// Deterministic hash over the song's content (title, lyrics, key and
+  /// remaining content fields), stable across processes and devices.
+  ///
+  /// Unlike [contentHash], this ignores identity fields (uuid, sourceBank)
+  /// and doesn't use [Object.hash], so it can be persisted and compared to
+  /// detect when a bank song changed relative to a local copy made of it.
+  String get stableContentHash {
+    final sortedContentMap = Map.fromEntries(
+      contentMap.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
+    );
+    final payload = jsonEncode({
+      'title': title,
+      'lyrics': lyrics,
+      'keyField': keyField.map((e) => e.toString()).toList(),
+      'contentMap': sortedContentMap,
+    });
+    return md5.convert(utf8.encode(payload)).toString();
+  }
+
   @override
   bool operator ==(Object other) {
     if (other is! Song) return false;
@@ -213,6 +279,8 @@ class Song extends Insertable<Song> {
       variationOf: Value(variationOf),
       keyField: Value(keyField),
       ownership: Value(ownership),
+      originalSongUuid: Value(originalSongUuid),
+      originalContentHash: Value(originalContentHash),
     ).toColumns(nullToAbsent);
   }
 }
@@ -270,6 +338,8 @@ class Songs extends Table {
       .withDefault(const Constant('opensong'))
       .map(const LyricsFormatConverter())();
   TextColumn get variationOf => text().nullable()();
+  TextColumn get originalSongUuid => text().nullable()();
+  TextColumn get originalContentHash => text().nullable()();
   TextColumn get keyField => text().map(const KeyFieldConverter())();
   TextColumn get ownership =>
       text().nullable().map(const SongFieldOwnershipConverter())();
