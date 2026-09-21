@@ -25,8 +25,14 @@ Stream<AssetResult> getSongAsset(
 
   () async {
     final bank = await ref.watch(bankOfSongProvider(song).future);
+    final contentReference = song.contentMap[fieldName];
+    if (bank == null || contentReference == null) {
+      // Local songs and songs whose bank is gone have no fetchable assets.
+      await controller.close();
+      return;
+    }
     final String sourceUrl = bank.baseUrl
-        .resolve(song.contentMap[fieldName]!)
+        .resolve(contentReference)
         .toString();
 
     final asset =
