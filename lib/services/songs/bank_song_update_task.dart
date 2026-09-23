@@ -30,8 +30,13 @@ class BankSongUpdateTask extends BackgroundTask {
   final Set<String> _writtenUuids = {};
   final Set<String> _writtenVariationUuids = {};
   final Set<String> _listedUpdateUuids = {};
+  final Set<String> _countedUuids = {};
 
-  int get _songsWithErrors => _failedSongsByUuid.length;
+  // Songs counted as written keep their update count if they later fail a
+  // merge; the failure stays in the map for logging and retry persistence.
+  int get _songsWithErrors => _failedSongsByUuid.keys
+      .where((uuid) => !_countedUuids.contains(uuid))
+      .length;
 
   Uint8List? get logo => bank.logo;
   Uint8List? get tinyLogo => bank.tinyLogo;
@@ -92,6 +97,9 @@ class BankSongUpdateTask extends BackgroundTask {
   void _markFailed(String uuid, String title) {
     _hadErrors = true;
     _failedSongsByUuid[uuid] = title;
+    // Unlisted songs failing the merge phase grow the workload, mirroring
+    // their written siblings.
+    if (_listedUpdateUuids.add(uuid)) _toUpdateCount++;
     notifyListeners();
   }
 
@@ -110,10 +118,10 @@ class BankSongUpdateTask extends BackgroundTask {
 
       await deleteAssetsForSong(song);
 
-      _updatedCount++;
-      // Songs the bank did not list (merge-phase descendants) grow the
-      // workload here; listed ones were already counted when the workload
-      // was resolved, so their merge rewrites do not re-count.
+      // Each song counts once per run, at its first write; later merge
+      // rewrites of the same song do not re-count. Songs the bank did not
+      // list (merge-phase descendants) grow the workload on first write.
+      if (_countedUuids.add(song.uuid)) _updatedCount++;
       if (_listedUpdateUuids.add(song.uuid)) _toUpdateCount++;
       _writtenUuids.add(song.uuid);
       if (song.variationOf != null) _writtenVariationUuids.add(song.uuid);
@@ -233,6 +241,7 @@ class BankSongUpdateTask extends BackgroundTask {
       _writtenUuids.clear();
       _writtenVariationUuids.clear();
       _listedUpdateUuids.clear();
+      _countedUuids.clear();
 
       final bankApi = BankApi(dio);
 
