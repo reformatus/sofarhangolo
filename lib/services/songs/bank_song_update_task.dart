@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:queue/queue.dart';
-import 'package:sofarhangolo/data/song/extensions.dart';
 
 import '../../data/bank/bank.dart';
 import '../../data/database.dart';
@@ -13,6 +12,7 @@ import '../bank/bank_api.dart';
 import '../bank/bank_updated.dart';
 import '../task/background_task.dart';
 import 'delete_for_song.dart';
+import 'variation_resolver.dart';
 
 class BankSongUpdateTask extends BackgroundTask {
   BankSongUpdateTask({required this.bank, required this.dio});
@@ -22,8 +22,21 @@ class BankSongUpdateTask extends BackgroundTask {
 
   int _toUpdateCount = 0;
   int _updatedCount = 0;
-  int _songsWithErrors = 0;
   bool _hasResolvedWorkload = false;
+
+  // Per-run state, re-initialized in [execute].
+  bool _hadErrors = false;
+  final Map<String, String> _failedSongsByUuid = {};
+  final Set<String> _writtenUuids = {};
+  final Set<String> _writtenVariationUuids = {};
+  final Set<String> _listedUpdateUuids = {};
+  final Set<String> _countedUuids = {};
+
+  // Songs counted as written keep their update count if they later fail a
+  // merge; the failure stays in the map for logging and retry persistence.
+  int get _songsWithErrors => _failedSongsByUuid.keys
+      .where((uuid) => !_countedUuids.contains(uuid))
+      .length;
 
   Uint8List? get logo => bank.logo;
   Uint8List? get tinyLogo => bank.tinyLogo;
@@ -58,7 +71,7 @@ class BankSongUpdateTask extends BackgroundTask {
     if (!_hasResolvedWorkload) return null;
     if (_toUpdateCount == 0) return 1;
 
-    return (_updatedCount + _songsWithErrors) / _toUpdateCount;
+    return min(1.0, (_updatedCount + _songsWithErrors) / _toUpdateCount);
   }
 
   @override
@@ -78,96 +91,206 @@ class BankSongUpdateTask extends BackgroundTask {
     super.resetProgress();
     _toUpdateCount = 0;
     _updatedCount = 0;
-    _songsWithErrors = 0;
     _hasResolvedWorkload = false;
+  }
+
+  void _markFailed(String uuid, String title) {
+    _hadErrors = true;
+    _failedSongsByUuid[uuid] = title;
+    // Unlisted songs failing the merge phase grow the workload, mirroring
+    // their written siblings.
+    if (_listedUpdateUuids.add(uuid)) _toUpdateCount++;
+    notifyListeners();
+  }
+
+  Future<void> _persistBankState(int? totalSongsInBank) async {
+    await (db.banks.update()..where((b) => b.id.equals(bank.id))).write(
+      BanksCompanion(
+        failedSongUuids: Value(Bank.encodeFailedProtoSongs(_failedSongsByUuid)),
+        totalSongsInBank: Value.absentIfNull(totalSongsInBank),
+      ),
+    );
+  }
+
+  Future<void> _upsertSong(Song song) async {
+    try {
+      await db.into(db.songs).insert(song, mode: InsertMode.insertOrReplace);
+
+      await deleteAssetsForSong(song);
+
+      // Each song counts once per run, at its first write; later merge
+      // rewrites of the same song do not re-count. Songs the bank did not
+      // list (merge-phase descendants) grow the workload on first write.
+      if (_countedUuids.add(song.uuid)) _updatedCount++;
+      if (_listedUpdateUuids.add(song.uuid)) _toUpdateCount++;
+      _writtenUuids.add(song.uuid);
+      if (song.variationOf != null) _writtenVariationUuids.add(song.uuid);
+      notifyListeners();
+    } catch (error, stackTrace) {
+      _markFailed(song.uuid, song.title);
+      log.severe(
+        'Nem sikerült adatbázisba írni: "${song.title}"',
+        error.toString(),
+        stackTrace,
+      );
+    }
+  }
+
+  /// Resolves which songs need updating and the bank's total song count.
+  Future<(List<ProtoSong>, int?)> _resolveWorkload(BankApi bankApi) async {
+    var totalSongsInBank = bank.totalSongsInBank;
+
+    // Fetch songs that were updated in the bank
+    final List<ProtoSong> toUpdate;
+    if (bank.noCms) {
+      final remoteLastUpdated = await bankApi.getRemoteLastUpdated(bank);
+      if (remoteLastUpdated != null &&
+          bank.lastUpdated != null &&
+          bank.lastUpdated!.isAfter(remoteLastUpdated)) {
+        toUpdate = [];
+      } else {
+        toUpdate = await bankApi.getProtoSongs(bank);
+        totalSongsInBank = toUpdate.length;
+      }
+    } else {
+      toUpdate = await bankApi.getProtoSongs(bank, since: bank.lastUpdated);
+      if (bank.lastUpdated == null) {
+        totalSongsInBank = toUpdate.length;
+      }
+    }
+
+    // Add previously failed song to the update list
+    final persistedFailedSongs = bank.failedProtoSongs;
+    if (persistedFailedSongs.isNotEmpty) {
+      final mergedByUuid = <String, ProtoSong>{
+        for (final protoSong in toUpdate) protoSong.uuid: protoSong,
+      };
+      for (final failedSong in persistedFailedSongs) {
+        mergedByUuid.putIfAbsent(failedSong.uuid, () => failedSong);
+      }
+      return (mergedByUuid.values.toList(growable: false), totalSongsInBank);
+    }
+
+    return (toUpdate, totalSongsInBank);
+  }
+
+  /// Re-merges the variation chains affected by this run's writes and writes
+  /// back the songs whose merged content changed. Never accesses the API.
+  Future<void> _mergeVariations() async {
+    if (_writtenUuids.isEmpty) return;
+
+    // Every variation below a written song may inherit its values, so
+    // collect the affected chains level by level in the database. Only the
+    // uuid column is read: full-row mapping could throw on rows with
+    // corrupt metadata, which the per-song handling below must own.
+    var frontier = _writtenUuids.toSet();
+    final affected = <String>{};
+    while (frontier.isNotEmpty) {
+      final uuids = frontier.toList()..sort();
+      final childUuids = <String>[];
+      for (var i = 0; i < uuids.length; i += _frontierQueryChunkSize) {
+        childUuids.addAll(
+          await (db.songs.selectOnly()
+                ..addColumns([db.songs.uuid])
+                ..where(
+                  db.songs.variationOf.isIn(
+                    uuids.sublist(
+                      i,
+                      min(i + _frontierQueryChunkSize, uuids.length),
+                    ),
+                  ),
+                ))
+              .map((row) => row.read(db.songs.uuid)!)
+              .get(),
+        );
+      }
+      frontier = {
+        for (final uuid in childUuids)
+          if (affected.add(uuid)) uuid,
+      };
+    }
+
+    // Written variations were stored raw this run and need re-merging too.
+    final workset = affected..addAll(_writtenVariationUuids);
+    final reportedFailures = <String>{};
+
+    for (final uuid in workset.toList()..sort()) {
+      try {
+        final stored = await _loadSong(uuid);
+        // Rows without ownership metadata are frozen and never re-merged.
+        if (stored == null || stored.ownership == null) continue;
+
+        final (resolved, error) = await resolveVariationChain(
+          stored,
+          _loadSong,
+        );
+        if (error != null) {
+          if (reportedFailures.add(resolved.uuid)) {
+            _markFailed(resolved.uuid, resolved.title);
+            switch (error.kind) {
+              case VariationMergeErrorKind.cyclicChain:
+                log.warning(
+                  'Cirkuláris variációlánc, a dal helyben nem egyesíthető:',
+                  '"${resolved.title}" (UUID: ${resolved.uuid})',
+                );
+              case VariationMergeErrorKind.tooDeep:
+                log.warning(
+                  'Túl mély variációlánc, a dal helyben nem egyesíthető:',
+                  '"${resolved.title}" (UUID: ${resolved.uuid})',
+                );
+            }
+          }
+          continue;
+        }
+        if (!resolved.sameMergeableContentAs(stored)) {
+          await _upsertSong(resolved);
+        }
+      } catch (error, stackTrace) {
+        final title = await _loadTitle(uuid);
+        _markFailed(uuid, title);
+        log.severe(
+          'Nem sikerült helyben egyesíteni: "$title"',
+          error.toString(),
+          stackTrace,
+        );
+      }
+    }
+  }
+
+  static const _frontierQueryChunkSize = 500;
+
+  Future<Song?> _loadSong(String uuid) {
+    return (db.songs.select()..where((song) => song.uuid.equals(uuid)))
+        .getSingleOrNull();
+  }
+
+  Future<String> _loadTitle(String uuid) async {
+    final query =
+        db.songs.selectOnly()
+          ..addColumns([db.songs.title])
+          ..where(db.songs.uuid.equals(uuid));
+    final row = await query.getSingleOrNull();
+    return row?.read(db.songs.title) ?? uuid;
   }
 
   @override
   Future<void> execute() async {
     try {
+      _hadErrors = false;
+      _failedSongsByUuid.clear();
+      _writtenUuids.clear();
+      _writtenVariationUuids.clear();
+      _listedUpdateUuids.clear();
+      _countedUuids.clear();
+
       final bankApi = BankApi(dio);
 
-      List<ProtoSong> toUpdate;
-      int? totalSongsInBank = bank.totalSongsInBank;
-
-      // Fetch songs that were updated in the bank
-      if (bank.noCms) {
-        final remoteLastUpdated = await bankApi.getRemoteLastUpdated(bank);
-        if (remoteLastUpdated != null &&
-            bank.lastUpdated != null &&
-            bank.lastUpdated!.isAfter(remoteLastUpdated)) {
-          toUpdate = [];
-        } else {
-          toUpdate = await bankApi.getProtoSongs(bank);
-          totalSongsInBank = toUpdate.length;
-        }
-      } else {
-        toUpdate = await bankApi.getProtoSongs(bank, since: bank.lastUpdated);
-        if (bank.lastUpdated == null) {
-          totalSongsInBank = toUpdate.length;
-        }
-      }
-
-      // Add previously failed song to the update list
-      final persistedFailedSongs = bank.failedProtoSongs;
-      if (persistedFailedSongs.isNotEmpty) {
-        final mergedByUuid = <String, ProtoSong>{
-          for (final protoSong in toUpdate) protoSong.uuid: protoSong,
-        };
-        for (final failedSong in persistedFailedSongs) {
-          mergedByUuid.putIfAbsent(failedSong.uuid, () => failedSong);
-        }
-        toUpdate = mergedByUuid.values.toList(growable: false);
-      }
+      final (toUpdate, totalSongsInBank) = await _resolveWorkload(bankApi);
 
       _hasResolvedWorkload = true;
       _toUpdateCount = toUpdate.length;
+      _listedUpdateUuids.addAll(toUpdate.map((protoSong) => protoSong.uuid));
       notifyListeners();
-
-      bool hadErrors = false;
-      final failedSongsByUuid = <String, String>{};
-
-      void markFailedProtoSong(ProtoSong protoSong) {
-        hadErrors = true;
-        failedSongsByUuid[protoSong.uuid] = protoSong.title;
-        _songsWithErrors = failedSongsByUuid.length;
-        notifyListeners();
-      }
-
-      Future<void> persistBankState() async {
-        await (db.banks.update()..where((b) => b.id.equals(bank.id))).write(
-          BanksCompanion(
-            failedSongUuids: Value(
-              Bank.encodeFailedProtoSongs(failedSongsByUuid),
-            ),
-            totalSongsInBank: Value.absentIfNull(totalSongsInBank),
-          ),
-        );
-      }
-
-      Future<void> upsertSong(Song song) async {
-        try {
-          await db
-              .into(db.songs)
-              .insert(song, mode: InsertMode.insertOrReplace);
-
-          await deleteAssetsForSong(song);
-
-          _updatedCount++;
-          notifyListeners();
-        } catch (error, stackTrace) {
-          hadErrors = true;
-          failedSongsByUuid[song.uuid] = song.title;
-          _songsWithErrors = failedSongsByUuid.length;
-          notifyListeners();
-
-          log.severe(
-            'Nem sikerült adatbázisba írni: "${song.title}"',
-            error.toString(),
-            stackTrace,
-          );
-        }
-      }
 
       Future<void> processSingleSong(ProtoSong protoSong) async {
         try {
@@ -179,7 +302,7 @@ class BankSongUpdateTask extends BackgroundTask {
           );
 
           if (matchingSongs.isEmpty) {
-            markFailedProtoSong(protoSong);
+            _markFailed(protoSong.uuid, protoSong.title);
             log.severe(
               '"${protoSong.title}" lekérdezése sikeres volt, de a válaszban nem szerepelt a dal.',
               'UUID: ${protoSong.uuid}',
@@ -188,10 +311,10 @@ class BankSongUpdateTask extends BackgroundTask {
           }
 
           for (final song in matchingSongs) {
-            await upsertSong(song);
+            await _upsertSong(song);
           }
         } catch (error, stackTrace) {
-          markFailedProtoSong(protoSong);
+          _markFailed(protoSong.uuid, protoSong.title);
           log.severe(
             'Nem sikerült lekérdezni: "${protoSong.title}"',
             error.toString(),
@@ -225,7 +348,7 @@ class BankSongUpdateTask extends BackgroundTask {
               .toSet();
 
           for (final song in returnedRequestedSongs) {
-            await upsertSong(song);
+            await _upsertSong(song);
           }
 
           final missingProtoSongs = protoSongs
@@ -235,7 +358,6 @@ class BankSongUpdateTask extends BackgroundTask {
               .toList();
 
           if (missingProtoSongs.isNotEmpty) {
-            hadErrors = true;
             final missingTitles = missingProtoSongs
                 .map((protoSong) => protoSong.title)
                 .toList();
@@ -252,7 +374,6 @@ class BankSongUpdateTask extends BackgroundTask {
             }
           }
         } catch (error, stackTrace) {
-          hadErrors = true;
           final protoSongTitles = protoSongs
               .map((protoSong) => protoSong.title)
               .toList();
@@ -301,82 +422,17 @@ class BankSongUpdateTask extends BackgroundTask {
             '${bank.name} tárból $_songsWithErrors dal frissítése sikertelen volt!',
           );
         }
-
-        await persistBankState();
-        await setAsUpdatedNow(bank);
       }
 
-      // Check circular dependency with this array
-      List<String> variationChain = [];
+      await _mergeVariations();
 
-      // Copy values from variations
-      Future<Song?> updateRecursive(Song song) async {
-        if (variationChain.contains(song.uuid)) {
-          throw Exception(
-            'Circular dependency in variation chain! Found at song: ${song.title} (uuid: ${song.uuid})',
-          );
-        }
-        variationChain.add(song.uuid);
-        Song? parent;
-        if (song.variationOf != null) {
-          parent =
-              await (db.songs.select()..where(
-                    (songRecord) => songRecord.uuid.equals(song.variationOf!),
-                  ))
-                  .getSingleOrNull();
-        }
-        if (parent == null) {
-          if (toUpdate.any((protoSong) => protoSong.uuid == song.uuid)) {
-            return song;
-          }
-        } else {
-          final updatedParent = await updateRecursive(parent);
-          if (updatedParent != null) {
-            final originalSong = (await bankApi.getDetailsForSongs(bank, [
-              song.uuid,
-            ]))[0];
-            song = Song(
-              contentMap: updatedParent.contentMap.map((key, value) {
-                final orginalValue = originalSong.contentMap[key];
-                if (orginalValue != null && orginalValue.isNotEmpty) {
-                  return MapEntry(key, orginalValue);
-                } else {
-                  return MapEntry(key, value);
-                }
-              }),
-              keyField: updatedParent.keyField.isNotEmpty
-                  ? originalSong.keyField
-                  : updatedParent.keyField,
-              title: originalSong.title,
-              uuid: originalSong.uuid,
-              lyrics: originalSong.hasLyrics
-                  ? originalSong.lyrics
-                  : updatedParent.lyrics,
-              lyricsFormat: originalSong.lyricsFormat,
-              sourceBank: originalSong.sourceBank,
-              variationOf: originalSong.variationOf,
-            );
-            upsertSong(song);
-            return song;
-          } else {
-            if (toUpdate.any((protoSong) => protoSong.uuid == song.uuid)) {
-              return song;
-            }
-          }
-        }
-        return null;
-      }
+      // Persisted unconditionally so variation-merge failures and old
+      // last-updated state survive as well, not only download failures.
+      await _persistBankState(totalSongsInBank);
 
-      // Process variations
-      for (var song
-          in await (db.songs.select()
-                ..where((song) => song.variationOf.isNotNull()))
-              .get()) {
-        variationChain.clear();
-        await updateRecursive(song);
-      }
+      await setAsUpdatedNow(bank);
 
-      if (!hadErrors) {
+      if (!_hadErrors) {
         log.info('Minden dal frissítve: ${bank.name}');
       }
     } catch (error, stackTrace) {
