@@ -10,6 +10,7 @@ import 'generated/schema_v1.dart' as v1;
 import 'generated/schema_v2.dart' as v2;
 import 'generated/schema_v3.dart' as v3;
 import 'generated/schema_v4.dart' as v4;
+import 'generated/schema_v5.dart' as v5;
 import 'generated/schema_v6.dart' as v6;
 import 'generated/schema_v7.dart' as v7;
 
@@ -334,6 +335,97 @@ void main() {
         final bank = await newDb.select(newDb.banks).getSingle();
         expect(bank.lastUpdated, '1900-01-01T00:00:00');
         expect(bank.totalSongsInBank, 2);
+      },
+    );
+  });
+
+  test('migration from v5 to v7 keeps songs and forces a refetch', () async {
+    final oldBanksData = <v5.BanksData>[
+      const v5.BanksData(
+        id: 1,
+        uuid: 'bank-1',
+        logo: null,
+        tinyLogo: null,
+        name: 'Migration Bank',
+        description: null,
+        legal: null,
+        aboutLink: null,
+        contactEmail: null,
+        baseUrl: 'https://example.com',
+        parallelUpdateJobs: 1,
+        amountOfSongsInRequest: 10,
+        noCms: 0,
+        songFields: '{}',
+        isEnabled: 1,
+        isOfflineMode: 0,
+        lastUpdated: '2025-03-01T12:00:00',
+        failedSongUuids: null,
+        totalSongsInBank: 2,
+      ),
+    ];
+    final oldSongsData = <v5.SongsData>[
+      const v5.SongsData(
+        id: 1,
+        uuid: 'song-1',
+        sourceBank: 'bank-1',
+        contentMap: '{"composer":"Composer A"}',
+        title: 'Root Song',
+        lyrics: '[V1]\n Első sor',
+        lyricsFormat: 'opensong',
+        keyField: 'C-dur',
+      ),
+      const v5.SongsData(
+        id: 2,
+        uuid: 'song-2',
+        sourceBank: 'bank-1',
+        contentMap: '{}',
+        title: 'Other Song',
+        lyrics: '[V1]\n Második sor',
+        lyricsFormat: 'opensong',
+        keyField: '',
+      ),
+    ];
+
+    await verifier.testWithDataIntegrity(
+      oldVersion: 5,
+      newVersion: 7,
+      createOld: v5.DatabaseAtV5.new,
+      createNew: v7.DatabaseAtV7.new,
+      openTestedDatabase: LyricDatabase.new,
+      createItems: (batch, oldDb) {
+        batch.insertAll(oldDb.banks, oldBanksData);
+        batch.insertAll(oldDb.songs, oldSongsData);
+      },
+      validateItems: (newDb) async {
+        final songs = await newDb.select(newDb.songs).get();
+        final songsByUuid = {for (final song in songs) song.uuid: song};
+        expect(songsByUuid.keys, equals({'song-1', 'song-2'}));
+
+        // Rows survive both steps unchanged; variationOf and ownership are
+        // added empty, nothing is inferred or lost along the way.
+        final root = songsByUuid['song-1']!;
+        expect(root.title, 'Root Song');
+        expect(root.lyrics, '[V1]\n Első sor');
+        expect(root.contentMap, '{"composer":"Composer A"}');
+        expect(root.lyricsFormat, 'opensong');
+        expect(root.keyField, 'C-dur');
+        expect(root.variationOf, isNull);
+        expect(root.ownership, isNull);
+
+        final other = songsByUuid['song-2']!;
+        expect(other.title, 'Other Song');
+        expect(other.lyrics, '[V1]\n Második sor');
+        expect(other.contentMap, '{}');
+        expect(other.keyField, '');
+        expect(other.variationOf, isNull);
+        expect(other.ownership, isNull);
+
+        // The v5 bank row keeps its metadata and gets the refetch sentinel.
+        final bank = await newDb.select(newDb.banks).getSingle();
+        expect(bank.name, 'Migration Bank');
+        expect(bank.failedSongUuids, isNull);
+        expect(bank.totalSongsInBank, 2);
+        expect(bank.lastUpdated, '1900-01-01T00:00:00');
       },
     );
   });

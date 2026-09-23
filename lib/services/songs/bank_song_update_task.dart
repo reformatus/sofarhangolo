@@ -180,17 +180,33 @@ class BankSongUpdateTask extends BackgroundTask {
     if (_writtenUuids.isEmpty) return;
 
     // Every variation below a written song may inherit its values, so
-    // collect the affected chains level by level in the database.
+    // collect the affected chains level by level in the database. Only the
+    // uuid column is read: full-row mapping could throw on rows with
+    // corrupt metadata, which the per-song handling below must own.
     var frontier = _writtenUuids.toSet();
     final affected = <String>{};
     while (frontier.isNotEmpty) {
-      final children =
-          await (db.songs.select()
-                ..where((song) => song.variationOf.isIn(frontier)))
-              .get();
+      final uuids = frontier.toList()..sort();
+      final childUuids = <String>[];
+      for (var i = 0; i < uuids.length; i += _frontierQueryChunkSize) {
+        childUuids.addAll(
+          await (db.songs.selectOnly()
+                ..addColumns([db.songs.uuid])
+                ..where(
+                  db.songs.variationOf.isIn(
+                    uuids.sublist(
+                      i,
+                      min(i + _frontierQueryChunkSize, uuids.length),
+                    ),
+                  ),
+                ))
+              .map((row) => row.read(db.songs.uuid)!)
+              .get(),
+        );
+      }
       frontier = {
-        for (final child in children)
-          if (affected.add(child.uuid)) child.uuid,
+        for (final uuid in childUuids)
+          if (affected.add(uuid)) uuid,
       };
     }
 
@@ -199,38 +215,62 @@ class BankSongUpdateTask extends BackgroundTask {
     final reportedFailures = <String>{};
 
     for (final uuid in workset.toList()..sort()) {
-      final stored = await _loadSong(uuid);
-      // Rows without ownership metadata are frozen and never re-merged.
-      if (stored == null || stored.ownership == null) continue;
+      try {
+        final stored = await _loadSong(uuid);
+        // Rows without ownership metadata are frozen and never re-merged.
+        if (stored == null || stored.ownership == null) continue;
 
-      final (resolved, error) = await resolveVariationChain(stored, _loadSong);
-      if (error != null) {
-        if (reportedFailures.add(resolved.uuid)) {
-          _markFailed(resolved.uuid, resolved.title);
-          switch (error.kind) {
-            case VariationMergeErrorKind.cyclicChain:
-              log.warning(
-                'Cirkuláris variációlánc, a dal helyben nem egyesíthető:',
-                '"${resolved.title}" (UUID: ${resolved.uuid})',
-              );
-            case VariationMergeErrorKind.tooDeep:
-              log.warning(
-                'Túl mély variációlánc, a dal helyben nem egyesíthető:',
-                '"${resolved.title}" (UUID: ${resolved.uuid})',
-              );
+        final (resolved, error) = await resolveVariationChain(
+          stored,
+          _loadSong,
+        );
+        if (error != null) {
+          if (reportedFailures.add(resolved.uuid)) {
+            _markFailed(resolved.uuid, resolved.title);
+            switch (error.kind) {
+              case VariationMergeErrorKind.cyclicChain:
+                log.warning(
+                  'Cirkuláris variációlánc, a dal helyben nem egyesíthető:',
+                  '"${resolved.title}" (UUID: ${resolved.uuid})',
+                );
+              case VariationMergeErrorKind.tooDeep:
+                log.warning(
+                  'Túl mély variációlánc, a dal helyben nem egyesíthető:',
+                  '"${resolved.title}" (UUID: ${resolved.uuid})',
+                );
+            }
           }
+          continue;
         }
-        continue;
-      }
-      if (!resolved.sameMergeableContentAs(stored)) {
-        await _upsertSong(resolved);
+        if (!resolved.sameMergeableContentAs(stored)) {
+          await _upsertSong(resolved);
+        }
+      } catch (error, stackTrace) {
+        final title = await _loadTitle(uuid);
+        _markFailed(uuid, title);
+        log.severe(
+          'Nem sikerült helyben egyesíteni: "$title"',
+          error.toString(),
+          stackTrace,
+        );
       }
     }
   }
 
+  static const _frontierQueryChunkSize = 500;
+
   Future<Song?> _loadSong(String uuid) {
     return (db.songs.select()..where((song) => song.uuid.equals(uuid)))
         .getSingleOrNull();
+  }
+
+  Future<String> _loadTitle(String uuid) async {
+    final query =
+        db.songs.selectOnly()
+          ..addColumns([db.songs.title])
+          ..where(db.songs.uuid.equals(uuid));
+    final row = await query.getSingleOrNull();
+    return row?.read(db.songs.title) ?? uuid;
   }
 
   @override
