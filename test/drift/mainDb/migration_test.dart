@@ -1,14 +1,17 @@
 // dart format width=80
 // ignore_for_file: unused_local_variable, unused_import
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
+
 import 'generated/schema.dart';
 
 import 'generated/schema_v1.dart' as v1;
 import 'generated/schema_v2.dart' as v2;
 import 'generated/schema_v3.dart' as v3;
 import 'generated/schema_v4.dart' as v4;
+import 'generated/schema_v6.dart' as v6;
+import 'generated/schema_v7.dart' as v7;
 
 import 'package:sofarhangolo/data/database.dart';
 
@@ -245,6 +248,157 @@ void main() {
           expectedNewSongsFtsData,
           await newDb.select(newDb.songsFts).get(),
         );
+      },
+    );
+  });
+
+  test('migration from v6 to v7 keeps songs and forces a refetch', () async {
+    final oldBanksData = <v6.BanksData>[
+      const v6.BanksData(
+        id: 1,
+        uuid: 'bank-1',
+        logo: null,
+        tinyLogo: null,
+        name: 'Migration Bank',
+        description: null,
+        legal: null,
+        aboutLink: null,
+        contactEmail: null,
+        baseUrl: 'https://example.com',
+        parallelUpdateJobs: 1,
+        amountOfSongsInRequest: 10,
+        noCms: 0,
+        songFields: '{}',
+        isEnabled: 1,
+        isOfflineMode: 0,
+        lastUpdated: '2026-02-14T10:00:00',
+        failedSongUuids: null,
+        totalSongsInBank: 2,
+      ),
+    ];
+    final oldSongsData = <v6.SongsData>[
+      const v6.SongsData(
+        id: 1,
+        uuid: 'song-1',
+        sourceBank: 'bank-1',
+        contentMap: '{"composer":"Composer A"}',
+        title: 'Root Song',
+        lyrics: '[V1]\n Első sor',
+        lyricsFormat: 'opensong',
+        variationOf: null,
+        keyField: 'C-dur',
+      ),
+      const v6.SongsData(
+        id: 2,
+        uuid: 'song-2',
+        sourceBank: 'bank-1',
+        contentMap: '{}',
+        title: 'Variation Song',
+        lyrics: '[V1]\n Második sor',
+        lyricsFormat: 'opensong',
+        variationOf: 'song-1',
+        keyField: '',
+      ),
+    ];
+
+    await verifier.testWithDataIntegrity(
+      oldVersion: 6,
+      newVersion: 7,
+      createOld: v6.DatabaseAtV6.new,
+      createNew: v7.DatabaseAtV7.new,
+      openTestedDatabase: LyricDatabase.new,
+      createItems: (batch, oldDb) {
+        batch.insertAll(oldDb.banks, oldBanksData);
+        batch.insertAll(oldDb.songs, oldSongsData);
+      },
+      validateItems: (newDb) async {
+        final songs = await newDb.select(newDb.songs).get();
+        final songsByUuid = {for (final song in songs) song.uuid: song};
+        expect(songsByUuid.keys, equals({'song-1', 'song-2'}));
+
+        // Rows survive unchanged and ownership stays unset after the
+        // migration; the column simply does not exist at v6.
+        final root = songsByUuid['song-1']!;
+        expect(root.title, 'Root Song');
+        expect(root.lyrics, '[V1]\n Első sor');
+        expect(root.contentMap, '{"composer":"Composer A"}');
+        expect(root.keyField, 'C-dur');
+        expect(root.variationOf, isNull);
+        expect(root.ownership, isNull);
+
+        final variation = songsByUuid['song-2']!;
+        expect(variation.variationOf, 'song-1');
+        expect(variation.ownership, isNull);
+
+        // The lastUpdated sentinel forces a full refetch after v7.
+        final bank = await newDb.select(newDb.banks).getSingle();
+        expect(bank.lastUpdated, '1900-01-01T00:00:00');
+        expect(bank.totalSongsInBank, 2);
+      },
+    );
+  });
+
+  test('v7 keeps the fts index in sync through writes after migration', () async {
+    final oldSongsData = <v6.SongsData>[
+      const v6.SongsData(
+        id: 1,
+        uuid: 'song-1',
+        sourceBank: null,
+        contentMap: '{}',
+        title: 'Amazing grace',
+        lyrics: 'Áldás és béke',
+        lyricsFormat: 'opensong',
+        variationOf: null,
+        keyField: '',
+      ),
+    ];
+
+    await verifier.testWithDataIntegrity(
+      oldVersion: 6,
+      newVersion: 7,
+      createOld: v6.DatabaseAtV6.new,
+      createNew: v7.DatabaseAtV7.new,
+      openTestedDatabase: LyricDatabase.new,
+      createItems: (batch, oldDb) {
+        batch.insertAll(oldDb.songs, oldSongsData);
+      },
+      validateItems: (newDb) async {
+        Future<List<int>> matchedRowIds(String term) async {
+          final rows = await newDb
+              .customSelect(
+                'SELECT rowid FROM songs_fts WHERE songs_fts MATCH ?',
+                variables: [Variable.withString(term)],
+              )
+              .get();
+          return rows.map((row) => row.read<int>('rowid')).toList();
+        }
+
+        // The pre-migration row stays searchable through the recreated
+        // triggers' index; trigram needs 3+ chars, diacritics are folded.
+        expect(await matchedRowIds('mazi'), [1]);
+        expect(await matchedRowIds('ald'), [1]);
+
+        // The recreated update trigger reindexes the row.
+        await newDb.customStatement(
+          "UPDATE songs SET title = 'New title', lyrics = 'Béke és világosság' "
+          'WHERE id = 1',
+        );
+        expect(await matchedRowIds('mazi'), isEmpty);
+        expect(await matchedRowIds('ald'), isEmpty);
+        expect(await matchedRowIds('New'), [1]);
+        expect(await matchedRowIds('bék'), [1]);
+
+        // The recreated insert trigger covers new rows.
+        await newDb.customStatement(
+          "INSERT INTO songs (uuid, content_map, title, key_field) "
+          "VALUES ('song-2', '{}', 'Kegyelem', '')",
+        );
+        expect(await matchedRowIds('Kegyelem'), [2]);
+
+        // The recreated delete trigger drops removed rows.
+        await newDb.customStatement('DELETE FROM songs WHERE id = 1');
+        expect(await matchedRowIds('New'), isEmpty);
+        expect(await matchedRowIds('Kegyelem'), [2]);
       },
     );
   });

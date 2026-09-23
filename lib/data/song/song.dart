@@ -180,6 +180,7 @@ const Set<String> _excludedFromContentMap = {
   'lyrics',
   'opensong', // legacy field name
   'lyricsFormat',
+  'lyrics_format',
   'variation_of',
   'key',
 };
