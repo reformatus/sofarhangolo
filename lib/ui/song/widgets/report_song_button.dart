@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../data/bank/bank.dart';
 import '../../../data/song/song.dart';
 import '../../../services/bank/bank_of_song.dart';
 import '../../../services/bank/report_song.dart';
@@ -20,10 +21,13 @@ class ReportSongButton extends ConsumerWidget {
 
     return bank.when(
       data: (bank) {
-        final contactEmail = bank?.contactEmail;
-        if (contactEmail != null && contactEmail.isNotEmpty) {
+        // Local songs are never reported back to a remote bank.
+        if (bank.access == BankAccess.local) {
+          return SizedBox.shrink();
+        }
+        if (bank.contactEmail != null && bank.contactEmail!.isNotEmpty) {
           return TextButton.icon(
-            onPressed: () => bank?.sendReportEmail(song),
+            onPressed: () => bank.sendReportEmail(song),
             label: Text('Hibajelentés'),
             icon: Icon(Icons.textsms_outlined),
           );

@@ -97,10 +97,13 @@ Future<({Song song, bool contentDifferentFlag})> getSongForSlideJson(
 ) async {
   Song song = (await dbSongFromUuid(json['uuid']))!;
   // far future todo: handle edge cases; reading from list file, from network, from bank, from local etc
-  // TODO fix
+  final sharedContentHash = json['contentHash'];
+  // Older shares carried a salted int hash that no longer matches anything,
+  // so only compare the current String hashes and never flag on legacy ones.
   return (
     song: song,
-    contentDifferentFlag: false, //song.contentHash == json['contentHash'],
+    contentDifferentFlag:
+        sharedContentHash is String && song.contentHash != sharedContentHash,
   );
 }
 
