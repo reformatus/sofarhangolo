@@ -1,4 +1,6 @@
+import 'package:drift/drift.dart' hide isNull, isNotNull;
 import 'package:flutter_test/flutter_test.dart';
+import 'package:sofarhangolo/data/bank/bank.dart';
 import 'package:sofarhangolo/data/database.dart';
 
 import '../harness/test_harness.dart';
@@ -23,7 +25,7 @@ void main() {
             BanksCompanion.insert(
               uuid: 'test-bank-uuid',
               name: 'Test Bank',
-              baseUrl: Uri.parse('https://example.com/api'),
+              baseUrl: Value(Uri.parse('https://example.com/api')),
               parallelUpdateJobs: 2,
               amountOfSongsInRequest: 10,
               noCms: false,
@@ -33,10 +35,20 @@ void main() {
             ),
           );
 
-      // Query it back
+      // Query it back alongside the built-in local bank row every
+      // database starts with.
       final banks = await testDb.select(testDb.banks).get();
-      expect(banks, hasLength(1));
-      expect(banks.first.name, equals('Test Bank'));
+      expect(banks, hasLength(2));
+      expect(
+        banks.where((b) => b.uuid != localBankUuid).single.name,
+        equals('Test Bank'),
+      );
+      final localBanks =
+          banks.where((b) => b.access == BankAccess.local).toList();
+      expect(localBanks, hasLength(1));
+      expect(localBanks.single.uuid, localBankUuid);
+      expect(localBanks.single.name, 'Helyi dalok');
+      expect(localBanks.single.source, isNull);
     });
 
     test('clearAllTables removes all data', () async {
@@ -47,7 +59,7 @@ void main() {
             BanksCompanion.insert(
               uuid: 'test-bank',
               name: 'Test',
-              baseUrl: Uri.parse('https://example.com'),
+              baseUrl: Value(Uri.parse('https://example.com')),
               parallelUpdateJobs: 1,
               amountOfSongsInRequest: 5,
               noCms: false,

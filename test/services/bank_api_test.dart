@@ -25,6 +25,8 @@ void main() {
         null,
         null,
         null,
+        BankAccess.remote,
+        BankSource.official,
         Uri.parse('https://example.com/api'),
         1,
         1,
