@@ -1399,6 +1399,9 @@ final class Schema8 extends i0.VersionedSchema {
     banks,
     songs,
     songsFts,
+    songLinks,
+    songLinksSource,
+    songLinksTarget,
     preferenceStorage,
     cues,
     cuesUuid,
@@ -1410,7 +1413,7 @@ final class Schema8 extends i0.VersionedSchema {
     songsAd,
     songsAu,
   ];
-  late final Shape6 banks = Shape6(
+  late final Shape9 banks = Shape9(
     source: i0.VersionedTable(
       entityName: 'banks',
       withoutRowId: false,
@@ -1426,7 +1429,9 @@ final class Schema8 extends i0.VersionedSchema {
         _column_6,
         _column_7,
         _column_8,
-        _column_9,
+        _column_39,
+        _column_40,
+        _column_41,
         _column_10,
         _column_11,
         _column_12,
@@ -1441,7 +1446,7 @@ final class Schema8 extends i0.VersionedSchema {
     ),
     alias: null,
   );
-  late final Shape9 songs = Shape9(
+  late final Shape8 songs = Shape8(
     source: i0.VersionedTable(
       entityName: 'songs',
       withoutRowId: false,
@@ -1456,8 +1461,6 @@ final class Schema8 extends i0.VersionedSchema {
         _column_36,
         _column_21,
         _column_37,
-        _column_39,
-        _column_40,
         _column_22,
         _column_38,
       ],
@@ -1473,6 +1476,32 @@ final class Schema8 extends i0.VersionedSchema {
       attachedDatabase: database,
     ),
     alias: null,
+  );
+  late final Shape10 songLinks = Shape10(
+    source: i0.VersionedTable(
+      entityName: 'song_links',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: ['UNIQUE(source_uuid, type, target_uuid)'],
+      columns: [
+        _column_0,
+        _column_42,
+        _column_43,
+        _column_44,
+        _column_45,
+        _column_46,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  final i1.Index songLinksSource = i1.Index(
+    'song_links_source',
+    'CREATE INDEX song_links_source ON song_links (source_uuid)',
+  );
+  final i1.Index songLinksTarget = i1.Index(
+    'song_links_target',
+    'CREATE INDEX song_links_target ON song_links (target_uuid)',
   );
   late final Shape2 preferenceStorage = Shape2(
     source: i0.VersionedTable(
@@ -1550,39 +1579,123 @@ class Shape9 extends i0.VersionedTable {
       columnsByName['id']! as i1.GeneratedColumn<int>;
   i1.GeneratedColumn<String> get uuid =>
       columnsByName['uuid']! as i1.GeneratedColumn<String>;
-  i1.GeneratedColumn<String> get sourceBank =>
-      columnsByName['source_bank']! as i1.GeneratedColumn<String>;
-  i1.GeneratedColumn<String> get contentMap =>
-      columnsByName['content_map']! as i1.GeneratedColumn<String>;
-  i1.GeneratedColumn<String> get title =>
-      columnsByName['title']! as i1.GeneratedColumn<String>;
-  i1.GeneratedColumn<String> get lyrics =>
-      columnsByName['lyrics']! as i1.GeneratedColumn<String>;
-  i1.GeneratedColumn<String> get lyricsFormat =>
-      columnsByName['lyrics_format']! as i1.GeneratedColumn<String>;
-  i1.GeneratedColumn<String> get variationOf =>
-      columnsByName['variation_of']! as i1.GeneratedColumn<String>;
-  i1.GeneratedColumn<String> get originalSongUuid =>
-      columnsByName['original_song_uuid']! as i1.GeneratedColumn<String>;
-  i1.GeneratedColumn<String> get originalContentHash =>
-      columnsByName['original_content_hash']! as i1.GeneratedColumn<String>;
-  i1.GeneratedColumn<String> get keyField =>
-      columnsByName['key_field']! as i1.GeneratedColumn<String>;
-  i1.GeneratedColumn<String> get ownership =>
-      columnsByName['ownership']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<i2.Uint8List> get logo =>
+      columnsByName['logo']! as i1.GeneratedColumn<i2.Uint8List>;
+  i1.GeneratedColumn<i2.Uint8List> get tinyLogo =>
+      columnsByName['tiny_logo']! as i1.GeneratedColumn<i2.Uint8List>;
+  i1.GeneratedColumn<String> get name =>
+      columnsByName['name']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get description =>
+      columnsByName['description']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get legal =>
+      columnsByName['legal']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get aboutLink =>
+      columnsByName['about_link']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get contactEmail =>
+      columnsByName['contact_email']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<int> get access =>
+      columnsByName['access']! as i1.GeneratedColumn<int>;
+  i1.GeneratedColumn<int> get source =>
+      columnsByName['source']! as i1.GeneratedColumn<int>;
+  i1.GeneratedColumn<String> get baseUrl =>
+      columnsByName['base_url']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<int> get parallelUpdateJobs =>
+      columnsByName['parallel_update_jobs']! as i1.GeneratedColumn<int>;
+  i1.GeneratedColumn<int> get amountOfSongsInRequest =>
+      columnsByName['amount_of_songs_in_request']! as i1.GeneratedColumn<int>;
+  i1.GeneratedColumn<int> get noCms =>
+      columnsByName['no_cms']! as i1.GeneratedColumn<int>;
+  i1.GeneratedColumn<String> get songFields =>
+      columnsByName['song_fields']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<int> get isEnabled =>
+      columnsByName['is_enabled']! as i1.GeneratedColumn<int>;
+  i1.GeneratedColumn<int> get isOfflineMode =>
+      columnsByName['is_offline_mode']! as i1.GeneratedColumn<int>;
+  i1.GeneratedColumn<String> get lastUpdated =>
+      columnsByName['last_updated']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get failedSongUuids =>
+      columnsByName['failed_song_uuids']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<int> get totalSongsInBank =>
+      columnsByName['total_songs_in_bank']! as i1.GeneratedColumn<int>;
 }
 
-i1.GeneratedColumn<String> _column_39(String aliasedName) =>
+i1.GeneratedColumn<int> _column_39(String aliasedName) =>
+    i1.GeneratedColumn<int>(
+      'access',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.int,
+      $customConstraints: 'NOT NULL DEFAULT 0',
+      defaultValue: const i1.CustomExpression('0'),
+    );
+i1.GeneratedColumn<int> _column_40(String aliasedName) =>
+    i1.GeneratedColumn<int>(
+      'source',
+      aliasedName,
+      true,
+      type: i1.DriftSqlType.int,
+      $customConstraints: 'NULL',
+    );
+i1.GeneratedColumn<String> _column_41(String aliasedName) =>
     i1.GeneratedColumn<String>(
-      'original_song_uuid',
+      'base_url',
       aliasedName,
       true,
       type: i1.DriftSqlType.string,
       $customConstraints: 'NULL',
     );
-i1.GeneratedColumn<String> _column_40(String aliasedName) =>
+
+class Shape10 extends i0.VersionedTable {
+  Shape10({required super.source, required super.alias}) : super.aliased();
+  i1.GeneratedColumn<int> get id =>
+      columnsByName['id']! as i1.GeneratedColumn<int>;
+  i1.GeneratedColumn<String> get sourceUuid =>
+      columnsByName['source_uuid']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<int> get type =>
+      columnsByName['type']! as i1.GeneratedColumn<int>;
+  i1.GeneratedColumn<String> get targetUuid =>
+      columnsByName['target_uuid']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get targetContentHash =>
+      columnsByName['target_content_hash']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get note =>
+      columnsByName['note']! as i1.GeneratedColumn<String>;
+}
+
+i1.GeneratedColumn<String> _column_42(String aliasedName) =>
     i1.GeneratedColumn<String>(
-      'original_content_hash',
+      'source_uuid',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.string,
+      $customConstraints: 'NOT NULL',
+    );
+i1.GeneratedColumn<int> _column_43(String aliasedName) =>
+    i1.GeneratedColumn<int>(
+      'type',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.int,
+      $customConstraints: 'NOT NULL',
+    );
+i1.GeneratedColumn<String> _column_44(String aliasedName) =>
+    i1.GeneratedColumn<String>(
+      'target_uuid',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.string,
+      $customConstraints: 'NOT NULL',
+    );
+i1.GeneratedColumn<String> _column_45(String aliasedName) =>
+    i1.GeneratedColumn<String>(
+      'target_content_hash',
+      aliasedName,
+      true,
+      type: i1.DriftSqlType.string,
+      $customConstraints: 'NULL',
+    );
+i1.GeneratedColumn<String> _column_46(String aliasedName) =>
+    i1.GeneratedColumn<String>(
+      'note',
       aliasedName,
       true,
       type: i1.DriftSqlType.string,

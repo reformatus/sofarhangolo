@@ -19,13 +19,14 @@ import 'database.steps.dart';
 import 'preferences/storage.dart';
 import 'song/lyrics/format.dart';
 import 'song/song.dart';
+import 'song/song_link.dart';
 
 part 'database.g.dart';
 
 late LyricDatabase db;
 
 @DriftDatabase(
-  tables: [Songs, Banks, Assets, Cues, PreferenceStorage],
+  tables: [Songs, Banks, Assets, Cues, PreferenceStorage, SongLinks],
   include: {'song/song.drift', '../services/songs/filter.drift'},
 )
 class LyricDatabase extends _$LyricDatabase {
@@ -41,6 +42,7 @@ class LyricDatabase extends _$LyricDatabase {
     return MigrationStrategy(
       onCreate: (Migrator m) async {
         await m.createAll();
+        await _insertLocalBankRow();
       },
       // Examples for migrations at: https://github.com/simolus3/drift/blob/develop/examples/migrations_example/lib/database.dart#L58
       onUpgrade: stepByStep(
@@ -109,8 +111,12 @@ class LyricDatabase extends _$LyricDatabase {
           );
         },
         from7To8: (m, schema) async {
-          await m.addColumn(schema.songs, schema.songs.originalSongUuid);
-          await m.addColumn(schema.songs, schema.songs.originalContentHash);
+          await m.createTable(schema.songLinks);
+          await m.alterTable(TableMigration(schema.banks));
+          // Every pre-existing bank predates the source dimension, so it is
+          // an official one. New banks get their source from the metadata API.
+          await customStatement('UPDATE banks SET source = 0');
+          await _insertLocalBankRow();
         },
       ),
     );
@@ -124,6 +130,36 @@ class LyricDatabase extends _$LyricDatabase {
         driftWorker: Uri.parse('drift_worker.js'),
       ),
     );
+  }
+
+  /// Inserts the built-in local bank row that stores user-created and
+  /// copied songs. Idempotent; called on fresh installs and from the
+  /// v7→v8 migration so both paths share this single definition.
+  Future<void> _insertLocalBankRow() async {
+    final localBank = Bank(
+      0, // unused; toColumns leaves the autoincrement id absent
+      localBankUuid,
+      null, // logo
+      null, // tinyLogo
+      'Helyi dalok',
+      null, // description
+      null, // legal
+      null, // aboutLink
+      null, // contactEmail
+      BankAccess.local,
+      null, // source: official/unofficial is a remote-bank concept
+      null, // baseUrl: local banks have no remote endpoint
+      1, // parallelUpdateJobs
+      1, // amountOfSongsInRequest
+      false, // noCms
+      const {}, // songFields
+      true, // isEnabled
+      false, // isOfflineMode
+      null, // lastUpdated
+      null, // failedSongUuids
+      null, // totalSongsInBank
+    );
+    await into(banks).insert(localBank, mode: InsertMode.insertOrIgnore);
   }
 }
 

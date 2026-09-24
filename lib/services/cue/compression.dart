@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:archive/archive.dart';
 import 'package:msgpack_dart/msgpack_dart.dart';
 
-Map<String, dynamic> _withShortSongUuids(Map<String, dynamic> cueJson) {
+Map<String, dynamic> _withCompactSongs(Map<String, dynamic> cueJson) {
   final result = Map<String, dynamic>.from(cueJson);
   final content = result['content'];
 
@@ -19,6 +19,10 @@ Map<String, dynamic> _withShortSongUuids(Map<String, dynamic> cueJson) {
       if (song is! Map) return slide;
 
       final songMap = Map<String, dynamic>.from(song);
+      // Drop content hashes: the recipient resolves songs from their own
+      // banks, where hashes are meaningless drift for the QR/link payload.
+      songMap.remove('contentHash');
+
       final uuid = songMap['uuid'];
       if (uuid is String && uuid.isNotEmpty) {
         final dashIndex = uuid.indexOf('-');
@@ -78,8 +82,9 @@ Map<String, dynamic> _ensureKeys(Map json, List<String> expectedKeys) {
 /// 3. Compress with gzip
 /// 4. Encode as base64url for URL safety
 String compressCueForUrl(Map<String, dynamic> cueJson) {
-  // Step 1: Replace full song UUIDs with their first segment.
-  final shortened = _withShortSongUuids(cueJson);
+  // Step 1: Replace full song UUIDs with their first segment and drop
+  // per-song content hashes, keeping QR/link payloads at a fixed weight.
+  final shortened = _withCompactSongs(cueJson);
 
   // Step 2: Remove nulls
   final cleaned = _removeNulls(shortened);

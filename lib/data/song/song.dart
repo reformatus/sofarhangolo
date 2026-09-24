@@ -18,13 +18,6 @@ class Song extends Insertable<Song> {
   final String? variationOf;
   final List<KeyField> keyField;
 
-  /// Uuid of the bank song this local song was copied from, if any.
-  final String? originalSongUuid;
-
-  /// [Song.stableContentHash] of the original bank song at copy time,
-  /// used to detect when the original changed since the copy was made.
-  final String? originalContentHash;
-
   Map<String, String> contentMap;
 
   /// Records which fields the song owns in its own (raw) bank data, as
@@ -113,17 +106,17 @@ class Song extends Insertable<Song> {
     required this.contentMap,
     this.sourceBank,
     this.ownership,
-    this.originalSongUuid,
-    this.originalContentHash,
   });
 
-  /// Creates a new local (bank-independent) song with a fresh uuid.
+  /// Creates a new local song with a fresh uuid. Local songs live in the
+  /// app's local bank and are never touched by bank updates.
   factory Song.local({
     required String title,
     String? lyrics,
     LyricsFormat lyricsFormat = LyricsFormat.opensong,
     List<KeyField> keyField = const [],
     Map<String, String> contentMap = const {},
+    String? sourceBank,
   }) {
     return Song(
       uuid: UuidV4().generate(),
@@ -132,6 +125,7 @@ class Song extends Insertable<Song> {
       lyricsFormat: lyricsFormat,
       keyField: keyField,
       contentMap: contentMap,
+      sourceBank: sourceBank,
     );
   }
 
@@ -144,8 +138,7 @@ class Song extends Insertable<Song> {
     String? variationOf,
     List<KeyField>? keyField,
     Map<String, String>? contentMap,
-    String? originalSongUuid,
-    String? originalContentHash,
+    SongFieldOwnership? ownership,
   }) {
     return Song(
       uuid: uuid ?? this.uuid,
@@ -156,8 +149,7 @@ class Song extends Insertable<Song> {
       variationOf: variationOf ?? this.variationOf,
       keyField: keyField ?? this.keyField,
       contentMap: contentMap ?? this.contentMap,
-      originalSongUuid: originalSongUuid ?? this.originalSongUuid,
-      originalContentHash: originalContentHash ?? this.originalContentHash,
+      ownership: ownership ?? this.ownership,
     );
   }
 
@@ -172,11 +164,24 @@ class Song extends Insertable<Song> {
     return keyField.first;
   }
 
-  int get contentHash => Object.hash(
-    jsonEncode(contentMap),
-    jsonEncode(keyField.map((e) => e.toString()).toList()),
-    sourceBank,
-  );
+  /// Deterministic hash over the song's content (title, lyrics, key and
+  /// remaining content fields), stable across processes and devices.
+  ///
+  /// Persisted into cue shares and local-copy links to detect content drift,
+  /// so it must not use [Object.hash] (which is salted per process) and must
+  /// ignore identity fields (uuid, sourceBank).
+  String get contentHash {
+    final sortedContentMap = Map.fromEntries(
+      contentMap.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
+    );
+    final payload = jsonEncode({
+      'title': title,
+      'lyrics': lyrics,
+      'keyField': keyField.map((e) => e.toString()).toList(),
+      'contentMap': sortedContentMap,
+    });
+    return md5.convert(utf8.encode(payload)).toString();
+  }
 
   /// Whether [other] carries the same values for the fields the variation
   /// merge can change: contentMap, keyField and lyrics. Identity fields are
@@ -203,25 +208,6 @@ class Song extends Insertable<Song> {
     return true;
   }
 
-  /// Deterministic hash over the song's content (title, lyrics, key and
-  /// remaining content fields), stable across processes and devices.
-  ///
-  /// Unlike [contentHash], this ignores identity fields (uuid, sourceBank)
-  /// and doesn't use [Object.hash], so it can be persisted and compared to
-  /// detect when a bank song changed relative to a local copy made of it.
-  String get stableContentHash {
-    final sortedContentMap = Map.fromEntries(
-      contentMap.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
-    );
-    final payload = jsonEncode({
-      'title': title,
-      'lyrics': lyrics,
-      'keyField': keyField.map((e) => e.toString()).toList(),
-      'contentMap': sortedContentMap,
-    });
-    return md5.convert(utf8.encode(payload)).toString();
-  }
-
   @override
   bool operator ==(Object other) {
     if (other is! Song) return false;
@@ -243,8 +229,6 @@ class Song extends Insertable<Song> {
       variationOf: Value(variationOf),
       keyField: Value(keyField),
       ownership: Value(ownership),
-      originalSongUuid: Value(originalSongUuid),
-      originalContentHash: Value(originalContentHash),
     ).toColumns(nullToAbsent);
   }
 }
@@ -278,8 +262,6 @@ class Songs extends Table {
       .withDefault(const Constant('opensong'))
       .map(const LyricsFormatConverter())();
   TextColumn get variationOf => text().nullable()();
-  TextColumn get originalSongUuid => text().nullable()();
-  TextColumn get originalContentHash => text().nullable()();
   TextColumn get keyField => text().map(const KeyFieldConverter())();
   TextColumn get ownership =>
       text().nullable().map(const SongFieldOwnershipConverter())();

@@ -112,10 +112,38 @@
             "dsl_features": []
           },
           {
+            "name": "access",
+            "getter_name": "access",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": "const CustomExpression('0')",
+            "default_client_dart": null,
+            "dsl_features": [],
+            "type_converter": {
+              "dart_expr": "const EnumIndexConverter<BankAccess>(BankAccess.values)",
+              "dart_type_name": "BankAccess"
+            }
+          },
+          {
+            "name": "source",
+            "getter_name": "source",
+            "moor_type": "int",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [],
+            "type_converter": {
+              "dart_expr": "const EnumIndexConverter<BankSource>(BankSource.values)",
+              "dart_type_name": "BankSource"
+            }
+          },
+          {
             "name": "base_url",
             "getter_name": "baseUrl",
             "moor_type": "string",
-            "nullable": false,
+            "nullable": true,
             "customConstraints": null,
             "default_dart": null,
             "default_client_dart": null,
@@ -358,26 +386,6 @@
             "dsl_features": []
           },
           {
-            "name": "original_song_uuid",
-            "getter_name": "originalSongUuid",
-            "moor_type": "string",
-            "nullable": true,
-            "customConstraints": null,
-            "default_dart": null,
-            "default_client_dart": null,
-            "dsl_features": []
-          },
-          {
-            "name": "original_content_hash",
-            "getter_name": "originalContentHash",
-            "moor_type": "string",
-            "nullable": true,
-            "customConstraints": null,
-            "default_dart": null,
-            "default_client_dart": null,
-            "dsl_features": []
-          },
-          {
             "name": "key_field",
             "getter_name": "keyField",
             "moor_type": "string",
@@ -453,6 +461,135 @@
       "references": [],
       "type": "table",
       "data": {
+        "name": "song_links",
+        "was_declared_in_moor": false,
+        "columns": [
+          {
+            "name": "id",
+            "getter_name": "id",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "defaultConstraints": "PRIMARY KEY AUTOINCREMENT",
+            "dialectAwareDefaultConstraints": {
+              "sqlite": "PRIMARY KEY AUTOINCREMENT"
+            },
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [
+              "auto-increment"
+            ]
+          },
+          {
+            "name": "source_uuid",
+            "getter_name": "sourceUuid",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "type",
+            "getter_name": "type",
+            "moor_type": "int",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": [],
+            "type_converter": {
+              "dart_expr": "const EnumIndexConverter<SongLinkType>(SongLinkType.values)",
+              "dart_type_name": "SongLinkType"
+            }
+          },
+          {
+            "name": "target_uuid",
+            "getter_name": "targetUuid",
+            "moor_type": "string",
+            "nullable": false,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "target_content_hash",
+            "getter_name": "targetContentHash",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          },
+          {
+            "name": "note",
+            "getter_name": "note",
+            "moor_type": "string",
+            "nullable": true,
+            "customConstraints": null,
+            "default_dart": null,
+            "default_client_dart": null,
+            "dsl_features": []
+          }
+        ],
+        "is_virtual": false,
+        "without_rowid": false,
+        "constraints": [],
+        "unique_keys": [
+          [
+            "source_uuid",
+            "type",
+            "target_uuid"
+          ]
+        ]
+      }
+    },
+    {
+      "id": 4,
+      "references": [
+        3
+      ],
+      "type": "index",
+      "data": {
+        "on": 3,
+        "name": "song_links_source",
+        "sql": null,
+        "unique": false,
+        "columns": [
+          {
+            "column": "source_uuid",
+            "order_by": null
+          }
+        ]
+      }
+    },
+    {
+      "id": 5,
+      "references": [
+        3
+      ],
+      "type": "index",
+      "data": {
+        "on": 3,
+        "name": "song_links_target",
+        "sql": null,
+        "unique": false,
+        "columns": [
+          {
+            "column": "target_uuid",
+            "order_by": null
+          }
+        ]
+      }
+    },
+    {
+      "id": 6,
+      "references": [],
+      "type": "table",
+      "data": {
         "name": "preference_storage",
         "was_declared_in_moor": false,
         "columns": [
@@ -490,7 +627,7 @@
       }
     },
     {
-      "id": 4,
+      "id": 7,
       "references": [],
       "type": "table",
       "data": {
@@ -574,13 +711,13 @@
       }
     },
     {
-      "id": 5,
+      "id": 8,
       "references": [
-        4
+        7
       ],
       "type": "index",
       "data": {
-        "on": 4,
+        "on": 7,
         "name": "cues_uuid",
         "sql": null,
         "unique": true,
@@ -593,7 +730,7 @@
       }
     },
     {
-      "id": 6,
+      "id": 9,
       "references": [],
       "type": "table",
       "data": {
@@ -663,13 +800,13 @@
       }
     },
     {
-      "id": 7,
+      "id": 10,
       "references": [
-        6
+        9
       ],
       "type": "index",
       "data": {
-        "on": 6,
+        "on": 9,
         "name": "asset_source_url",
         "sql": null,
         "unique": true,
@@ -682,7 +819,7 @@
       }
     },
     {
-      "id": 8,
+      "id": 11,
       "references": [
         1
       ],
@@ -701,7 +838,7 @@
       }
     },
     {
-      "id": 9,
+      "id": 12,
       "references": [
         1
       ],
@@ -720,7 +857,7 @@
       }
     },
     {
-      "id": 10,
+      "id": 13,
       "references": [
         1,
         2
@@ -737,7 +874,7 @@
       }
     },
     {
-      "id": 11,
+      "id": 14,
       "references": [
         1,
         2
@@ -754,7 +891,7 @@
       }
     },
     {
-      "id": 12,
+      "id": 15,
       "references": [
         1,
         2
@@ -777,7 +914,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TABLE IF NOT EXISTS \"banks\" (\"id\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \"uuid\" TEXT NOT NULL, \"logo\" BLOB NULL, \"tiny_logo\" BLOB NULL, \"name\" TEXT NOT NULL, \"description\" TEXT NULL, \"legal\" TEXT NULL, \"about_link\" TEXT NULL, \"contact_email\" TEXT NULL, \"base_url\" TEXT NOT NULL, \"parallel_update_jobs\" INTEGER NOT NULL, \"amount_of_songs_in_request\" INTEGER NOT NULL, \"no_cms\" INTEGER NOT NULL CHECK (\"no_cms\" IN (0, 1)), \"song_fields\" TEXT NOT NULL, \"is_enabled\" INTEGER NOT NULL CHECK (\"is_enabled\" IN (0, 1)), \"is_offline_mode\" INTEGER NOT NULL CHECK (\"is_offline_mode\" IN (0, 1)), \"last_updated\" TEXT NULL, \"failed_song_uuids\" TEXT NULL, \"total_songs_in_bank\" INTEGER NULL);"
+          "sql": "CREATE TABLE IF NOT EXISTS \"banks\" (\"id\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \"uuid\" TEXT NOT NULL, \"logo\" BLOB NULL, \"tiny_logo\" BLOB NULL, \"name\" TEXT NOT NULL, \"description\" TEXT NULL, \"legal\" TEXT NULL, \"about_link\" TEXT NULL, \"contact_email\" TEXT NULL, \"access\" INTEGER NOT NULL DEFAULT 0, \"source\" INTEGER NULL, \"base_url\" TEXT NULL, \"parallel_update_jobs\" INTEGER NOT NULL, \"amount_of_songs_in_request\" INTEGER NOT NULL, \"no_cms\" INTEGER NOT NULL CHECK (\"no_cms\" IN (0, 1)), \"song_fields\" TEXT NOT NULL, \"is_enabled\" INTEGER NOT NULL CHECK (\"is_enabled\" IN (0, 1)), \"is_offline_mode\" INTEGER NOT NULL CHECK (\"is_offline_mode\" IN (0, 1)), \"last_updated\" TEXT NULL, \"failed_song_uuids\" TEXT NULL, \"total_songs_in_bank\" INTEGER NULL);"
         }
       ]
     },
@@ -786,7 +923,7 @@
       "sql": [
         {
           "dialect": "sqlite",
-          "sql": "CREATE TABLE IF NOT EXISTS \"songs\" (\"id\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \"uuid\" TEXT NOT NULL, \"source_bank\" TEXT NULL REFERENCES banks (uuid), \"content_map\" TEXT NOT NULL, \"title\" TEXT NOT NULL, \"lyrics\" TEXT NULL, \"lyrics_format\" TEXT NOT NULL DEFAULT 'opensong', \"variation_of\" TEXT NULL, \"original_song_uuid\" TEXT NULL, \"original_content_hash\" TEXT NULL, \"key_field\" TEXT NOT NULL, \"ownership\" TEXT NULL);"
+          "sql": "CREATE TABLE IF NOT EXISTS \"songs\" (\"id\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \"uuid\" TEXT NOT NULL, \"source_bank\" TEXT NULL REFERENCES banks (uuid), \"content_map\" TEXT NOT NULL, \"title\" TEXT NOT NULL, \"lyrics\" TEXT NULL, \"lyrics_format\" TEXT NOT NULL DEFAULT 'opensong', \"variation_of\" TEXT NULL, \"key_field\" TEXT NOT NULL, \"ownership\" TEXT NULL);"
         }
       ]
     },
@@ -796,6 +933,33 @@
         {
           "dialect": "sqlite",
           "sql": "CREATE VIRTUAL TABLE IF NOT EXISTS \"songs_fts\" USING fts5(title, lyrics, content='songs', content_rowid='id', tokenize='trigram remove_diacritics 1');"
+        }
+      ]
+    },
+    {
+      "name": "song_links",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE TABLE IF NOT EXISTS \"song_links\" (\"id\" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, \"source_uuid\" TEXT NOT NULL, \"type\" INTEGER NOT NULL, \"target_uuid\" TEXT NOT NULL, \"target_content_hash\" TEXT NULL, \"note\" TEXT NULL, UNIQUE (\"source_uuid\", \"type\", \"target_uuid\"));"
+        }
+      ]
+    },
+    {
+      "name": "song_links_source",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX song_links_source ON song_links (source_uuid)"
+        }
+      ]
+    },
+    {
+      "name": "song_links_target",
+      "sql": [
+        {
+          "dialect": "sqlite",
+          "sql": "CREATE INDEX song_links_target ON song_links (target_uuid)"
         }
       ]
     },

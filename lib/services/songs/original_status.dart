@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../../data/database.dart';
 import '../../data/song/song.dart';
+import '../../data/song/song_link.dart';
 
 part 'original_status.g.dart';
 
@@ -20,24 +21,30 @@ enum OriginalSongStatus {
 
 /// Tracks whether the bank original of a local song copy changed or vanished.
 ///
-/// Returns null when [song] is not a copy of another song
-/// ([Song.originalSongUuid] is null).
+/// Returns null when [song] has no [SongLinkType.localCopyOf] link.
 @riverpod
 Future<OriginalSongStatus?> originalSongStatus(Ref ref, Song song) async {
-  final originalUuid = song.originalSongUuid;
-  if (originalUuid == null) {
+  final link = await (db.songLinks.select()
+        ..where(
+          (l) =>
+              l.sourceUuid.equals(song.uuid) &
+              l.type.equals(SongLinkType.localCopyOf.index),
+        ))
+      .getSingleOrNull();
+
+  if (link == null) {
     return null;
   }
 
   final original = await (db.songs.select()
-        ..where((s) => s.uuid.equals(originalUuid)))
+        ..where((s) => s.uuid.equals(link.targetUuid)))
       .getSingleOrNull();
 
   if (original == null) {
     return OriginalSongStatus.missing;
   }
 
-  return original.stableContentHash == song.originalContentHash
+  return original.contentHash == link.targetContentHash
       ? OriginalSongStatus.unchanged
       : OriginalSongStatus.changed;
 }
