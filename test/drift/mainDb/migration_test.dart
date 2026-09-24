@@ -15,6 +15,7 @@ import 'generated/schema_v6.dart' as v6;
 import 'generated/schema_v7.dart' as v7;
 import 'generated/schema_v8.dart' as v8;
 
+import 'package:sofarhangolo/data/bank/bank.dart';
 import 'package:sofarhangolo/data/database.dart';
 
 /// Migration tests are tagged so they can be excluded until migrations are implemented.
@@ -497,7 +498,7 @@ void main() {
   });
 
   test(
-    'migration from v7 to v8 adds original song columns and keeps data',
+    'migration from v7 to v8 adds song links, bank access and local bank',
     () async {
       const ownershipJson =
           '{"contentKeys":["composer"],"keyField":true,"lyrics":true}';
@@ -566,8 +567,8 @@ void main() {
           final songsByUuid = {for (final song in songs) song.uuid: song};
           expect(songsByUuid.keys, equals({'song-1', 'song-2'}));
 
-          // Rows survive unchanged; the new columns are added empty and
-          // existing ownership metadata is not touched.
+          // Rows survive unchanged; v8 does not alter the songs table,
+          // so existing ownership metadata is not touched.
           final root = songsByUuid['song-1']!;
           expect(root.title, 'Root Song');
           expect(root.lyrics, '[V1]\n Első sor');
@@ -575,18 +576,29 @@ void main() {
           expect(root.keyField, 'C-dur');
           expect(root.variationOf, isNull);
           expect(root.ownership, ownershipJson);
-          expect(root.originalSongUuid, isNull);
-          expect(root.originalContentHash, isNull);
 
           final variation = songsByUuid['song-2']!;
           expect(variation.variationOf, 'song-1');
           expect(variation.ownership, isNull);
-          expect(variation.originalSongUuid, isNull);
-          expect(variation.originalContentHash, isNull);
 
-          // v8 does not touch banks, so no refetch sentinel is set.
-          final bank = await newDb.select(newDb.banks).getSingle();
+          // Existing banks become remote and official; the migration
+          // also creates the built-in local bank row.
+          final banks = await newDb.select(newDb.banks).get();
+          final bank = banks.singleWhere((b) => b.uuid == 'bank-1');
+          expect(bank.name, 'Migration Bank');
+          expect(bank.access, BankAccess.remote.index);
+          expect(bank.source, BankSource.official.index);
+          expect(bank.baseUrl, 'https://example.com');
           expect(bank.lastUpdated, '2026-02-14T10:00:00');
+
+          final localBank = banks.singleWhere((b) => b.uuid == localBankUuid);
+          expect(localBank.name, 'Helyi dalok');
+          expect(localBank.access, BankAccess.local.index);
+          expect(localBank.source, isNull);
+          expect(localBank.baseUrl, isNull);
+
+          // v8 adds an empty song links table.
+          expect(await newDb.select(newDb.songLinks).get(), isEmpty);
 
           // The FTS triggers recreated at v7 keep working after v8.
           Future<List<int>> matchedRowIds(String term) async {

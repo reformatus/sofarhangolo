@@ -120,7 +120,7 @@ Future<Bank> insertCueHarnessBank({
         BanksCompanion.insert(
           uuid: uuid,
           name: 'Cue Harness Bank',
-          baseUrl: baseUrl ?? Uri.parse('https://example.com/assets/'),
+          baseUrl: Value(baseUrl ?? Uri.parse('https://example.com/assets/')),
           parallelUpdateJobs: 1,
           amountOfSongsInRequest: 1,
           noCms: false,

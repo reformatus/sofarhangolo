@@ -112,7 +112,19 @@ class LyricDatabase extends _$LyricDatabase {
         },
         from7To8: (m, schema) async {
           await m.createTable(schema.songLinks);
-          await m.alterTable(TableMigration(schema.banks));
+          await m.alterTable(
+            TableMigration(
+              schema.banks,
+              // Omitted from the data copy, so their column defaults
+              // apply: access defaults to remote, source stays null
+              // until the update below marks existing banks official.
+              newColumns: [schema.banks.access, schema.banks.source],
+            ),
+          );
+          // createTable doesn't create the table's indexes; only a fresh
+          // createAll() would, so step-by-step migrations need these.
+          await m.createIndex(schema.songLinksSource);
+          await m.createIndex(schema.songLinksTarget);
           // Every pre-existing bank predates the source dimension, so it is
           // an official one. New banks get their source from the metadata API.
           await customStatement('UPDATE banks SET source = 0');
