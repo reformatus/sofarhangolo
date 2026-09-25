@@ -13,7 +13,9 @@ import 'generated/schema_v4.dart' as v4;
 import 'generated/schema_v5.dart' as v5;
 import 'generated/schema_v6.dart' as v6;
 import 'generated/schema_v7.dart' as v7;
+import 'generated/schema_v8.dart' as v8;
 
+import 'package:sofarhangolo/data/bank/bank.dart';
 import 'package:sofarhangolo/data/database.dart';
 
 /// Migration tests are tagged so they can be excluded until migrations are implemented.
@@ -494,4 +496,129 @@ void main() {
       },
     );
   });
+
+  test(
+    'migration from v7 to v8 adds song links, bank access and local bank',
+    () async {
+      const ownershipJson =
+          '{"contentKeys":["composer"],"keyField":true,"lyrics":true}';
+      final oldBanksData = <v7.BanksData>[
+        const v7.BanksData(
+          id: 1,
+          uuid: 'bank-1',
+          logo: null,
+          tinyLogo: null,
+          name: 'Migration Bank',
+          description: null,
+          legal: null,
+          aboutLink: null,
+          contactEmail: null,
+          baseUrl: 'https://example.com',
+          parallelUpdateJobs: 1,
+          amountOfSongsInRequest: 10,
+          noCms: 0,
+          songFields: '{}',
+          isEnabled: 1,
+          isOfflineMode: 0,
+          lastUpdated: '2026-02-14T10:00:00',
+          failedSongUuids: null,
+          totalSongsInBank: 2,
+        ),
+      ];
+      final oldSongsData = <v7.SongsData>[
+        const v7.SongsData(
+          id: 1,
+          uuid: 'song-1',
+          sourceBank: 'bank-1',
+          contentMap: '{"composer":"Composer A"}',
+          title: 'Root Song',
+          lyrics: '[V1]\n Első sor',
+          lyricsFormat: 'opensong',
+          variationOf: null,
+          keyField: 'C-dur',
+          ownership: ownershipJson,
+        ),
+        const v7.SongsData(
+          id: 2,
+          uuid: 'song-2',
+          sourceBank: 'bank-1',
+          contentMap: '{}',
+          title: 'Variation Song',
+          lyrics: '[V1]\n Második sor',
+          lyricsFormat: 'opensong',
+          variationOf: 'song-1',
+          keyField: '',
+          ownership: null,
+        ),
+      ];
+
+      await verifier.testWithDataIntegrity(
+        oldVersion: 7,
+        newVersion: 8,
+        createOld: v7.DatabaseAtV7.new,
+        createNew: v8.DatabaseAtV8.new,
+        openTestedDatabase: LyricDatabase.new,
+        createItems: (batch, oldDb) {
+          batch.insertAll(oldDb.banks, oldBanksData);
+          batch.insertAll(oldDb.songs, oldSongsData);
+        },
+        validateItems: (newDb) async {
+          final songs = await newDb.select(newDb.songs).get();
+          final songsByUuid = {for (final song in songs) song.uuid: song};
+          expect(songsByUuid.keys, equals({'song-1', 'song-2'}));
+
+          // Rows survive unchanged; v8 does not alter the songs table,
+          // so existing ownership metadata is not touched.
+          final root = songsByUuid['song-1']!;
+          expect(root.title, 'Root Song');
+          expect(root.lyrics, '[V1]\n Első sor');
+          expect(root.contentMap, '{"composer":"Composer A"}');
+          expect(root.keyField, 'C-dur');
+          expect(root.variationOf, isNull);
+          expect(root.ownership, ownershipJson);
+
+          final variation = songsByUuid['song-2']!;
+          expect(variation.variationOf, 'song-1');
+          expect(variation.ownership, isNull);
+
+          // Existing banks become remote and official; the migration
+          // also creates the built-in local bank row.
+          final banks = await newDb.select(newDb.banks).get();
+          final bank = banks.singleWhere((b) => b.uuid == 'bank-1');
+          expect(bank.name, 'Migration Bank');
+          expect(bank.access, BankAccess.remote.index);
+          expect(bank.source, BankSource.official.index);
+          expect(bank.baseUrl, 'https://example.com');
+          expect(bank.lastUpdated, '2026-02-14T10:00:00');
+
+          final localBank = banks.singleWhere((b) => b.uuid == localBankUuid);
+          expect(localBank.name, 'Helyi dalok');
+          expect(localBank.access, BankAccess.local.index);
+          expect(localBank.source, isNull);
+          expect(localBank.baseUrl, isNull);
+
+          // v8 adds an empty song links table.
+          expect(await newDb.select(newDb.songLinks).get(), isEmpty);
+
+          // The FTS triggers recreated at v7 keep working after v8.
+          Future<List<int>> matchedRowIds(String term) async {
+            final rows = await newDb
+                .customSelect(
+                  'SELECT rowid FROM songs_fts WHERE songs_fts MATCH ?',
+                  variables: [Variable.withString(term)],
+                )
+                .get();
+            return rows.map((row) => row.read<int>('rowid')).toList();
+          }
+
+          expect(await matchedRowIds('Első'), [1]);
+          await newDb.customStatement(
+            "INSERT INTO songs (uuid, content_map, title, key_field) "
+            "VALUES ('song-3', '{}', 'Kegyelem', '')",
+          );
+          expect(await matchedRowIds('Kegyelem'), [3]);
+        },
+      );
+    },
+  );
 }

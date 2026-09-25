@@ -1,6 +1,8 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
+import 'package:uuid/v4.dart';
 
 import '../bank/bank.dart';
 import '../database.dart';
@@ -106,6 +108,51 @@ class Song extends Insertable<Song> {
     this.ownership,
   });
 
+  /// Creates a new local song with a fresh uuid. Local songs live in the
+  /// app's local bank and are never touched by bank updates.
+  factory Song.local({
+    required String title,
+    String? lyrics,
+    LyricsFormat lyricsFormat = LyricsFormat.opensong,
+    List<KeyField> keyField = const [],
+    Map<String, String> contentMap = const {},
+    String? sourceBank,
+  }) {
+    return Song(
+      uuid: UuidV4().generate(),
+      title: title,
+      lyrics: lyrics,
+      lyricsFormat: lyricsFormat,
+      keyField: keyField,
+      contentMap: contentMap,
+      sourceBank: sourceBank,
+    );
+  }
+
+  Song copyWith({
+    String? uuid,
+    String? sourceBank,
+    String? title,
+    String? lyrics,
+    LyricsFormat? lyricsFormat,
+    String? variationOf,
+    List<KeyField>? keyField,
+    Map<String, String>? contentMap,
+    SongFieldOwnership? ownership,
+  }) {
+    return Song(
+      uuid: uuid ?? this.uuid,
+      sourceBank: sourceBank ?? this.sourceBank,
+      title: title ?? this.title,
+      lyrics: lyrics ?? this.lyrics,
+      lyricsFormat: lyricsFormat ?? this.lyricsFormat,
+      variationOf: variationOf ?? this.variationOf,
+      keyField: keyField ?? this.keyField,
+      contentMap: contentMap ?? this.contentMap,
+      ownership: ownership ?? this.ownership,
+    );
+  }
+
   String? get firstLine {
     return lyrics != null
         ? LyricsParser.forFormat(lyricsFormat).getFirstLine(lyrics!)
@@ -117,11 +164,24 @@ class Song extends Insertable<Song> {
     return keyField.first;
   }
 
-  int get contentHash => Object.hash(
-    jsonEncode(contentMap),
-    jsonEncode(keyField.map((e) => e.toString()).toList()),
-    sourceBank,
-  );
+  /// Deterministic hash over the song's content (title, lyrics, key and
+  /// remaining content fields), stable across processes and devices.
+  ///
+  /// Persisted into cue shares and local-copy links to detect content drift,
+  /// so it must not use [Object.hash] (which is salted per process) and must
+  /// ignore identity fields (uuid, sourceBank).
+  String get contentHash {
+    final sortedContentMap = Map.fromEntries(
+      contentMap.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
+    );
+    final payload = jsonEncode({
+      'title': title,
+      'lyrics': lyrics,
+      'keyField': keyField.map((e) => e.toString()).toList(),
+      'contentMap': sortedContentMap,
+    });
+    return md5.convert(utf8.encode(payload)).toString();
+  }
 
   /// Whether [other] carries the same values for the fields the variation
   /// merge can change: contentMap, keyField and lyrics. Identity fields are

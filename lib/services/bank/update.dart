@@ -84,6 +84,8 @@ Future<Set<String>> updateBanks(Dio dio) async {
       id: Value.absentIfNull(existingBank?.id),
       uuid: Value(details['uuid']!),
       baseUrl: Value(Uri.parse(protoBank['api'])),
+      // Banks discovered through the official metadata API are official.
+      source: Value(BankSource.official),
       logo: Value.absentIfNull(logo),
       tinyLogo: Value.absentIfNull(tinyLogo),
       name: Value(details['name']!),

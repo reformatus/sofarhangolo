@@ -33,7 +33,7 @@ void main() {
             BanksCompanion.insert(
               uuid: 'bank-1',
               name: 'Test Bank',
-              baseUrl: Uri.parse('https://example.com/api'),
+              baseUrl: Value(Uri.parse('https://example.com/api')),
               parallelUpdateJobs: 1,
               amountOfSongsInRequest: 1,
               noCms: false,
@@ -43,7 +43,8 @@ void main() {
             ),
           );
 
-      return db.select(db.banks).getSingle();
+      return (db.banks.select()..where((b) => b.uuid.equals('bank-1')))
+          .getSingle();
     }
 
     test('deletes assets when song content changes', () async {
@@ -431,7 +432,7 @@ void main() {
             BanksCompanion.insert(
               uuid: 'bank-1',
               name: 'Test Bank',
-              baseUrl: Uri.parse('https://example.com/api'),
+              baseUrl: Value(Uri.parse('https://example.com/api')),
               parallelUpdateJobs: 1,
               amountOfSongsInRequest: 1,
               noCms: false,
@@ -441,7 +442,8 @@ void main() {
             ),
           );
 
-      return db.select(db.banks).getSingle();
+      return (db.banks.select()..where((b) => b.uuid.equals('bank-1')))
+          .getSingle();
     }
 
     Future<Song> songByUuid(String uuid) =>
@@ -717,7 +719,7 @@ void main() {
             BanksCompanion.insert(
               uuid: 'bank-1',
               name: 'Test Bank',
-              baseUrl: Uri.parse('https://example.com/api'),
+              baseUrl: Value(Uri.parse('https://example.com/api')),
               parallelUpdateJobs: 1,
               amountOfSongsInRequest: 1,
               noCms: false,
@@ -727,7 +729,8 @@ void main() {
             ),
           );
 
-      return db.select(db.banks).getSingle();
+      return (db.banks.select()..where((b) => b.uuid.equals('bank-1')))
+          .getSingle();
     }
 
     Future<Song> songByUuid(String uuid) =>

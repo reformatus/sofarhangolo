@@ -19,13 +19,14 @@ import 'database.steps.dart';
 import 'preferences/storage.dart';
 import 'song/lyrics/format.dart';
 import 'song/song.dart';
+import 'song/song_link.dart';
 
 part 'database.g.dart';
 
 late LyricDatabase db;
 
 @DriftDatabase(
-  tables: [Songs, Banks, Assets, Cues, PreferenceStorage],
+  tables: [Songs, Banks, Assets, Cues, PreferenceStorage, SongLinks],
   include: {'song/song.drift', '../services/songs/filter.drift'},
 )
 class LyricDatabase extends _$LyricDatabase {
@@ -34,13 +35,14 @@ class LyricDatabase extends _$LyricDatabase {
     : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration {
     return MigrationStrategy(
       onCreate: (Migrator m) async {
         await m.createAll();
+        await _insertLocalBankRow();
       },
       // Examples for migrations at: https://github.com/simolus3/drift/blob/develop/examples/migrations_example/lib/database.dart#L58
       onUpgrade: stepByStep(
@@ -108,6 +110,26 @@ class LyricDatabase extends _$LyricDatabase {
             "UPDATE banks SET last_updated = '1900-01-01T00:00:00'",
           );
         },
+        from7To8: (m, schema) async {
+          await m.createTable(schema.songLinks);
+          await m.alterTable(
+            TableMigration(
+              schema.banks,
+              // Omitted from the data copy, so their column defaults
+              // apply: access defaults to remote, source stays null
+              // until the update below marks existing banks official.
+              newColumns: [schema.banks.access, schema.banks.source],
+            ),
+          );
+          // createTable doesn't create the table's indexes; only a fresh
+          // createAll() would, so step-by-step migrations need these.
+          await m.createIndex(schema.songLinksSource);
+          await m.createIndex(schema.songLinksTarget);
+          // Every pre-existing bank predates the source dimension, so it is
+          // an official one. New banks get their source from the metadata API.
+          await customStatement('UPDATE banks SET source = 0');
+          await _insertLocalBankRow();
+        },
       ),
     );
   }
@@ -120,6 +142,36 @@ class LyricDatabase extends _$LyricDatabase {
         driftWorker: Uri.parse('drift_worker.js'),
       ),
     );
+  }
+
+  /// Inserts the built-in local bank row that stores user-created and
+  /// copied songs. Idempotent; called on fresh installs and from the
+  /// v7→v8 migration so both paths share this single definition.
+  Future<void> _insertLocalBankRow() async {
+    final localBank = Bank(
+      0, // unused; toColumns leaves the autoincrement id absent
+      localBankUuid,
+      null, // logo
+      null, // tinyLogo
+      'Helyi dalok',
+      null, // description
+      null, // legal
+      null, // aboutLink
+      null, // contactEmail
+      BankAccess.local,
+      null, // source: official/unofficial is a remote-bank concept
+      null, // baseUrl: local banks have no remote endpoint
+      1, // parallelUpdateJobs
+      1, // amountOfSongsInRequest
+      false, // noCms
+      const {}, // songFields
+      true, // isEnabled
+      false, // isOfflineMode
+      null, // lastUpdated
+      null, // failedSongUuids
+      null, // totalSongsInBank
+    );
+    await into(banks).insert(localBank, mode: InsertMode.insertOrIgnore);
   }
 }
 

@@ -4,7 +4,9 @@ import 'package:dio/dio.dart';
 import 'package:drift/drift.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
+import '../../data/bank/bank.dart';
 import '../../data/database.dart';
+import '../../data/log/logger.dart';
 import '../../data/song/song.dart';
 import '../bank/bank_of_song.dart';
 import '../error/app_error.dart';
@@ -25,8 +27,38 @@ Stream<AssetResult> getSongAsset(
 
   () async {
     final bank = await ref.watch(bankOfSongProvider(song).future);
+    final contentReference = song.contentMap[fieldName];
+    if (contentReference == null) {
+      await controller.close();
+      return;
+    }
+
+    if (bank.access == BankAccess.local) {
+      // Local songs reference their attachments with a bank-independent
+      // local:// scheme stored verbatim as the asset's sourceUrl.
+      final asset =
+          await (db.assets.select()
+                ..where((a) => a.sourceUrl.equals(contentReference)))
+              .getSingleOrNull();
+
+      if (asset != null) {
+        controller.add((progress: 1.0, data: asset.content));
+      } else {
+        controller.addError(
+          AppError.from(
+            StateError('Missing local song attachment: $contentReference'),
+            userMessage: 'A csatolmány nem található.',
+            technicalMessage:
+                'Helyi dal csatolmánya nem található: $contentReference',
+          ),
+        );
+      }
+      await controller.close();
+      return;
+    }
+
     final String sourceUrl = bank.baseUrl
-        .resolve(song.contentMap[fieldName]!)
+        .resolve(contentReference)
         .toString();
 
     final asset =
@@ -61,19 +93,29 @@ Stream<AssetResult> getSongAsset(
         if (responseData == null) {
           throw StateError('Üres válasz érkezett a kottához: $sourceUrl');
         }
+        final bytes = Uint8List.fromList(responseData);
 
-        // Save the downloaded asset to the database
-        await db.assets.insert().insert(
-          AssetsCompanion(
-            songUuid: Value(song.uuid),
-            fieldName: Value(fieldName),
-            sourceUrl: Value(sourceUrl),
-            content: Value(Uint8List.fromList(responseData)),
+        // Display the content right away; caching it below must not
+        // block showing the sheet music.
+        controller.add((progress: 1.0, data: bytes));
+
+        // Save the downloaded asset to the database for offline reuse.
+        // Errors surface through the logging-based snackbar convention.
+        unawaited(
+          db.assets.insert().insert(
+            AssetsCompanion(
+              songUuid: Value(song.uuid),
+              fieldName: Value(fieldName),
+              sourceUrl: Value(sourceUrl),
+              content: Value(bytes),
+            ),
+          ).then(
+            (_) {},
+            onError: (Object error, StackTrace stackTrace) {
+              log.severe('Nem sikerült menteni a letöltött kottát', error, stackTrace);
+            },
           ),
         );
-
-        // Add the final value
-        controller.add((progress: 1.0, data: Uint8List.fromList(responseData)));
       } catch (error, stackTrace) {
         controller.addError(
           AppError.from(

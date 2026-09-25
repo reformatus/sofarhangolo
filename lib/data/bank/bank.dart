@@ -27,6 +27,28 @@ import '../database.dart';
 // these get added to the database on first run
 // todo add a way to add and disable banks
 
+/// How a bank's content is reached.
+enum BankAccess {
+  /// Content is downloaded from a remote API ([Bank.baseUrl]).
+  remote,
+
+  /// Content lives in the local database and is user-editable.
+  local,
+}
+
+/// The provenance of a remote bank's content.
+enum BankSource {
+  /// Endorsed banks listed by the official bank discovery API.
+  official,
+
+  /// Self-hosted or otherwise unofficial remote banks.
+  unofficial,
+}
+
+/// Well-known uuid of the app's single local bank. The row itself is created
+/// by the database bootstrap and migrations - never write it from services.
+const String localBankUuid = 'c0ffee00-0000-4000-8000-000000000001';
+
 class Bank extends Insertable<Bank> {
   final int id;
   final String uuid;
@@ -37,7 +59,11 @@ class Bank extends Insertable<Bank> {
   final String? legal;
   final String? aboutLink;
   final String? contactEmail;
-  final Uri baseUrl;
+  final BankAccess access;
+
+  /// Provenance of remote content; null for the local bank.
+  final BankSource? source;
+  final Uri? _baseUrl;
   final int parallelUpdateJobs;
   final int amountOfSongsInRequest;
   final bool noCms;
@@ -58,7 +84,9 @@ class Bank extends Insertable<Bank> {
     this.legal,
     this.aboutLink,
     this.contactEmail,
-    this.baseUrl,
+    this.access,
+    this.source,
+    Uri? baseUrl,
     this.parallelUpdateJobs,
     this.amountOfSongsInRequest,
     this.noCms,
@@ -68,7 +96,17 @@ class Bank extends Insertable<Bank> {
     this.lastUpdated,
     this.failedSongUuids,
     this.totalSongsInBank,
-  );
+  ) : _baseUrl = baseUrl;
+
+  /// Base url for remote API calls. Only remote banks have one; accessing
+  /// it on a local bank is a programming error.
+  Uri get baseUrl {
+    final url = _baseUrl;
+    if (url == null) {
+      throw StateError('Bank $uuid has no base url');
+    }
+    return url;
+  }
 
   List<ProtoSong> get failedProtoSongs {
     final rawFailedSongs = failedSongUuids;
@@ -113,7 +151,9 @@ class Bank extends Insertable<Bank> {
       name: Value(name),
       description: Value(description),
       legal: Value(legal),
-      baseUrl: Value(baseUrl),
+      access: Value(access),
+      source: Value.absentIfNull(source),
+      baseUrl: Value.absentIfNull(_baseUrl),
       parallelUpdateJobs: Value(parallelUpdateJobs),
       amountOfSongsInRequest: Value(amountOfSongsInRequest),
       noCms: Value(noCms),
@@ -138,7 +178,12 @@ class Banks extends Table {
   TextColumn get legal => text().nullable()();
   TextColumn get aboutLink => text().nullable()();
   TextColumn get contactEmail => text().nullable()();
-  TextColumn get baseUrl => text().map(const UriConverter())();
+  IntColumn get access => intEnum<BankAccess>()
+      // 0 == BankAccess.remote; spelled out so the generated migration
+      // steps don't need to import the enum.
+      .withDefault(Constant(0))();
+  IntColumn get source => intEnum<BankSource>().nullable()();
+  TextColumn get baseUrl => text().map(const UriConverter()).nullable()();
   IntColumn get parallelUpdateJobs => integer()();
   IntColumn get amountOfSongsInRequest => integer()();
   BoolColumn get noCms => boolean()();

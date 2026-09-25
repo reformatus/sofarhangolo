@@ -85,13 +85,30 @@ class Banks extends Table with TableInfo<Banks, BanksData> {
     requiredDuringInsert: false,
     $customConstraints: 'NULL',
   );
+  late final GeneratedColumn<int> access = GeneratedColumn<int>(
+    'access',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL DEFAULT 0',
+    defaultValue: const CustomExpression('0'),
+  );
+  late final GeneratedColumn<int> source = GeneratedColumn<int>(
+    'source',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
   late final GeneratedColumn<String> baseUrl = GeneratedColumn<String>(
     'base_url',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
   );
   late final GeneratedColumn<int> parallelUpdateJobs = GeneratedColumn<int>(
     'parallel_update_jobs',
@@ -149,6 +166,22 @@ class Banks extends Table with TableInfo<Banks, BanksData> {
     requiredDuringInsert: false,
     $customConstraints: 'NULL',
   );
+  late final GeneratedColumn<String> failedSongUuids = GeneratedColumn<String>(
+    'failed_song_uuids',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  late final GeneratedColumn<int> totalSongsInBank = GeneratedColumn<int>(
+    'total_songs_in_bank',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -160,6 +193,8 @@ class Banks extends Table with TableInfo<Banks, BanksData> {
     legal,
     aboutLink,
     contactEmail,
+    access,
+    source,
     baseUrl,
     parallelUpdateJobs,
     amountOfSongsInRequest,
@@ -168,6 +203,8 @@ class Banks extends Table with TableInfo<Banks, BanksData> {
     isEnabled,
     isOfflineMode,
     lastUpdated,
+    failedSongUuids,
+    totalSongsInBank,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -216,10 +253,18 @@ class Banks extends Table with TableInfo<Banks, BanksData> {
         DriftSqlType.string,
         data['${effectivePrefix}contact_email'],
       ),
+      access: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}access'],
+      )!,
+      source: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}source'],
+      ),
       baseUrl: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}base_url'],
-      )!,
+      ),
       parallelUpdateJobs: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}parallel_update_jobs'],
@@ -248,6 +293,14 @@ class Banks extends Table with TableInfo<Banks, BanksData> {
         DriftSqlType.string,
         data['${effectivePrefix}last_updated'],
       ),
+      failedSongUuids: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}failed_song_uuids'],
+      ),
+      totalSongsInBank: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}total_songs_in_bank'],
+      ),
     );
   }
 
@@ -270,7 +323,9 @@ class BanksData extends DataClass implements Insertable<BanksData> {
   final String? legal;
   final String? aboutLink;
   final String? contactEmail;
-  final String baseUrl;
+  final int access;
+  final int? source;
+  final String? baseUrl;
   final int parallelUpdateJobs;
   final int amountOfSongsInRequest;
   final int noCms;
@@ -278,6 +333,8 @@ class BanksData extends DataClass implements Insertable<BanksData> {
   final int isEnabled;
   final int isOfflineMode;
   final String? lastUpdated;
+  final String? failedSongUuids;
+  final int? totalSongsInBank;
   const BanksData({
     required this.id,
     required this.uuid,
@@ -288,7 +345,9 @@ class BanksData extends DataClass implements Insertable<BanksData> {
     this.legal,
     this.aboutLink,
     this.contactEmail,
-    required this.baseUrl,
+    required this.access,
+    this.source,
+    this.baseUrl,
     required this.parallelUpdateJobs,
     required this.amountOfSongsInRequest,
     required this.noCms,
@@ -296,6 +355,8 @@ class BanksData extends DataClass implements Insertable<BanksData> {
     required this.isEnabled,
     required this.isOfflineMode,
     this.lastUpdated,
+    this.failedSongUuids,
+    this.totalSongsInBank,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -321,7 +382,13 @@ class BanksData extends DataClass implements Insertable<BanksData> {
     if (!nullToAbsent || contactEmail != null) {
       map['contact_email'] = Variable<String>(contactEmail);
     }
-    map['base_url'] = Variable<String>(baseUrl);
+    map['access'] = Variable<int>(access);
+    if (!nullToAbsent || source != null) {
+      map['source'] = Variable<int>(source);
+    }
+    if (!nullToAbsent || baseUrl != null) {
+      map['base_url'] = Variable<String>(baseUrl);
+    }
     map['parallel_update_jobs'] = Variable<int>(parallelUpdateJobs);
     map['amount_of_songs_in_request'] = Variable<int>(amountOfSongsInRequest);
     map['no_cms'] = Variable<int>(noCms);
@@ -330,6 +397,12 @@ class BanksData extends DataClass implements Insertable<BanksData> {
     map['is_offline_mode'] = Variable<int>(isOfflineMode);
     if (!nullToAbsent || lastUpdated != null) {
       map['last_updated'] = Variable<String>(lastUpdated);
+    }
+    if (!nullToAbsent || failedSongUuids != null) {
+      map['failed_song_uuids'] = Variable<String>(failedSongUuids);
+    }
+    if (!nullToAbsent || totalSongsInBank != null) {
+      map['total_songs_in_bank'] = Variable<int>(totalSongsInBank);
     }
     return map;
   }
@@ -355,7 +428,13 @@ class BanksData extends DataClass implements Insertable<BanksData> {
       contactEmail: contactEmail == null && nullToAbsent
           ? const Value.absent()
           : Value(contactEmail),
-      baseUrl: Value(baseUrl),
+      access: Value(access),
+      source: source == null && nullToAbsent
+          ? const Value.absent()
+          : Value(source),
+      baseUrl: baseUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(baseUrl),
       parallelUpdateJobs: Value(parallelUpdateJobs),
       amountOfSongsInRequest: Value(amountOfSongsInRequest),
       noCms: Value(noCms),
@@ -365,6 +444,12 @@ class BanksData extends DataClass implements Insertable<BanksData> {
       lastUpdated: lastUpdated == null && nullToAbsent
           ? const Value.absent()
           : Value(lastUpdated),
+      failedSongUuids: failedSongUuids == null && nullToAbsent
+          ? const Value.absent()
+          : Value(failedSongUuids),
+      totalSongsInBank: totalSongsInBank == null && nullToAbsent
+          ? const Value.absent()
+          : Value(totalSongsInBank),
     );
   }
 
@@ -383,7 +468,9 @@ class BanksData extends DataClass implements Insertable<BanksData> {
       legal: serializer.fromJson<String?>(json['legal']),
       aboutLink: serializer.fromJson<String?>(json['aboutLink']),
       contactEmail: serializer.fromJson<String?>(json['contactEmail']),
-      baseUrl: serializer.fromJson<String>(json['baseUrl']),
+      access: serializer.fromJson<int>(json['access']),
+      source: serializer.fromJson<int?>(json['source']),
+      baseUrl: serializer.fromJson<String?>(json['baseUrl']),
       parallelUpdateJobs: serializer.fromJson<int>(json['parallelUpdateJobs']),
       amountOfSongsInRequest: serializer.fromJson<int>(
         json['amountOfSongsInRequest'],
@@ -393,6 +480,8 @@ class BanksData extends DataClass implements Insertable<BanksData> {
       isEnabled: serializer.fromJson<int>(json['isEnabled']),
       isOfflineMode: serializer.fromJson<int>(json['isOfflineMode']),
       lastUpdated: serializer.fromJson<String?>(json['lastUpdated']),
+      failedSongUuids: serializer.fromJson<String?>(json['failedSongUuids']),
+      totalSongsInBank: serializer.fromJson<int?>(json['totalSongsInBank']),
     );
   }
   @override
@@ -408,7 +497,9 @@ class BanksData extends DataClass implements Insertable<BanksData> {
       'legal': serializer.toJson<String?>(legal),
       'aboutLink': serializer.toJson<String?>(aboutLink),
       'contactEmail': serializer.toJson<String?>(contactEmail),
-      'baseUrl': serializer.toJson<String>(baseUrl),
+      'access': serializer.toJson<int>(access),
+      'source': serializer.toJson<int?>(source),
+      'baseUrl': serializer.toJson<String?>(baseUrl),
       'parallelUpdateJobs': serializer.toJson<int>(parallelUpdateJobs),
       'amountOfSongsInRequest': serializer.toJson<int>(amountOfSongsInRequest),
       'noCms': serializer.toJson<int>(noCms),
@@ -416,6 +507,8 @@ class BanksData extends DataClass implements Insertable<BanksData> {
       'isEnabled': serializer.toJson<int>(isEnabled),
       'isOfflineMode': serializer.toJson<int>(isOfflineMode),
       'lastUpdated': serializer.toJson<String?>(lastUpdated),
+      'failedSongUuids': serializer.toJson<String?>(failedSongUuids),
+      'totalSongsInBank': serializer.toJson<int?>(totalSongsInBank),
     };
   }
 
@@ -429,7 +522,9 @@ class BanksData extends DataClass implements Insertable<BanksData> {
     Value<String?> legal = const Value.absent(),
     Value<String?> aboutLink = const Value.absent(),
     Value<String?> contactEmail = const Value.absent(),
-    String? baseUrl,
+    int? access,
+    Value<int?> source = const Value.absent(),
+    Value<String?> baseUrl = const Value.absent(),
     int? parallelUpdateJobs,
     int? amountOfSongsInRequest,
     int? noCms,
@@ -437,6 +532,8 @@ class BanksData extends DataClass implements Insertable<BanksData> {
     int? isEnabled,
     int? isOfflineMode,
     Value<String?> lastUpdated = const Value.absent(),
+    Value<String?> failedSongUuids = const Value.absent(),
+    Value<int?> totalSongsInBank = const Value.absent(),
   }) => BanksData(
     id: id ?? this.id,
     uuid: uuid ?? this.uuid,
@@ -447,7 +544,9 @@ class BanksData extends DataClass implements Insertable<BanksData> {
     legal: legal.present ? legal.value : this.legal,
     aboutLink: aboutLink.present ? aboutLink.value : this.aboutLink,
     contactEmail: contactEmail.present ? contactEmail.value : this.contactEmail,
-    baseUrl: baseUrl ?? this.baseUrl,
+    access: access ?? this.access,
+    source: source.present ? source.value : this.source,
+    baseUrl: baseUrl.present ? baseUrl.value : this.baseUrl,
     parallelUpdateJobs: parallelUpdateJobs ?? this.parallelUpdateJobs,
     amountOfSongsInRequest:
         amountOfSongsInRequest ?? this.amountOfSongsInRequest,
@@ -456,6 +555,12 @@ class BanksData extends DataClass implements Insertable<BanksData> {
     isEnabled: isEnabled ?? this.isEnabled,
     isOfflineMode: isOfflineMode ?? this.isOfflineMode,
     lastUpdated: lastUpdated.present ? lastUpdated.value : this.lastUpdated,
+    failedSongUuids: failedSongUuids.present
+        ? failedSongUuids.value
+        : this.failedSongUuids,
+    totalSongsInBank: totalSongsInBank.present
+        ? totalSongsInBank.value
+        : this.totalSongsInBank,
   );
   BanksData copyWithCompanion(BanksCompanion data) {
     return BanksData(
@@ -472,6 +577,8 @@ class BanksData extends DataClass implements Insertable<BanksData> {
       contactEmail: data.contactEmail.present
           ? data.contactEmail.value
           : this.contactEmail,
+      access: data.access.present ? data.access.value : this.access,
+      source: data.source.present ? data.source.value : this.source,
       baseUrl: data.baseUrl.present ? data.baseUrl.value : this.baseUrl,
       parallelUpdateJobs: data.parallelUpdateJobs.present
           ? data.parallelUpdateJobs.value
@@ -490,6 +597,12 @@ class BanksData extends DataClass implements Insertable<BanksData> {
       lastUpdated: data.lastUpdated.present
           ? data.lastUpdated.value
           : this.lastUpdated,
+      failedSongUuids: data.failedSongUuids.present
+          ? data.failedSongUuids.value
+          : this.failedSongUuids,
+      totalSongsInBank: data.totalSongsInBank.present
+          ? data.totalSongsInBank.value
+          : this.totalSongsInBank,
     );
   }
 
@@ -505,6 +618,8 @@ class BanksData extends DataClass implements Insertable<BanksData> {
           ..write('legal: $legal, ')
           ..write('aboutLink: $aboutLink, ')
           ..write('contactEmail: $contactEmail, ')
+          ..write('access: $access, ')
+          ..write('source: $source, ')
           ..write('baseUrl: $baseUrl, ')
           ..write('parallelUpdateJobs: $parallelUpdateJobs, ')
           ..write('amountOfSongsInRequest: $amountOfSongsInRequest, ')
@@ -512,13 +627,15 @@ class BanksData extends DataClass implements Insertable<BanksData> {
           ..write('songFields: $songFields, ')
           ..write('isEnabled: $isEnabled, ')
           ..write('isOfflineMode: $isOfflineMode, ')
-          ..write('lastUpdated: $lastUpdated')
+          ..write('lastUpdated: $lastUpdated, ')
+          ..write('failedSongUuids: $failedSongUuids, ')
+          ..write('totalSongsInBank: $totalSongsInBank')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     id,
     uuid,
     $driftBlobEquality.hash(logo),
@@ -528,6 +645,8 @@ class BanksData extends DataClass implements Insertable<BanksData> {
     legal,
     aboutLink,
     contactEmail,
+    access,
+    source,
     baseUrl,
     parallelUpdateJobs,
     amountOfSongsInRequest,
@@ -536,7 +655,9 @@ class BanksData extends DataClass implements Insertable<BanksData> {
     isEnabled,
     isOfflineMode,
     lastUpdated,
-  );
+    failedSongUuids,
+    totalSongsInBank,
+  ]);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -550,6 +671,8 @@ class BanksData extends DataClass implements Insertable<BanksData> {
           other.legal == this.legal &&
           other.aboutLink == this.aboutLink &&
           other.contactEmail == this.contactEmail &&
+          other.access == this.access &&
+          other.source == this.source &&
           other.baseUrl == this.baseUrl &&
           other.parallelUpdateJobs == this.parallelUpdateJobs &&
           other.amountOfSongsInRequest == this.amountOfSongsInRequest &&
@@ -557,7 +680,9 @@ class BanksData extends DataClass implements Insertable<BanksData> {
           other.songFields == this.songFields &&
           other.isEnabled == this.isEnabled &&
           other.isOfflineMode == this.isOfflineMode &&
-          other.lastUpdated == this.lastUpdated);
+          other.lastUpdated == this.lastUpdated &&
+          other.failedSongUuids == this.failedSongUuids &&
+          other.totalSongsInBank == this.totalSongsInBank);
 }
 
 class BanksCompanion extends UpdateCompanion<BanksData> {
@@ -570,7 +695,9 @@ class BanksCompanion extends UpdateCompanion<BanksData> {
   final Value<String?> legal;
   final Value<String?> aboutLink;
   final Value<String?> contactEmail;
-  final Value<String> baseUrl;
+  final Value<int> access;
+  final Value<int?> source;
+  final Value<String?> baseUrl;
   final Value<int> parallelUpdateJobs;
   final Value<int> amountOfSongsInRequest;
   final Value<int> noCms;
@@ -578,6 +705,8 @@ class BanksCompanion extends UpdateCompanion<BanksData> {
   final Value<int> isEnabled;
   final Value<int> isOfflineMode;
   final Value<String?> lastUpdated;
+  final Value<String?> failedSongUuids;
+  final Value<int?> totalSongsInBank;
   const BanksCompanion({
     this.id = const Value.absent(),
     this.uuid = const Value.absent(),
@@ -588,6 +717,8 @@ class BanksCompanion extends UpdateCompanion<BanksData> {
     this.legal = const Value.absent(),
     this.aboutLink = const Value.absent(),
     this.contactEmail = const Value.absent(),
+    this.access = const Value.absent(),
+    this.source = const Value.absent(),
     this.baseUrl = const Value.absent(),
     this.parallelUpdateJobs = const Value.absent(),
     this.amountOfSongsInRequest = const Value.absent(),
@@ -596,6 +727,8 @@ class BanksCompanion extends UpdateCompanion<BanksData> {
     this.isEnabled = const Value.absent(),
     this.isOfflineMode = const Value.absent(),
     this.lastUpdated = const Value.absent(),
+    this.failedSongUuids = const Value.absent(),
+    this.totalSongsInBank = const Value.absent(),
   });
   BanksCompanion.insert({
     this.id = const Value.absent(),
@@ -607,7 +740,9 @@ class BanksCompanion extends UpdateCompanion<BanksData> {
     this.legal = const Value.absent(),
     this.aboutLink = const Value.absent(),
     this.contactEmail = const Value.absent(),
-    required String baseUrl,
+    this.access = const Value.absent(),
+    this.source = const Value.absent(),
+    this.baseUrl = const Value.absent(),
     required int parallelUpdateJobs,
     required int amountOfSongsInRequest,
     required int noCms,
@@ -615,9 +750,10 @@ class BanksCompanion extends UpdateCompanion<BanksData> {
     required int isEnabled,
     required int isOfflineMode,
     this.lastUpdated = const Value.absent(),
+    this.failedSongUuids = const Value.absent(),
+    this.totalSongsInBank = const Value.absent(),
   }) : uuid = Value(uuid),
        name = Value(name),
-       baseUrl = Value(baseUrl),
        parallelUpdateJobs = Value(parallelUpdateJobs),
        amountOfSongsInRequest = Value(amountOfSongsInRequest),
        noCms = Value(noCms),
@@ -634,6 +770,8 @@ class BanksCompanion extends UpdateCompanion<BanksData> {
     Expression<String>? legal,
     Expression<String>? aboutLink,
     Expression<String>? contactEmail,
+    Expression<int>? access,
+    Expression<int>? source,
     Expression<String>? baseUrl,
     Expression<int>? parallelUpdateJobs,
     Expression<int>? amountOfSongsInRequest,
@@ -642,6 +780,8 @@ class BanksCompanion extends UpdateCompanion<BanksData> {
     Expression<int>? isEnabled,
     Expression<int>? isOfflineMode,
     Expression<String>? lastUpdated,
+    Expression<String>? failedSongUuids,
+    Expression<int>? totalSongsInBank,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -653,6 +793,8 @@ class BanksCompanion extends UpdateCompanion<BanksData> {
       if (legal != null) 'legal': legal,
       if (aboutLink != null) 'about_link': aboutLink,
       if (contactEmail != null) 'contact_email': contactEmail,
+      if (access != null) 'access': access,
+      if (source != null) 'source': source,
       if (baseUrl != null) 'base_url': baseUrl,
       if (parallelUpdateJobs != null)
         'parallel_update_jobs': parallelUpdateJobs,
@@ -663,6 +805,8 @@ class BanksCompanion extends UpdateCompanion<BanksData> {
       if (isEnabled != null) 'is_enabled': isEnabled,
       if (isOfflineMode != null) 'is_offline_mode': isOfflineMode,
       if (lastUpdated != null) 'last_updated': lastUpdated,
+      if (failedSongUuids != null) 'failed_song_uuids': failedSongUuids,
+      if (totalSongsInBank != null) 'total_songs_in_bank': totalSongsInBank,
     });
   }
 
@@ -676,7 +820,9 @@ class BanksCompanion extends UpdateCompanion<BanksData> {
     Value<String?>? legal,
     Value<String?>? aboutLink,
     Value<String?>? contactEmail,
-    Value<String>? baseUrl,
+    Value<int>? access,
+    Value<int?>? source,
+    Value<String?>? baseUrl,
     Value<int>? parallelUpdateJobs,
     Value<int>? amountOfSongsInRequest,
     Value<int>? noCms,
@@ -684,6 +830,8 @@ class BanksCompanion extends UpdateCompanion<BanksData> {
     Value<int>? isEnabled,
     Value<int>? isOfflineMode,
     Value<String?>? lastUpdated,
+    Value<String?>? failedSongUuids,
+    Value<int?>? totalSongsInBank,
   }) {
     return BanksCompanion(
       id: id ?? this.id,
@@ -695,6 +843,8 @@ class BanksCompanion extends UpdateCompanion<BanksData> {
       legal: legal ?? this.legal,
       aboutLink: aboutLink ?? this.aboutLink,
       contactEmail: contactEmail ?? this.contactEmail,
+      access: access ?? this.access,
+      source: source ?? this.source,
       baseUrl: baseUrl ?? this.baseUrl,
       parallelUpdateJobs: parallelUpdateJobs ?? this.parallelUpdateJobs,
       amountOfSongsInRequest:
@@ -704,6 +854,8 @@ class BanksCompanion extends UpdateCompanion<BanksData> {
       isEnabled: isEnabled ?? this.isEnabled,
       isOfflineMode: isOfflineMode ?? this.isOfflineMode,
       lastUpdated: lastUpdated ?? this.lastUpdated,
+      failedSongUuids: failedSongUuids ?? this.failedSongUuids,
+      totalSongsInBank: totalSongsInBank ?? this.totalSongsInBank,
     );
   }
 
@@ -737,6 +889,12 @@ class BanksCompanion extends UpdateCompanion<BanksData> {
     if (contactEmail.present) {
       map['contact_email'] = Variable<String>(contactEmail.value);
     }
+    if (access.present) {
+      map['access'] = Variable<int>(access.value);
+    }
+    if (source.present) {
+      map['source'] = Variable<int>(source.value);
+    }
     if (baseUrl.present) {
       map['base_url'] = Variable<String>(baseUrl.value);
     }
@@ -763,6 +921,12 @@ class BanksCompanion extends UpdateCompanion<BanksData> {
     if (lastUpdated.present) {
       map['last_updated'] = Variable<String>(lastUpdated.value);
     }
+    if (failedSongUuids.present) {
+      map['failed_song_uuids'] = Variable<String>(failedSongUuids.value);
+    }
+    if (totalSongsInBank.present) {
+      map['total_songs_in_bank'] = Variable<int>(totalSongsInBank.value);
+    }
     return map;
   }
 
@@ -778,6 +942,8 @@ class BanksCompanion extends UpdateCompanion<BanksData> {
           ..write('legal: $legal, ')
           ..write('aboutLink: $aboutLink, ')
           ..write('contactEmail: $contactEmail, ')
+          ..write('access: $access, ')
+          ..write('source: $source, ')
           ..write('baseUrl: $baseUrl, ')
           ..write('parallelUpdateJobs: $parallelUpdateJobs, ')
           ..write('amountOfSongsInRequest: $amountOfSongsInRequest, ')
@@ -785,7 +951,9 @@ class BanksCompanion extends UpdateCompanion<BanksData> {
           ..write('songFields: $songFields, ')
           ..write('isEnabled: $isEnabled, ')
           ..write('isOfflineMode: $isOfflineMode, ')
-          ..write('lastUpdated: $lastUpdated')
+          ..write('lastUpdated: $lastUpdated, ')
+          ..write('failedSongUuids: $failedSongUuids, ')
+          ..write('totalSongsInBank: $totalSongsInBank')
           ..write(')'))
         .toString();
   }
@@ -840,10 +1008,10 @@ class Songs extends Table with TableInfo<Songs, SongsData> {
   late final GeneratedColumn<String> lyrics = GeneratedColumn<String>(
     'lyrics',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.string,
-    requiredDuringInsert: true,
-    $customConstraints: 'NOT NULL',
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
   );
   late final GeneratedColumn<String> lyricsFormat = GeneratedColumn<String>(
     'lyrics_format',
@@ -854,6 +1022,14 @@ class Songs extends Table with TableInfo<Songs, SongsData> {
     $customConstraints: 'NOT NULL DEFAULT \'opensong\'',
     defaultValue: const CustomExpression('\'opensong\''),
   );
+  late final GeneratedColumn<String> variationOf = GeneratedColumn<String>(
+    'variation_of',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
   late final GeneratedColumn<String> keyField = GeneratedColumn<String>(
     'key_field',
     aliasedName,
@@ -861,6 +1037,14 @@ class Songs extends Table with TableInfo<Songs, SongsData> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
     $customConstraints: 'NOT NULL',
+  );
+  late final GeneratedColumn<String> ownership = GeneratedColumn<String>(
+    'ownership',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
   );
   @override
   List<GeneratedColumn> get $columns => [
@@ -871,7 +1055,9 @@ class Songs extends Table with TableInfo<Songs, SongsData> {
     title,
     lyrics,
     lyricsFormat,
+    variationOf,
     keyField,
+    ownership,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -907,15 +1093,23 @@ class Songs extends Table with TableInfo<Songs, SongsData> {
       lyrics: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}lyrics'],
-      )!,
+      ),
       lyricsFormat: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}lyrics_format'],
       )!,
+      variationOf: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}variation_of'],
+      ),
       keyField: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}key_field'],
       )!,
+      ownership: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ownership'],
+      ),
     );
   }
 
@@ -934,18 +1128,22 @@ class SongsData extends DataClass implements Insertable<SongsData> {
   final String? sourceBank;
   final String contentMap;
   final String title;
-  final String lyrics;
+  final String? lyrics;
   final String lyricsFormat;
+  final String? variationOf;
   final String keyField;
+  final String? ownership;
   const SongsData({
     required this.id,
     required this.uuid,
     this.sourceBank,
     required this.contentMap,
     required this.title,
-    required this.lyrics,
+    this.lyrics,
     required this.lyricsFormat,
+    this.variationOf,
     required this.keyField,
+    this.ownership,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -957,9 +1155,17 @@ class SongsData extends DataClass implements Insertable<SongsData> {
     }
     map['content_map'] = Variable<String>(contentMap);
     map['title'] = Variable<String>(title);
-    map['lyrics'] = Variable<String>(lyrics);
+    if (!nullToAbsent || lyrics != null) {
+      map['lyrics'] = Variable<String>(lyrics);
+    }
     map['lyrics_format'] = Variable<String>(lyricsFormat);
+    if (!nullToAbsent || variationOf != null) {
+      map['variation_of'] = Variable<String>(variationOf);
+    }
     map['key_field'] = Variable<String>(keyField);
+    if (!nullToAbsent || ownership != null) {
+      map['ownership'] = Variable<String>(ownership);
+    }
     return map;
   }
 
@@ -972,9 +1178,17 @@ class SongsData extends DataClass implements Insertable<SongsData> {
           : Value(sourceBank),
       contentMap: Value(contentMap),
       title: Value(title),
-      lyrics: Value(lyrics),
+      lyrics: lyrics == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lyrics),
       lyricsFormat: Value(lyricsFormat),
+      variationOf: variationOf == null && nullToAbsent
+          ? const Value.absent()
+          : Value(variationOf),
       keyField: Value(keyField),
+      ownership: ownership == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ownership),
     );
   }
 
@@ -989,9 +1203,11 @@ class SongsData extends DataClass implements Insertable<SongsData> {
       sourceBank: serializer.fromJson<String?>(json['sourceBank']),
       contentMap: serializer.fromJson<String>(json['contentMap']),
       title: serializer.fromJson<String>(json['title']),
-      lyrics: serializer.fromJson<String>(json['lyrics']),
+      lyrics: serializer.fromJson<String?>(json['lyrics']),
       lyricsFormat: serializer.fromJson<String>(json['lyricsFormat']),
+      variationOf: serializer.fromJson<String?>(json['variationOf']),
       keyField: serializer.fromJson<String>(json['keyField']),
+      ownership: serializer.fromJson<String?>(json['ownership']),
     );
   }
   @override
@@ -1003,9 +1219,11 @@ class SongsData extends DataClass implements Insertable<SongsData> {
       'sourceBank': serializer.toJson<String?>(sourceBank),
       'contentMap': serializer.toJson<String>(contentMap),
       'title': serializer.toJson<String>(title),
-      'lyrics': serializer.toJson<String>(lyrics),
+      'lyrics': serializer.toJson<String?>(lyrics),
       'lyricsFormat': serializer.toJson<String>(lyricsFormat),
+      'variationOf': serializer.toJson<String?>(variationOf),
       'keyField': serializer.toJson<String>(keyField),
+      'ownership': serializer.toJson<String?>(ownership),
     };
   }
 
@@ -1015,18 +1233,22 @@ class SongsData extends DataClass implements Insertable<SongsData> {
     Value<String?> sourceBank = const Value.absent(),
     String? contentMap,
     String? title,
-    String? lyrics,
+    Value<String?> lyrics = const Value.absent(),
     String? lyricsFormat,
+    Value<String?> variationOf = const Value.absent(),
     String? keyField,
+    Value<String?> ownership = const Value.absent(),
   }) => SongsData(
     id: id ?? this.id,
     uuid: uuid ?? this.uuid,
     sourceBank: sourceBank.present ? sourceBank.value : this.sourceBank,
     contentMap: contentMap ?? this.contentMap,
     title: title ?? this.title,
-    lyrics: lyrics ?? this.lyrics,
+    lyrics: lyrics.present ? lyrics.value : this.lyrics,
     lyricsFormat: lyricsFormat ?? this.lyricsFormat,
+    variationOf: variationOf.present ? variationOf.value : this.variationOf,
     keyField: keyField ?? this.keyField,
+    ownership: ownership.present ? ownership.value : this.ownership,
   );
   SongsData copyWithCompanion(SongsCompanion data) {
     return SongsData(
@@ -1043,7 +1265,11 @@ class SongsData extends DataClass implements Insertable<SongsData> {
       lyricsFormat: data.lyricsFormat.present
           ? data.lyricsFormat.value
           : this.lyricsFormat,
+      variationOf: data.variationOf.present
+          ? data.variationOf.value
+          : this.variationOf,
       keyField: data.keyField.present ? data.keyField.value : this.keyField,
+      ownership: data.ownership.present ? data.ownership.value : this.ownership,
     );
   }
 
@@ -1057,7 +1283,9 @@ class SongsData extends DataClass implements Insertable<SongsData> {
           ..write('title: $title, ')
           ..write('lyrics: $lyrics, ')
           ..write('lyricsFormat: $lyricsFormat, ')
-          ..write('keyField: $keyField')
+          ..write('variationOf: $variationOf, ')
+          ..write('keyField: $keyField, ')
+          ..write('ownership: $ownership')
           ..write(')'))
         .toString();
   }
@@ -1071,7 +1299,9 @@ class SongsData extends DataClass implements Insertable<SongsData> {
     title,
     lyrics,
     lyricsFormat,
+    variationOf,
     keyField,
+    ownership,
   );
   @override
   bool operator ==(Object other) =>
@@ -1084,7 +1314,9 @@ class SongsData extends DataClass implements Insertable<SongsData> {
           other.title == this.title &&
           other.lyrics == this.lyrics &&
           other.lyricsFormat == this.lyricsFormat &&
-          other.keyField == this.keyField);
+          other.variationOf == this.variationOf &&
+          other.keyField == this.keyField &&
+          other.ownership == this.ownership);
 }
 
 class SongsCompanion extends UpdateCompanion<SongsData> {
@@ -1093,9 +1325,11 @@ class SongsCompanion extends UpdateCompanion<SongsData> {
   final Value<String?> sourceBank;
   final Value<String> contentMap;
   final Value<String> title;
-  final Value<String> lyrics;
+  final Value<String?> lyrics;
   final Value<String> lyricsFormat;
+  final Value<String?> variationOf;
   final Value<String> keyField;
+  final Value<String?> ownership;
   const SongsCompanion({
     this.id = const Value.absent(),
     this.uuid = const Value.absent(),
@@ -1104,7 +1338,9 @@ class SongsCompanion extends UpdateCompanion<SongsData> {
     this.title = const Value.absent(),
     this.lyrics = const Value.absent(),
     this.lyricsFormat = const Value.absent(),
+    this.variationOf = const Value.absent(),
     this.keyField = const Value.absent(),
+    this.ownership = const Value.absent(),
   });
   SongsCompanion.insert({
     this.id = const Value.absent(),
@@ -1112,13 +1348,14 @@ class SongsCompanion extends UpdateCompanion<SongsData> {
     this.sourceBank = const Value.absent(),
     required String contentMap,
     required String title,
-    required String lyrics,
+    this.lyrics = const Value.absent(),
     this.lyricsFormat = const Value.absent(),
+    this.variationOf = const Value.absent(),
     required String keyField,
+    this.ownership = const Value.absent(),
   }) : uuid = Value(uuid),
        contentMap = Value(contentMap),
        title = Value(title),
-       lyrics = Value(lyrics),
        keyField = Value(keyField);
   static Insertable<SongsData> custom({
     Expression<int>? id,
@@ -1128,7 +1365,9 @@ class SongsCompanion extends UpdateCompanion<SongsData> {
     Expression<String>? title,
     Expression<String>? lyrics,
     Expression<String>? lyricsFormat,
+    Expression<String>? variationOf,
     Expression<String>? keyField,
+    Expression<String>? ownership,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1138,7 +1377,9 @@ class SongsCompanion extends UpdateCompanion<SongsData> {
       if (title != null) 'title': title,
       if (lyrics != null) 'lyrics': lyrics,
       if (lyricsFormat != null) 'lyrics_format': lyricsFormat,
+      if (variationOf != null) 'variation_of': variationOf,
       if (keyField != null) 'key_field': keyField,
+      if (ownership != null) 'ownership': ownership,
     });
   }
 
@@ -1148,9 +1389,11 @@ class SongsCompanion extends UpdateCompanion<SongsData> {
     Value<String?>? sourceBank,
     Value<String>? contentMap,
     Value<String>? title,
-    Value<String>? lyrics,
+    Value<String?>? lyrics,
     Value<String>? lyricsFormat,
+    Value<String?>? variationOf,
     Value<String>? keyField,
+    Value<String?>? ownership,
   }) {
     return SongsCompanion(
       id: id ?? this.id,
@@ -1160,7 +1403,9 @@ class SongsCompanion extends UpdateCompanion<SongsData> {
       title: title ?? this.title,
       lyrics: lyrics ?? this.lyrics,
       lyricsFormat: lyricsFormat ?? this.lyricsFormat,
+      variationOf: variationOf ?? this.variationOf,
       keyField: keyField ?? this.keyField,
+      ownership: ownership ?? this.ownership,
     );
   }
 
@@ -1188,8 +1433,14 @@ class SongsCompanion extends UpdateCompanion<SongsData> {
     if (lyricsFormat.present) {
       map['lyrics_format'] = Variable<String>(lyricsFormat.value);
     }
+    if (variationOf.present) {
+      map['variation_of'] = Variable<String>(variationOf.value);
+    }
     if (keyField.present) {
       map['key_field'] = Variable<String>(keyField.value);
+    }
+    if (ownership.present) {
+      map['ownership'] = Variable<String>(ownership.value);
     }
     return map;
   }
@@ -1204,7 +1455,565 @@ class SongsCompanion extends UpdateCompanion<SongsData> {
           ..write('title: $title, ')
           ..write('lyrics: $lyrics, ')
           ..write('lyricsFormat: $lyricsFormat, ')
-          ..write('keyField: $keyField')
+          ..write('variationOf: $variationOf, ')
+          ..write('keyField: $keyField, ')
+          ..write('ownership: $ownership')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class SongsFts extends Table
+    with
+        TableInfo<SongsFts, SongsFtsData>,
+        VirtualTableInfo<SongsFts, SongsFtsData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  SongsFts(this.attachedDatabase, [this._alias]);
+  late final GeneratedColumn<String> title = GeneratedColumn<String>(
+    'title',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
+  late final GeneratedColumn<String> lyrics = GeneratedColumn<String>(
+    'lyrics',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: '',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [title, lyrics];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'songs_fts';
+  @override
+  Set<GeneratedColumn> get $primaryKey => const {};
+  @override
+  SongsFtsData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SongsFtsData(
+      title: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}title'],
+      ),
+      lyrics: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}lyrics'],
+      ),
+    );
+  }
+
+  @override
+  SongsFts createAlias(String alias) {
+    return SongsFts(attachedDatabase, alias);
+  }
+
+  @override
+  bool get dontWriteConstraints => true;
+  @override
+  String get moduleAndArgs =>
+      'fts5(title, lyrics, content=\'songs\', content_rowid=\'id\', tokenize=\'trigram remove_diacritics 1\')';
+}
+
+class SongsFtsData extends DataClass implements Insertable<SongsFtsData> {
+  final String? title;
+  final String? lyrics;
+  const SongsFtsData({this.title, this.lyrics});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (!nullToAbsent || title != null) {
+      map['title'] = Variable<String>(title);
+    }
+    if (!nullToAbsent || lyrics != null) {
+      map['lyrics'] = Variable<String>(lyrics);
+    }
+    return map;
+  }
+
+  SongsFtsCompanion toCompanion(bool nullToAbsent) {
+    return SongsFtsCompanion(
+      title: title == null && nullToAbsent
+          ? const Value.absent()
+          : Value(title),
+      lyrics: lyrics == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lyrics),
+    );
+  }
+
+  factory SongsFtsData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SongsFtsData(
+      title: serializer.fromJson<String?>(json['title']),
+      lyrics: serializer.fromJson<String?>(json['lyrics']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'title': serializer.toJson<String?>(title),
+      'lyrics': serializer.toJson<String?>(lyrics),
+    };
+  }
+
+  SongsFtsData copyWith({
+    Value<String?> title = const Value.absent(),
+    Value<String?> lyrics = const Value.absent(),
+  }) => SongsFtsData(
+    title: title.present ? title.value : this.title,
+    lyrics: lyrics.present ? lyrics.value : this.lyrics,
+  );
+  SongsFtsData copyWithCompanion(SongsFtsCompanion data) {
+    return SongsFtsData(
+      title: data.title.present ? data.title.value : this.title,
+      lyrics: data.lyrics.present ? data.lyrics.value : this.lyrics,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SongsFtsData(')
+          ..write('title: $title, ')
+          ..write('lyrics: $lyrics')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(title, lyrics);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SongsFtsData &&
+          other.title == this.title &&
+          other.lyrics == this.lyrics);
+}
+
+class SongsFtsCompanion extends UpdateCompanion<SongsFtsData> {
+  final Value<String?> title;
+  final Value<String?> lyrics;
+  final Value<int> rowid;
+  const SongsFtsCompanion({
+    this.title = const Value.absent(),
+    this.lyrics = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SongsFtsCompanion.insert({
+    this.title = const Value.absent(),
+    this.lyrics = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  static Insertable<SongsFtsData> custom({
+    Expression<String>? title,
+    Expression<String>? lyrics,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (title != null) 'title': title,
+      if (lyrics != null) 'lyrics': lyrics,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SongsFtsCompanion copyWith({
+    Value<String?>? title,
+    Value<String?>? lyrics,
+    Value<int>? rowid,
+  }) {
+    return SongsFtsCompanion(
+      title: title ?? this.title,
+      lyrics: lyrics ?? this.lyrics,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (title.present) {
+      map['title'] = Variable<String>(title.value);
+    }
+    if (lyrics.present) {
+      map['lyrics'] = Variable<String>(lyrics.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SongsFtsCompanion(')
+          ..write('title: $title, ')
+          ..write('lyrics: $lyrics, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class SongLinks extends Table with TableInfo<SongLinks, SongLinksData> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  SongLinks(this.attachedDatabase, [this._alias]);
+  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+    'id',
+    aliasedName,
+    false,
+    hasAutoIncrement: true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    $customConstraints: 'NOT NULL PRIMARY KEY AUTOINCREMENT',
+  );
+  late final GeneratedColumn<String> sourceUuid = GeneratedColumn<String>(
+    'source_uuid',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  late final GeneratedColumn<int> type = GeneratedColumn<int>(
+    'type',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  late final GeneratedColumn<String> targetUuid = GeneratedColumn<String>(
+    'target_uuid',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    $customConstraints: 'NOT NULL',
+  );
+  late final GeneratedColumn<String> targetContentHash =
+      GeneratedColumn<String>(
+        'target_content_hash',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        $customConstraints: 'NULL',
+      );
+  late final GeneratedColumn<String> note = GeneratedColumn<String>(
+    'note',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    $customConstraints: 'NULL',
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    sourceUuid,
+    type,
+    targetUuid,
+    targetContentHash,
+    note,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'song_links';
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  List<Set<GeneratedColumn>> get uniqueKeys => [
+    {sourceUuid, type, targetUuid},
+  ];
+  @override
+  SongLinksData map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SongLinksData(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}id'],
+      )!,
+      sourceUuid: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}source_uuid'],
+      )!,
+      type: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}type'],
+      )!,
+      targetUuid: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target_uuid'],
+      )!,
+      targetContentHash: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}target_content_hash'],
+      ),
+      note: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}note'],
+      ),
+    );
+  }
+
+  @override
+  SongLinks createAlias(String alias) {
+    return SongLinks(attachedDatabase, alias);
+  }
+
+  @override
+  List<String> get customConstraints => const [
+    'UNIQUE(source_uuid, type, target_uuid)',
+  ];
+  @override
+  bool get dontWriteConstraints => true;
+}
+
+class SongLinksData extends DataClass implements Insertable<SongLinksData> {
+  final int id;
+  final String sourceUuid;
+  final int type;
+  final String targetUuid;
+  final String? targetContentHash;
+  final String? note;
+  const SongLinksData({
+    required this.id,
+    required this.sourceUuid,
+    required this.type,
+    required this.targetUuid,
+    this.targetContentHash,
+    this.note,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<int>(id);
+    map['source_uuid'] = Variable<String>(sourceUuid);
+    map['type'] = Variable<int>(type);
+    map['target_uuid'] = Variable<String>(targetUuid);
+    if (!nullToAbsent || targetContentHash != null) {
+      map['target_content_hash'] = Variable<String>(targetContentHash);
+    }
+    if (!nullToAbsent || note != null) {
+      map['note'] = Variable<String>(note);
+    }
+    return map;
+  }
+
+  SongLinksCompanion toCompanion(bool nullToAbsent) {
+    return SongLinksCompanion(
+      id: Value(id),
+      sourceUuid: Value(sourceUuid),
+      type: Value(type),
+      targetUuid: Value(targetUuid),
+      targetContentHash: targetContentHash == null && nullToAbsent
+          ? const Value.absent()
+          : Value(targetContentHash),
+      note: note == null && nullToAbsent ? const Value.absent() : Value(note),
+    );
+  }
+
+  factory SongLinksData.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SongLinksData(
+      id: serializer.fromJson<int>(json['id']),
+      sourceUuid: serializer.fromJson<String>(json['sourceUuid']),
+      type: serializer.fromJson<int>(json['type']),
+      targetUuid: serializer.fromJson<String>(json['targetUuid']),
+      targetContentHash: serializer.fromJson<String?>(
+        json['targetContentHash'],
+      ),
+      note: serializer.fromJson<String?>(json['note']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<int>(id),
+      'sourceUuid': serializer.toJson<String>(sourceUuid),
+      'type': serializer.toJson<int>(type),
+      'targetUuid': serializer.toJson<String>(targetUuid),
+      'targetContentHash': serializer.toJson<String?>(targetContentHash),
+      'note': serializer.toJson<String?>(note),
+    };
+  }
+
+  SongLinksData copyWith({
+    int? id,
+    String? sourceUuid,
+    int? type,
+    String? targetUuid,
+    Value<String?> targetContentHash = const Value.absent(),
+    Value<String?> note = const Value.absent(),
+  }) => SongLinksData(
+    id: id ?? this.id,
+    sourceUuid: sourceUuid ?? this.sourceUuid,
+    type: type ?? this.type,
+    targetUuid: targetUuid ?? this.targetUuid,
+    targetContentHash: targetContentHash.present
+        ? targetContentHash.value
+        : this.targetContentHash,
+    note: note.present ? note.value : this.note,
+  );
+  SongLinksData copyWithCompanion(SongLinksCompanion data) {
+    return SongLinksData(
+      id: data.id.present ? data.id.value : this.id,
+      sourceUuid: data.sourceUuid.present
+          ? data.sourceUuid.value
+          : this.sourceUuid,
+      type: data.type.present ? data.type.value : this.type,
+      targetUuid: data.targetUuid.present
+          ? data.targetUuid.value
+          : this.targetUuid,
+      targetContentHash: data.targetContentHash.present
+          ? data.targetContentHash.value
+          : this.targetContentHash,
+      note: data.note.present ? data.note.value : this.note,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SongLinksData(')
+          ..write('id: $id, ')
+          ..write('sourceUuid: $sourceUuid, ')
+          ..write('type: $type, ')
+          ..write('targetUuid: $targetUuid, ')
+          ..write('targetContentHash: $targetContentHash, ')
+          ..write('note: $note')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, sourceUuid, type, targetUuid, targetContentHash, note);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SongLinksData &&
+          other.id == this.id &&
+          other.sourceUuid == this.sourceUuid &&
+          other.type == this.type &&
+          other.targetUuid == this.targetUuid &&
+          other.targetContentHash == this.targetContentHash &&
+          other.note == this.note);
+}
+
+class SongLinksCompanion extends UpdateCompanion<SongLinksData> {
+  final Value<int> id;
+  final Value<String> sourceUuid;
+  final Value<int> type;
+  final Value<String> targetUuid;
+  final Value<String?> targetContentHash;
+  final Value<String?> note;
+  const SongLinksCompanion({
+    this.id = const Value.absent(),
+    this.sourceUuid = const Value.absent(),
+    this.type = const Value.absent(),
+    this.targetUuid = const Value.absent(),
+    this.targetContentHash = const Value.absent(),
+    this.note = const Value.absent(),
+  });
+  SongLinksCompanion.insert({
+    this.id = const Value.absent(),
+    required String sourceUuid,
+    required int type,
+    required String targetUuid,
+    this.targetContentHash = const Value.absent(),
+    this.note = const Value.absent(),
+  }) : sourceUuid = Value(sourceUuid),
+       type = Value(type),
+       targetUuid = Value(targetUuid);
+  static Insertable<SongLinksData> custom({
+    Expression<int>? id,
+    Expression<String>? sourceUuid,
+    Expression<int>? type,
+    Expression<String>? targetUuid,
+    Expression<String>? targetContentHash,
+    Expression<String>? note,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (sourceUuid != null) 'source_uuid': sourceUuid,
+      if (type != null) 'type': type,
+      if (targetUuid != null) 'target_uuid': targetUuid,
+      if (targetContentHash != null) 'target_content_hash': targetContentHash,
+      if (note != null) 'note': note,
+    });
+  }
+
+  SongLinksCompanion copyWith({
+    Value<int>? id,
+    Value<String>? sourceUuid,
+    Value<int>? type,
+    Value<String>? targetUuid,
+    Value<String?>? targetContentHash,
+    Value<String?>? note,
+  }) {
+    return SongLinksCompanion(
+      id: id ?? this.id,
+      sourceUuid: sourceUuid ?? this.sourceUuid,
+      type: type ?? this.type,
+      targetUuid: targetUuid ?? this.targetUuid,
+      targetContentHash: targetContentHash ?? this.targetContentHash,
+      note: note ?? this.note,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<int>(id.value);
+    }
+    if (sourceUuid.present) {
+      map['source_uuid'] = Variable<String>(sourceUuid.value);
+    }
+    if (type.present) {
+      map['type'] = Variable<int>(type.value);
+    }
+    if (targetUuid.present) {
+      map['target_uuid'] = Variable<String>(targetUuid.value);
+    }
+    if (targetContentHash.present) {
+      map['target_content_hash'] = Variable<String>(targetContentHash.value);
+    }
+    if (note.present) {
+      map['note'] = Variable<String>(note.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SongLinksCompanion(')
+          ..write('id: $id, ')
+          ..write('sourceUuid: $sourceUuid, ')
+          ..write('type: $type, ')
+          ..write('targetUuid: $targetUuid, ')
+          ..write('targetContentHash: $targetContentHash, ')
+          ..write('note: $note')
           ..write(')'))
         .toString();
   }
@@ -2031,216 +2840,19 @@ class AssetsCompanion extends UpdateCompanion<AssetsData> {
   }
 }
 
-class SongsFts extends Table
-    with
-        TableInfo<SongsFts, SongsFtsData>,
-        VirtualTableInfo<SongsFts, SongsFtsData> {
-  @override
-  final GeneratedDatabase attachedDatabase;
-  final String? _alias;
-  SongsFts(this.attachedDatabase, [this._alias]);
-  late final GeneratedColumn<String> title = GeneratedColumn<String>(
-    'title',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: '',
-  );
-  late final GeneratedColumn<String> lyrics = GeneratedColumn<String>(
-    'lyrics',
-    aliasedName,
-    true,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    $customConstraints: '',
-  );
-  @override
-  List<GeneratedColumn> get $columns => [title, lyrics];
-  @override
-  String get aliasedName => _alias ?? actualTableName;
-  @override
-  String get actualTableName => $name;
-  static const String $name = 'songs_fts';
-  @override
-  Set<GeneratedColumn> get $primaryKey => const {};
-  @override
-  SongsFtsData map(Map<String, dynamic> data, {String? tablePrefix}) {
-    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
-    return SongsFtsData(
-      title: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}title'],
-      ),
-      lyrics: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}lyrics'],
-      ),
-    );
-  }
-
-  @override
-  SongsFts createAlias(String alias) {
-    return SongsFts(attachedDatabase, alias);
-  }
-
-  @override
-  bool get dontWriteConstraints => true;
-  @override
-  String get moduleAndArgs =>
-      'fts5(title, lyrics, content=\'songs\', content_rowid=\'id\', tokenize=\'trigram remove_diacritics 1\')';
-}
-
-class SongsFtsData extends DataClass implements Insertable<SongsFtsData> {
-  final String? title;
-  final String? lyrics;
-  const SongsFtsData({this.title, this.lyrics});
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (!nullToAbsent || title != null) {
-      map['title'] = Variable<String>(title);
-    }
-    if (!nullToAbsent || lyrics != null) {
-      map['lyrics'] = Variable<String>(lyrics);
-    }
-    return map;
-  }
-
-  SongsFtsCompanion toCompanion(bool nullToAbsent) {
-    return SongsFtsCompanion(
-      title: title == null && nullToAbsent
-          ? const Value.absent()
-          : Value(title),
-      lyrics: lyrics == null && nullToAbsent
-          ? const Value.absent()
-          : Value(lyrics),
-    );
-  }
-
-  factory SongsFtsData.fromJson(
-    Map<String, dynamic> json, {
-    ValueSerializer? serializer,
-  }) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return SongsFtsData(
-      title: serializer.fromJson<String?>(json['title']),
-      lyrics: serializer.fromJson<String?>(json['lyrics']),
-    );
-  }
-  @override
-  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
-    serializer ??= driftRuntimeOptions.defaultSerializer;
-    return <String, dynamic>{
-      'title': serializer.toJson<String?>(title),
-      'lyrics': serializer.toJson<String?>(lyrics),
-    };
-  }
-
-  SongsFtsData copyWith({
-    Value<String?> title = const Value.absent(),
-    Value<String?> lyrics = const Value.absent(),
-  }) => SongsFtsData(
-    title: title.present ? title.value : this.title,
-    lyrics: lyrics.present ? lyrics.value : this.lyrics,
-  );
-  SongsFtsData copyWithCompanion(SongsFtsCompanion data) {
-    return SongsFtsData(
-      title: data.title.present ? data.title.value : this.title,
-      lyrics: data.lyrics.present ? data.lyrics.value : this.lyrics,
-    );
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('SongsFtsData(')
-          ..write('title: $title, ')
-          ..write('lyrics: $lyrics')
-          ..write(')'))
-        .toString();
-  }
-
-  @override
-  int get hashCode => Object.hash(title, lyrics);
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      (other is SongsFtsData &&
-          other.title == this.title &&
-          other.lyrics == this.lyrics);
-}
-
-class SongsFtsCompanion extends UpdateCompanion<SongsFtsData> {
-  final Value<String?> title;
-  final Value<String?> lyrics;
-  final Value<int> rowid;
-  const SongsFtsCompanion({
-    this.title = const Value.absent(),
-    this.lyrics = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  SongsFtsCompanion.insert({
-    this.title = const Value.absent(),
-    this.lyrics = const Value.absent(),
-    this.rowid = const Value.absent(),
-  });
-  static Insertable<SongsFtsData> custom({
-    Expression<String>? title,
-    Expression<String>? lyrics,
-    Expression<int>? rowid,
-  }) {
-    return RawValuesInsertable({
-      if (title != null) 'title': title,
-      if (lyrics != null) 'lyrics': lyrics,
-      if (rowid != null) 'rowid': rowid,
-    });
-  }
-
-  SongsFtsCompanion copyWith({
-    Value<String?>? title,
-    Value<String?>? lyrics,
-    Value<int>? rowid,
-  }) {
-    return SongsFtsCompanion(
-      title: title ?? this.title,
-      lyrics: lyrics ?? this.lyrics,
-      rowid: rowid ?? this.rowid,
-    );
-  }
-
-  @override
-  Map<String, Expression> toColumns(bool nullToAbsent) {
-    final map = <String, Expression>{};
-    if (title.present) {
-      map['title'] = Variable<String>(title.value);
-    }
-    if (lyrics.present) {
-      map['lyrics'] = Variable<String>(lyrics.value);
-    }
-    if (rowid.present) {
-      map['rowid'] = Variable<int>(rowid.value);
-    }
-    return map;
-  }
-
-  @override
-  String toString() {
-    return (StringBuffer('SongsFtsCompanion(')
-          ..write('title: $title, ')
-          ..write('lyrics: $lyrics, ')
-          ..write('rowid: $rowid')
-          ..write(')'))
-        .toString();
-  }
-}
-
-class DatabaseAtV2 extends GeneratedDatabase {
-  DatabaseAtV2(QueryExecutor e) : super(e);
+class DatabaseAtV8 extends GeneratedDatabase {
+  DatabaseAtV8(QueryExecutor e) : super(e);
   late final Banks banks = Banks(this);
   late final Songs songs = Songs(this);
-  late final Index songsUuid = Index(
-    'songs_uuid',
-    'CREATE UNIQUE INDEX songs_uuid ON songs (uuid)',
+  late final SongsFts songsFts = SongsFts(this);
+  late final SongLinks songLinks = SongLinks(this);
+  late final Index songLinksSource = Index(
+    'song_links_source',
+    'CREATE INDEX song_links_source ON song_links (source_uuid)',
+  );
+  late final Index songLinksTarget = Index(
+    'song_links_target',
+    'CREATE INDEX song_links_target ON song_links (target_uuid)',
   );
   late final PreferenceStorage preferenceStorage = PreferenceStorage(this);
   late final Cues cues = Cues(this);
@@ -2253,17 +2865,24 @@ class DatabaseAtV2 extends GeneratedDatabase {
     'asset_source_url',
     'CREATE UNIQUE INDEX asset_source_url ON assets (source_url)',
   );
-  late final SongsFts songsFts = SongsFts(this);
+  late final Index songsUuid = Index(
+    'songs_uuid',
+    'CREATE UNIQUE INDEX songs_uuid ON songs (uuid)',
+  );
+  late final Index songsVariationOf = Index(
+    'songs_variation_of',
+    'CREATE INDEX songs_variation_of ON songs (variation_of)',
+  );
   late final Trigger songsAi = Trigger(
     'CREATE TRIGGER songs_ai AFTER INSERT ON songs BEGIN INSERT INTO songs_fts ("rowid", title, lyrics) VALUES (new.id, new.title, new.lyrics);END',
     'songs_ai',
   );
   late final Trigger songsAd = Trigger(
-    'CREATE TRIGGER songs_ad AFTER DELETE ON songs BEGIN INSERT INTO songs_fts (songs_fts, "rowid", title, lyrics) VALUES (\'delete\', "rowid", old.title, old.lyrics);END',
+    'CREATE TRIGGER songs_ad AFTER DELETE ON songs BEGIN INSERT INTO songs_fts (songs_fts, "rowid", title, lyrics) VALUES (\'delete\', old.id, old.title, old.lyrics);END',
     'songs_ad',
   );
   late final Trigger songsAu = Trigger(
-    'CREATE TRIGGER songs_au AFTER UPDATE ON songs BEGIN INSERT INTO songs_fts (songs_fts, "rowid", title, lyrics) VALUES (\'delete\', "rowid", old.title, old.lyrics);INSERT INTO songs_fts ("rowid", title, lyrics) VALUES (new.id, new.title, new.lyrics);END',
+    'CREATE TRIGGER songs_au AFTER UPDATE ON songs BEGIN INSERT INTO songs_fts (songs_fts, "rowid", title, lyrics) VALUES (\'delete\', old.id, old.title, old.lyrics);INSERT INTO songs_fts ("rowid", title, lyrics) VALUES (new.id, new.title, new.lyrics);END',
     'songs_au',
   );
   @override
@@ -2273,13 +2892,17 @@ class DatabaseAtV2 extends GeneratedDatabase {
   List<DatabaseSchemaEntity> get allSchemaEntities => [
     banks,
     songs,
-    songsUuid,
+    songsFts,
+    songLinks,
+    songLinksSource,
+    songLinksTarget,
     preferenceStorage,
     cues,
     cuesUuid,
     assets,
     assetSourceUrl,
-    songsFts,
+    songsUuid,
+    songsVariationOf,
     songsAi,
     songsAd,
     songsAu,
@@ -2309,7 +2932,7 @@ class DatabaseAtV2 extends GeneratedDatabase {
     ),
   ]);
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 8;
   @override
   DriftDatabaseOptions get options =>
       const DriftDatabaseOptions(storeDateTimeAsText: true);
