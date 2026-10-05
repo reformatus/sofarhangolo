@@ -50,7 +50,7 @@ dependencies:
   sqlite3_flutter_libs: ^0.6.0+eol
   sqlite3: ^3.5.0
   flutter_svg: ^2.1.0
-  package_info_plus: ^10.1.0
+  package_info_plus: ^10.2.2
   uuid: ^4.5.1
   url_launcher: ^6.3.1
   msgpack_dart: ^1.0.1
