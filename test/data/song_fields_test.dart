@@ -73,6 +73,16 @@ void main() {
         'Zenekar',
       );
     });
+
+    test('degrades non-string title and type instead of throwing', () {
+      final field = SongField.fromJson('orchestra', {
+        'title': 123,
+        'type': ['list'],
+      });
+
+      expect(field.title, 'orchestra');
+      expect(field.type, SongFieldType.text);
+    });
   });
 
   group('defaultSongFields', () {
@@ -154,6 +164,45 @@ void main() {
       expect(genre.uses, {SongFieldUse.details});
       expect(genre.filterUse, isNull);
       expect(genre.icon, defaultSongFieldRegistry['genre']!.icon);
+    });
+
+    test('keeps the base title and type when the overlay omits them', () {
+      final merged = mergeSongFields(defaultSongFieldRegistry, {
+        'genre': {
+          'uses': ['details'],
+        },
+      });
+
+      final genre = merged['genre']!;
+      expect(genre.title, 'Stílus / műfaj');
+      expect(genre.type, SongFieldType.list);
+    });
+
+    test('keeps the base title and type for non-string overlay values', () {
+      final merged = mergeSongFields(defaultSongFieldRegistry, {
+        'genre': {
+          'title': 7,
+          'type': 7,
+          'uses': ['details'],
+        },
+      });
+
+      final genre = merged['genre']!;
+      expect(genre.title, 'Stílus / műfaj');
+      expect(genre.type, SongFieldType.list);
+    });
+
+    test('lets an overlay override the title and type', () {
+      final merged = mergeSongFields(defaultSongFieldRegistry, {
+        'genre': {
+          'title': 'Műfaj',
+          'type': 'text',
+          'uses': ['details'],
+        },
+      });
+
+      expect(merged['genre']!.title, 'Műfaj');
+      expect(merged['genre']!.type, SongFieldType.text);
     });
 
     test('strips filter_key from overlays', () {

@@ -76,7 +76,8 @@ class SongField {
   /// keys are read, everything else is ignored, and values degrade to safe
   /// defaults rather than throwing.
   factory SongField.fromJson(String apiName, Map<String, dynamic> json) {
-    final type = switch ((json['type'] as String? ?? '').toLowerCase()) {
+    final rawType = json['type'];
+    final type = switch ((rawType is String ? rawType : '').toLowerCase()) {
       'list' || 'array' || 'tags' => SongFieldType.list,
       _ => SongFieldType.text,
     };
@@ -93,9 +94,10 @@ class SongField {
           else if (use == 'summary')
             SongFieldUse.summary,
     };
+    final rawTitle = json['title'];
     return SongField(
       apiName,
-      (json['title'] ?? apiName) as String,
+      rawTitle is String ? rawTitle : apiName,
       type,
       uses: uses,
     );
@@ -286,17 +288,19 @@ Map<String, SongField> mergeSongFields(
     final json = entry.value;
     if (json is! Map<String, dynamic>) continue;
     final field = SongField.fromJson(entry.key, json);
+    // An overlay that omits (or malforms) title/type keeps the base
+    // definition's wording instead of degrading to the api name/text.
+    final rawTitle = json['title'];
+    final rawType = json['type'];
     merged[entry.key] = SongField(
       field.apiName,
-      field.title,
-      field.type,
+      rawTitle is String ? rawTitle : (baseDef?.title ?? field.title),
+      rawType is String ? field.type : (baseDef?.type ?? field.type),
       icon: baseDef?.icon,
       // Dedicated filter cards are app-side decisions, like icons: only
       // the core `key` field may use the key picker, and it is immune to
       // overlays anyway, so a bank's filter_key never passes through.
-      uses: field.uses
-          .where((use) => use != SongFieldUse.filterKey)
-          .toSet(),
+      uses: field.uses.where((use) => use != SongFieldUse.filterKey).toSet(),
     );
   }
   return merged;
