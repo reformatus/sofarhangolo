@@ -60,12 +60,11 @@ List<Widget> getDetailsContent(
 ]) {
   final effectiveRegistry = registry ?? defaultSongFieldRegistry;
   List<Widget> detailsContent = [];
-  for (MapEntry<String, Object> contentEntry in song.contentMap.entries) {
-    final field = effectiveRegistry[contentEntry.key];
+  for (final field in effectiveRegistry.values) {
     // Only fields with a definition and a details use show up; everything
     // else is known-but-unused vocabulary or bank-custom data.
-    if (field == null || !field.hasUse(SongFieldUse.details)) continue;
-    final display = song.contentDisplay(contentEntry.key);
+    if (!field.hasUse(SongFieldUse.details)) continue;
+    final display = song.contentDisplay(field.apiName);
     if (display != null) {
       detailsContent.add(
         ListTile(
