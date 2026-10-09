@@ -69,7 +69,14 @@ class BankChooser extends ConsumerWidget {
               ),
             ],
           ),
-          ...value.map((bank) => BankTile(bank)),
+          // The local bank is a special, user-owned source: keep it apart
+          // from remote banks at the end of the list.
+          ...value.where((bank) => !bank.isLocal).map(
+            (bank) => BankTile(bank),
+          ),
+          ...value.where((bank) => bank.isLocal).map(
+            (bank) => BankTile(bank),
+          ),
         ],
       ),
     };
@@ -83,6 +90,7 @@ class BankTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isLocal = bank.isLocal;
     return Hero(
       tag: 'details-${bank.uuid}',
       child: Card(
@@ -101,11 +109,18 @@ class BankTile extends ConsumerWidget {
                 Padding(
                   padding: EdgeInsets.only(left: 10, top: 10, bottom: 10),
                   child: SizedBox.square(
-                    dimension: 54,
+                    dimension: isLocal ? 36 : 54,
                     child: FittedBox(
                       child: bank.logo != null
                           ? Image.memory(bank.logo!)
-                          : Icon(Icons.library_music),
+                          : Icon(
+                              Icons.library_music,
+                              color: isLocal
+                                  ? Theme.of(
+                                      context,
+                                    ).colorScheme.onSurfaceVariant
+                                  : null,
+                            ),
                     ),
                   ),
                 ),

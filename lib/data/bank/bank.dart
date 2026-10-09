@@ -98,6 +98,10 @@ class Bank extends Insertable<Bank> {
     this.totalSongsInBank,
   ) : _baseUrl = baseUrl;
 
+  /// Whether this is the built-in bank that stores user-created and copied
+  /// songs. UI uses this to present it apart from remote banks.
+  bool get isLocal => access == BankAccess.local;
+
   /// Base url for remote API calls. Only remote banks have one; accessing
   /// it on a local bank is a programming error.
   Uri get baseUrl {
