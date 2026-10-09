@@ -22,6 +22,7 @@ import 'ui/cue/cue_page_type.dart';
 import 'ui/cue/loader.dart';
 import 'ui/loading/launch_page.dart';
 import 'ui/loading/page.dart';
+import 'ui/song/edit/page.dart';
 import 'ui/song/page.dart';
 
 part 'router.dart';

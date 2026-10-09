@@ -49,6 +49,11 @@ GoRouter createAppRouter({String? initialLocation}) {
             },
           ),
           GoRoute(
+            path: '/song/local/new',
+            pageBuilder: (context, state) =>
+                const MaterialPage(child: LocalSongEditPage()),
+          ),
+          GoRoute(
             path: '/song/:uuid',
             pageBuilder: (context, state) =>
                 MaterialPage(child: SongPage(state.pathParameters['uuid']!)),

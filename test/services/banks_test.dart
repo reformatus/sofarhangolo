@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sofarhangolo/data/bank/bank.dart';
@@ -16,7 +17,7 @@ Future<void> insertBank(String uuid, String name) async {
         BanksCompanion.insert(
           uuid: uuid,
           name: name,
-          baseUrl: Uri.parse('https://$uuid.example.com'),
+          baseUrl: Value(Uri.parse('https://$uuid.example.com')),
           parallelUpdateJobs: 1,
           amountOfSongsInRequest: 10,
           noCms: false,

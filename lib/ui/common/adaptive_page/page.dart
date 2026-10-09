@@ -13,6 +13,7 @@ class AdaptivePage extends StatefulWidget {
     required this.title,
     required this.body,
     this.subtitle,
+    this.titleWidget,
     this.selectableTitle = false,
     this.leftDrawer,
     this.leftDrawerIcon,
@@ -28,6 +29,10 @@ class AdaptivePage extends StatefulWidget {
 
   final String title;
   final String? subtitle;
+
+  /// Overrides [title] in the app bar with a custom widget, e.g. an
+  /// editable title field. [subtitle] is not rendered when set.
+  final Widget? titleWidget;
 
   /// Whether the app bar title (and subtitle) should be selectable. Enable
   /// for pages whose title is content-driven (e.g. cue titles), not for
@@ -285,6 +290,9 @@ class _AdaptivePageState extends State<AdaptivePage>
             appBar: AppBar(
               title: Builder(
                 builder: (context) {
+                  if (widget.titleWidget != null) {
+                    return widget.titleWidget!;
+                  }
                   final Widget title =
                       widget.subtitle != null && widget.subtitle!.isNotEmpty
                       ? Column(

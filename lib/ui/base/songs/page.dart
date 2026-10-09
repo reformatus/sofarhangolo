@@ -1,6 +1,7 @@
 import 'package:fading_edge_scrollview/fading_edge_scrollview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../config/config.dart';
 import '../../../data/bank/bank.dart';
@@ -118,6 +119,11 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                     Expanded(
                       child: Scaffold(
                         resizeToAvoidBottomInset: false,
+                        floatingActionButton: FloatingActionButton.extended(
+                          onPressed: () => context.push('/song/local/new'),
+                          icon: const Icon(Icons.add),
+                          label: const Text('Új dal'),
+                        ),
                         appBar: AppBar(
                           toolbarHeight: 51,
                           title: // Search bar
