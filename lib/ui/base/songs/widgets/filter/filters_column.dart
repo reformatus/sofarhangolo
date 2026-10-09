@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../../data/song/song_fields.dart';
 import '../../../../../services/songs/filter.dart';
 import '../../../../common/error/card.dart';
 import 'types/bank/bank_filter_card.dart';
-import 'types/field_type.dart';
 import 'types/key/key_filter_card.dart';
 import 'types/multiselect-tags/multiselect_filter_card.dart';
 
@@ -33,25 +33,20 @@ class FiltersColumn extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             BankFilterCard(),
-            ...filterList.reversed.map(
-              (e) => switch (e.value.type) {
-                FieldType.multiselect ||
-                FieldType.multiselectTags => MultiselectFilterCard(
-                  field: e.key,
-                  fieldType: e.value.type,
+            ...filterList.reversed.map((e) {
+              return switch (e.value.field.filterUse) {
+                SongFieldUse.filterKey => KeyFilterCard(
                   fieldPopulatedCount: e.value.count,
                 ),
-                FieldType.key => KeyFilterCard(
+                SongFieldUse.filterMultiselect => MultiselectFilterCard(
+                  field: e.value.field,
                   fieldPopulatedCount: e.value.count,
                 ),
-                _ => LErrorCard(
-                  type: LErrorType.warning,
-                  title: 'Nem támogatott szűrőtípus!',
-                  message: e.value.toString(),
-                  icon: Icons.filter_alt,
-                ),
-              },
-            ),
+                // Unreachable: fields only reach this list through a
+                // filter use.
+                _ => const SizedBox.shrink(),
+              };
+            }),
           ],
         );
     }

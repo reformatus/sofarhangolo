@@ -9,14 +9,14 @@ void main() {
         'uuid': 'song-1',
         'title': 'Song 1',
         'lyrics': '[V1]\n Sor 1',
-        'lyricsFormat': 'opensong',
+        'lyrics_format': 'opensong',
       });
 
       expect(song.lyrics, equals('[V1]\n Sor 1'));
       expect(song.lyricsFormat, equals(LyricsFormat.opensong));
     });
 
-    test('falls back to opensong when lyrics field is blank', () {
+    test('legacy opensong key never feeds the lyrics column', () {
       final song = Song.fromBankApiJson({
         'uuid': 'song-2',
         'title': 'Song 2',
@@ -24,8 +24,12 @@ void main() {
         'opensong': '[V1]\n Régi sor',
       });
 
-      expect(song.lyrics, equals('[V1]\n Régi sor'));
+      // Only the 'lyrics' field is read into the lyrics column; the
+      // legacy key is not interpreted at all. Like any unknown field it
+      // lands in contentMap verbatim (open-world storage).
+      expect(song.lyrics, isNull);
       expect(song.lyricsFormat, equals(LyricsFormat.opensong));
+      expect(song.contentMap['opensong'], equals('[V1]\n Régi sor'));
     });
 
     test(
@@ -60,31 +64,29 @@ void main() {
       expect(song.contentMap['composer'], equals('A & B'));
     });
 
-    test(
-      'marks filled fields owned and blank or null-string values unowned',
-      () {
-        final song = Song.fromBankApiJson({
-          'uuid': 'song-6',
-          'title': 'Song 6',
-          'lyrics': '[V1]\n Sor',
-          'composer': 'Composer',
-          'arranger': '',
-          'translator': 'null',
-        });
+    test('marks filled fields owned and null or blank values unowned', () {
+      final song = Song.fromBankApiJson({
+        'uuid': 'song-6',
+        'title': 'Song 6',
+        'lyrics': '[V1]\n Sor',
+        'composer': 'Composer',
+        'arranger': '',
+        'translator': null,
+      });
 
-        expect(song.ownership!.contentKeys, equals({'composer'}));
-        // Blank and literal 'null' values are still stored, just unowned.
-        expect(song.contentMap['arranger'], equals(''));
-        expect(song.contentMap['translator'], equals('null'));
-      },
-    );
+      expect(song.ownership!.contentKeys, equals({'composer'}));
+      // Blank strings are still stored, just unowned; JSON nulls are
+      // skipped entirely.
+      expect(song.contentMap['arranger'], equals(''));
+      expect(song.contentMap.containsKey('translator'), isFalse);
+    });
 
     test('derives lyrics and key ownership flags from parsed values', () {
       final song = Song.fromBankApiJson({
         'uuid': 'song-7',
         'title': 'Song 7',
         'lyrics': '[V1]\n Sor',
-        'key': 'C-dur, D-moll',
+        'key': ['C-dur', 'D-moll'],
       });
 
       expect(song.ownership!.lyrics, isTrue);
@@ -95,16 +97,16 @@ void main() {
       );
     });
 
-    test('legacy opensong lyrics still count as owned', () {
+    test('legacy opensong lyrics do not count as owned', () {
       final song = Song.fromBankApiJson({
         'uuid': 'song-8',
         'title': 'Song 8',
         'opensong': '[V1]\n Régi sor',
       });
 
-      expect(song.ownership!.lyrics, isTrue);
+      expect(song.ownership!.lyrics, isFalse);
       expect(song.ownership!.keyField, isFalse);
-      expect(song.lyrics, equals('[V1]\n Régi sor'));
+      expect(song.lyrics, isNull);
     });
 
     test('blank lyrics and empty key list are marked unowned', () {
@@ -112,7 +114,7 @@ void main() {
         'uuid': 'song-9',
         'title': 'Song 9',
         'lyrics': '   ',
-        'key': '  ',
+        'key': [],
       });
 
       expect(song.ownership!.lyrics, isFalse);

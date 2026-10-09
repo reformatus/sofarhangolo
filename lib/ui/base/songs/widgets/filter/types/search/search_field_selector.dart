@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../../../../data/song/song_fields.dart';
 import '../../../../../../../services/songs/filter.dart';
-import '../field_type.dart';
 import 'state.dart';
 
 class SearchFieldSelectorColumn extends ConsumerWidget {
@@ -26,10 +26,10 @@ class SearchFieldSelectorColumn extends ConsumerWidget {
           ),
         ),
         ...fullTextSearchFields.map((e) {
-          var field = songFieldsMap[e]!;
+          final field = defaultSongFieldRegistry[e]!;
           return CheckboxListTile(
-            title: Text(field['title_hu']),
-            secondary: Icon(field['icon']),
+            title: Text(field.title),
+            secondary: Icon(field.icon),
             value: searchFieldsState.contains(e),
             onChanged:
                 (searchFieldsState.length < 2 && searchFieldsState.contains(e))

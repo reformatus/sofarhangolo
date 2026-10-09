@@ -7,6 +7,7 @@ import 'package:sofarhangolo/data/cue/slide.dart';
 import 'package:sofarhangolo/data/database.dart';
 import 'package:sofarhangolo/data/song/song.dart';
 import 'package:sofarhangolo/data/song/transpose.dart';
+import 'package:sofarhangolo/services/bank/banks.dart';
 import 'package:sofarhangolo/services/cue/cues.dart';
 import 'package:sofarhangolo/services/preferences/preferences_parent.dart';
 import 'package:sofarhangolo/services/preferences/providers/song_view_order.dart';
@@ -36,7 +37,7 @@ Song _createSong(String uuid, String title) {
     'uuid': uuid,
     'title': title,
     'lyrics': '<song><lyrics>$title</lyrics></song>',
-    'lyricsFormat': 'opensong',
+    'lyrics_format': 'opensong',
   });
 }
 
@@ -193,6 +194,10 @@ Future<void> _pumpSongPageContent(
         songViewOrderPreferencesProvider.overrideWithValue(
           SongViewOrderPreferencesClass(songViewOrder: [SongViewType.lyrics]),
         ),
+        // The details registry watches the banks table for overlay fields;
+        // a real drift watch would leave drift's stream-GC timer pending at
+        // the end of the test (flutter_test fails on pending timers).
+        watchAllBanksProvider.overrideWith((ref) => Stream.value(const [])),
         if (session != null)
           activeCueSessionProvider.overrideWith(
             () => _FakeActiveCueSession(session),

@@ -7,8 +7,9 @@ import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/key/state.dart';
 
 import '../../data/database.dart';
 import '../../data/song/song.dart';
+import '../../data/song/song_fields.dart';
+import '../bank/banks.dart';
 import '../../ui/base/songs/widgets/filter/types/bank/state.dart';
-import '../../ui/base/songs/widgets/filter/types/field_type.dart';
 import '../../ui/base/songs/widgets/filter/types/multiselect-tags/state.dart';
 import '../../ui/base/songs/widgets/filter/types/search/state.dart';
 import '../assets/downloaded.dart';
@@ -20,51 +21,41 @@ const List<String> fullTextSearchFields = ['title', 'lyrics'];
 
 // todo write test
 @Riverpod(keepAlive: true)
-Future<Map<String, ({FieldType type, int count})>> existingFilterableFields(
+Future<Map<String, ({SongField field, int count})>> existingFilterableFields(
   Ref ref,
 ) async {
+  final banks = await ref.watch(watchAllBanksProvider.future);
+  final registry = mergeSongFields(defaultSongFieldRegistry, {
+    for (final bank in banks)
+      if (bank.songFields.isNotEmpty) ...bank.songFields,
+  });
   return buildExistingFilterableFields(
     await ref.watch(allSongsProvider.future),
+    registry,
   );
 }
 
-Map<String, ({FieldType type, int count})> buildExistingFilterableFields(
-  Iterable<Song> songs,
-) {
-  Map<String, ({FieldType type, int count})> fields = {};
-  int keyFieldCount = 0;
+Map<String, ({SongField field, int count})> buildExistingFilterableFields(
+  Iterable<Song> songs, [
+  Map<String, SongField>? registry,
+]) {
+  final effectiveRegistry = registry ?? defaultSongFieldRegistry;
+  Map<String, ({SongField field, int count})> fields = {};
 
   for (var song in songs) {
     if (song.keyField.isNotEmpty) {
-      keyFieldCount++;
+      final keyDef = effectiveRegistry['key']!;
+      final existing = fields['key'];
+      fields['key'] = (field: keyDef, count: (existing?.count ?? 0) + 1);
     }
 
     for (var field in song.contentMap.keys) {
-      if ((FieldType.fromString(
-                songFieldsMap[field]?['type'] ?? "",
-              )?.isFilterable ??
-              false) &&
-          song.contentMap[field]! != "") {
-        if (!fields.keys.any((k) => k == field)) {
-          // first time we see this field
-          fields[field] = (
-            type: FieldType.fromString(songFieldsMap[field]!['type'])!,
-            count: 1,
-          );
-        } else {
-          // increment count by reassigning the record for the entry
-          fields[field] = (
-            type: fields[field]!.type,
-            count: fields[field]!.count + 1,
-          );
-        }
-      }
+      final fieldDef = effectiveRegistry[field];
+      if (fieldDef == null || !fieldDef.hasFilterUse) continue;
+      if (!song.hasContent(field)) continue;
+      final existing = fields[field];
+      fields[field] = (field: fieldDef, count: (existing?.count ?? 0) + 1);
     }
-  }
-
-  // Add static field filters
-  if (keyFieldCount > 0) {
-    fields['key'] = (type: FieldType.key, count: keyFieldCount);
   }
 
   return fields;
@@ -74,7 +65,6 @@ Map<String, ({FieldType type, int count})> buildExistingFilterableFields(
 Future<List<String>> selectableValuesForFilterableField(
   Ref ref,
   String field,
-  FieldType fieldType,
 ) async {
   final allSongs = Stream.fromIterable(
     await ref.watch(allSongsProvider.future),
@@ -82,11 +72,7 @@ Future<List<String>> selectableValuesForFilterableField(
   Set<String> values = {};
 
   await for (Song song in allSongs) {
-    if (fieldType.commaDividedValues) {
-      values.addAll(song.contentMap[field]?.split(',') ?? []);
-    } else {
-      values.add(song.contentMap[field] ?? "");
-    }
+    values.addAll(song.contentList(field));
   }
 
   values.remove("");
@@ -144,8 +130,17 @@ Stream<List<SongResult>> filteredSongs(Ref ref) {
             final fieldData = songs.contentMap.jsonExtract<String>(
               '\$.${entry.key}',
             );
+            // json_extract unquotes scalars but keeps array elements
+            // quoted, so list fields match on the quoted element (avoids
+            // substring hits inside longer values) while text fields match
+            // plainly.
             return Expression.or(
-              entry.value.map((value) => fieldData.like('%$value%')),
+              entry.value.map((value) {
+                final likePattern = bankApiListValueFields.contains(entry.key)
+                    ? '%"$value"%'
+                    : '%$value%';
+                return fieldData.like(likePattern);
+              }),
             );
           })
           .followedBy([
@@ -180,9 +175,9 @@ Stream<List<SongResult>> filteredSongs(Ref ref) {
                   .where((result) => matchesKeyFilters(result.song, keyFilters))
                   .toList()
                 ..sort(
-                  (a, b) => removeDiacritics(
-                    a.song.title,
-                  ).compareTo(removeDiacritics(b.song.title)),
+                  (a, b) =>
+                      removeDiacritics(a.song.title)
+                          .compareTo(removeDiacritics(b.song.title)),
                 ),
         );
   } else {
@@ -206,9 +201,9 @@ Stream<List<SongResult>> filteredSongs(Ref ref) {
                   .where((result) => matchesKeyFilters(result.song, keyFilters))
                   .toList()
                 ..sort(
-                  (a, b) => removeDiacritics(
-                    a.song.title,
-                  ).compareTo(removeDiacritics(b.song.title)),
+                  (a, b) =>
+                      removeDiacritics(a.song.title)
+                          .compareTo(removeDiacritics(b.song.title)),
                 ),
         );
   }

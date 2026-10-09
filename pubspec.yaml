@@ -31,6 +31,7 @@ dependencies:
   flutter_web_plugins:
     sdk: flutter
   archive: ^4.0.7
+  crypto: ^3.0.7
   intl: any
   flutter_localizations:
     sdk: flutter
@@ -84,6 +85,7 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   build_runner: ^2.14.1
   json_serializable: ^6.9.5
+  riverpod: ^3.0.3
   riverpod_generator: ^4.0.0+1
   riverpod_lint: ^3.0.3
   drift_dev: 2.35.0

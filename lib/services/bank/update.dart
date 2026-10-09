@@ -26,12 +26,25 @@ Future<Set<String>> updateBanks(Dio dio) async {
 
   final availableBankUuids = <String>{};
 
+  /// Resolves the bank API root for the version the app parses
+  /// ([appConfig.supportedBankApiVersion]): discovery entries with an
+  /// `apiVersions` map get that version's URL; banks without one are
+  /// assumed to serve it on their plain `api` root.
+  String bankApiRootForVersion(Map protoBank) {
+    final apiVersions = protoBank['apiVersions'];
+    if (apiVersions is Map) {
+      final versioned = apiVersions[appConfig.supportedBankApiVersion];
+      if (versioned is String) return versioned;
+    }
+    return protoBank['api'];
+  }
+
   for (final protoBank in protoBanks) {
     late Map details;
 
     try {
       details = (await dio.getUri<Map>(
-        Uri.parse('${protoBank['api']}/about/'),
+        Uri.parse('${bankApiRootForVersion(protoBank)}/about/'),
       )).data!;
     } catch (e, s) {
       log.warning(
@@ -83,7 +96,7 @@ Future<Set<String>> updateBanks(Dio dio) async {
     BanksCompanion banksCompanion = BanksCompanion(
       id: Value.absentIfNull(existingBank?.id),
       uuid: Value(details['uuid']!),
-      baseUrl: Value(Uri.parse(protoBank['api'])),
+      baseUrl: Value(Uri.parse(bankApiRootForVersion(protoBank))),
       logo: Value.absentIfNull(logo),
       tinyLogo: Value.absentIfNull(tinyLogo),
       name: Value(details['name']!),

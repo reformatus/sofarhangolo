@@ -34,7 +34,7 @@ class LyricDatabase extends _$LyricDatabase {
     : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration {
@@ -104,6 +104,24 @@ class LyricDatabase extends _$LyricDatabase {
           await m.createTrigger(schema.songsAi);
           // Force a full refetch so every song gets its ownership metadata
           // populated from the bank.
+          await customStatement(
+            "UPDATE banks SET last_updated = '1900-01-01T00:00:00'",
+          );
+        },
+        from7To8: (m, schema) async {
+          // The v8 shape stores multi-value content fields as JSON arrays
+          // (previously comma-separated strings). Old rows cannot be
+          // interpreted under the new shape, and the refetch below is
+          // deliberately soft-forced: the app may have updated in the
+          // background and come back online later, so songs are only
+          // re-parsed when a bank is reachable. Rather than keep old-shape
+          // rows around to support, drop them all - the list is empty
+          // until the refetch repopulates it.
+          await customStatement('DELETE FROM songs');
+
+          // Soft-force the refetch: when the device is next online, every
+          // song is re-parsed from the bank API v2 (JSON arrays) and
+          // written back in the new shape.
           await customStatement(
             "UPDATE banks SET last_updated = '1900-01-01T00:00:00'",
           );

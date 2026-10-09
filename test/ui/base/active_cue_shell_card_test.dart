@@ -17,7 +17,7 @@ Song _createSong(String uuid, String title) {
     'uuid': uuid,
     'title': title,
     'lyrics': '<song><lyrics>$title</lyrics></song>',
-    'lyricsFormat': 'opensong',
+    'lyrics_format': 'opensong',
   });
 }
 

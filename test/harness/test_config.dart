@@ -23,4 +23,5 @@ final testAppConfig = AppConfig(
     seedColor: const Color(0xFF0000FF),
     primaryColor: const Color(0xFFFF0000),
   ),
+  supportedBankApiVersion: 'v2',
 );
