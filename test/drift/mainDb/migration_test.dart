@@ -13,6 +13,7 @@ import 'generated/schema_v4.dart' as v4;
 import 'generated/schema_v5.dart' as v5;
 import 'generated/schema_v6.dart' as v6;
 import 'generated/schema_v7.dart' as v7;
+import 'generated/schema_v8.dart' as v8;
 
 import 'package:sofarhangolo/data/database.dart';
 
@@ -494,4 +495,104 @@ void main() {
       },
     );
   });
+
+  test(
+    'migration from v7 to v8 drops songs and soft-forces a refetch',
+    () async {
+      final oldBanksData = <v7.BanksData>[
+        const v7.BanksData(
+          id: 1,
+          uuid: 'bank-1',
+          logo: null,
+          tinyLogo: null,
+          name: 'Migration Bank',
+          description: null,
+          legal: null,
+          aboutLink: null,
+          contactEmail: null,
+          baseUrl: 'https://example.com',
+          parallelUpdateJobs: 1,
+          amountOfSongsInRequest: 10,
+          noCms: 0,
+          songFields: '{}',
+          isEnabled: 1,
+          isOfflineMode: 0,
+          lastUpdated: '2026-10-01T12:00:00',
+          failedSongUuids: null,
+          totalSongsInBank: 2,
+        ),
+      ];
+
+      // Old-shape rows: multi-value fields stored as comma-joined strings.
+      final oldSongsData = <v7.SongsData>[
+        const v7.SongsData(
+          id: 1,
+          uuid: 'song-1',
+          sourceBank: 'bank-1',
+          contentMap: '{"genre":"Rock, Pop"}',
+          title: 'Root Song',
+          lyrics: '[V1]\n Első sor',
+          lyricsFormat: 'opensong',
+          variationOf: null,
+          keyField: 'C-dur',
+          ownership: null,
+        ),
+        const v7.SongsData(
+          id: 2,
+          uuid: 'song-2',
+          sourceBank: 'bank-1',
+          contentMap: '{}',
+          title: 'Variation Song',
+          lyrics: '[V1]\n Második sor',
+          lyricsFormat: 'opensong',
+          variationOf: 'song-1',
+          keyField: '',
+          ownership: null,
+        ),
+      ];
+
+      await verifier.testWithDataIntegrity(
+        oldVersion: 7,
+        newVersion: 8,
+        createOld: v7.DatabaseAtV7.new,
+        createNew: v8.DatabaseAtV8.new,
+        openTestedDatabase: LyricDatabase.new,
+        createItems: (batch, oldDb) {
+          batch.insertAll(oldDb.banks, oldBanksData);
+          batch.insertAll(oldDb.songs, oldSongsData);
+        },
+        validateItems: (newDb) async {
+          // The v8 shape (JSON-array multi-value fields) cannot interpret
+          // old rows, and the refetch is soft-forced, so all songs are
+          // dropped instead of kept around to support.
+          expect(await newDb.select(newDb.songs).get(), isEmpty);
+
+          // The delete triggers emptied the fts index along with the table.
+          final ftsCount = await newDb
+              .customSelect('SELECT count(*) AS c FROM songs_fts')
+              .getSingle();
+          expect(ftsCount.read<int>('c'), 0);
+
+          // Triggers stay live: songs written after the migration index
+          // again, so the refetch's rewrites are searchable.
+          await newDb.customStatement(
+            "INSERT INTO songs (uuid, content_map, title, lyrics, key_field) "
+            "VALUES ('song-9', '{}', 'Kegyelem', 'Békeesség', '')",
+          );
+          final matches = await newDb
+              .customSelect(
+                "SELECT rowid FROM songs_fts WHERE songs_fts MATCH 'Kegyelem'",
+              )
+              .get();
+          expect(matches, hasLength(1));
+
+          // Bank metadata survives with the refetch sentinel.
+          final bank = await newDb.select(newDb.banks).getSingle();
+          expect(bank.name, 'Migration Bank');
+          expect(bank.totalSongsInBank, 2);
+          expect(bank.lastUpdated, '1900-01-01T00:00:00');
+        },
+      );
+    },
+  );
 }

@@ -96,7 +96,7 @@ Song resolveVariation({required Song own, required Song parent}) {
   final ownership = own.ownership;
   if (ownership == null) return own;
 
-  final mergedContentMap = <String, String>{};
+  final mergedContentMap = <String, Object>{};
   for (final key in {...parent.contentMap.keys, ...ownership.contentKeys}) {
     if (ownership.contentKeys.contains(key)) {
       // Owned values live in the stored row; the parent fallback only exists

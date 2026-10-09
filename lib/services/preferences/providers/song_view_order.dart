@@ -28,7 +28,9 @@ class SongViewOrderPreferences extends _$SongViewOrderPreferences {
   void reorder(int oldIndex, int newIndex) {
     final newOrder = [...state.songViewOrder];
     final item = newOrder.removeAt(oldIndex);
-    newOrder.insert(newIndex > oldIndex ? newIndex - 1 : newIndex, item);
+    // ReorderableListView.onReorderItem already adjusts newIndex for the
+    // item removed at oldIndex, so it is the entry's final index.
+    newOrder.insert(newIndex, item);
 
     state = SongViewOrderPreferencesClass(songViewOrder: newOrder);
     go();

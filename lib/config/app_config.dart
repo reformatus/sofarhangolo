@@ -36,6 +36,11 @@ class AppConfig {
   final AppBreakpoints breakpoints;
   final AppColors colors;
 
+  /// Which bank API version the parser understands. Discovery entries
+  /// advertising [apiVersions] are resolved to this version's root, falling
+  /// back to their plain `api` URL when the map is absent or lacks it.
+  final String supportedBankApiVersion;
+
   const AppConfig({
     required this.appName,
     required this.organisationName,
@@ -54,5 +59,6 @@ class AppConfig {
     required this.iosStoreUrl,
     required this.breakpoints,
     required this.colors,
+    required this.supportedBankApiVersion,
   });
 }

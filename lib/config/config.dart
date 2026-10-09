@@ -27,6 +27,7 @@ final AppConfig appConfig = AppConfig(
     seedColor: const Color(0xff025462),
     primaryColor: const Color(0xffc3a140),
   ),
+  supportedBankApiVersion: 'v2',
 );
 
 String? get storeLinkForCurrentPlatform {

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/database.dart';
 import '../../data/log/logger.dart';
 import '../bank/update.dart';
+import '../error/app_error.dart';
 import '../http/dio_provider.dart';
 import '../task/task_queue.dart';
 import 'bank_song_update_task.dart';
@@ -109,8 +110,17 @@ class BankSongUpdateScheduler extends Notifier<AsyncValue<void>> {
 
       state = const AsyncValue.data(null);
     } catch (error, stackTrace) {
-      log.severe('Hiba a tárak frissítésének indításakor', error, stackTrace);
-      state = AsyncValue.error(error, stackTrace);
+      // Single reporting point for the refresh. Granular per-step context
+      // is already on the error (steps translate before throwing); the
+      // operation context is attached here and carried to both the log
+      // (message + view) and the state (update status card) by the same
+      // AppError.
+      final appError = AppError.from(
+        error,
+        stackTrace: stackTrace,
+      ).withTitle('Hiba a tárak frissítése közben');
+      log.severe(appError.title, appError, stackTrace);
+      state = AsyncValue.error(appError, stackTrace);
     } finally {
       _isScheduling = false;
     }

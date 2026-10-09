@@ -10,6 +10,7 @@ import '../../data/log/logger.dart';
 import '../../data/song/song.dart';
 import '../bank/bank_api.dart';
 import '../bank/bank_updated.dart';
+import '../error/app_error.dart';
 import '../task/background_task.dart';
 import 'delete_for_song.dart';
 import 'variation_resolver.dart';
@@ -130,7 +131,7 @@ class BankSongUpdateTask extends BackgroundTask {
       _markFailed(song.uuid, song.title);
       log.severe(
         'Nem sikerült adatbázisba írni: "${song.title}"',
-        error.toString(),
+        error,
         stackTrace,
       );
     }
@@ -250,7 +251,7 @@ class BankSongUpdateTask extends BackgroundTask {
         _markFailed(uuid, title);
         log.severe(
           'Nem sikerült helyben egyesíteni: "$title"',
-          error.toString(),
+          error,
           stackTrace,
         );
       }
@@ -265,10 +266,9 @@ class BankSongUpdateTask extends BackgroundTask {
   }
 
   Future<String> _loadTitle(String uuid) async {
-    final query =
-        db.songs.selectOnly()
-          ..addColumns([db.songs.title])
-          ..where(db.songs.uuid.equals(uuid));
+    final query = db.songs.selectOnly()
+      ..addColumns([db.songs.title])
+      ..where(db.songs.uuid.equals(uuid));
     final row = await query.getSingleOrNull();
     return row?.read(db.songs.title) ?? uuid;
   }
@@ -317,7 +317,7 @@ class BankSongUpdateTask extends BackgroundTask {
           _markFailed(protoSong.uuid, protoSong.title);
           log.severe(
             'Nem sikerült lekérdezni: "${protoSong.title}"',
-            error.toString(),
+            error,
             stackTrace,
           );
         }
@@ -436,8 +436,15 @@ class BankSongUpdateTask extends BackgroundTask {
         log.info('Minden dal frissítve: ${bank.name}');
       }
     } catch (error, stackTrace) {
-      log.severe('Hiba a ${bank.name} frissítése közben:', error, stackTrace);
-      rethrow;
+      // Attach the per-bank context to the error, so the reporting
+      // surface (the update banner) shows the same wording as the log
+      // instead of inventing its own.
+      final appError = AppError.from(
+        error,
+        stackTrace: stackTrace,
+      ).withTitle('Hiba a ${bank.name} frissítése közben');
+      log.severe(appError.title, appError, stackTrace);
+      throw appError;
     }
   }
 }

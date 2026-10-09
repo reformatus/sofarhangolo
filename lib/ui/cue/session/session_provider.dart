@@ -8,6 +8,7 @@ import '../../../data/cue/slide.dart';
 import '../../../data/log/logger.dart';
 import '../../../services/cue/source/cue_source.dart';
 import '../../../services/cue/source/local_source.dart';
+import '../../../services/error/app_error.dart';
 import 'cue_session.dart';
 
 /// The single source of truth for the currently active cue session.
@@ -103,8 +104,14 @@ class ActiveCueSession extends AsyncNotifier<CueSession?> {
         _handleExternalChange,
       );
     } catch (e, s) {
-      log.severe('Hiba lista betöltése közben:', e, s);
-      state = AsyncValue.error(e, s);
+      // Carry the context on the error so the loader renders the same
+      // wording as the log.
+      final appError = AppError.from(
+        e,
+        stackTrace: s,
+      ).withTitle('Nem sikerült betölteni a listát');
+      log.severe(appError.title, appError, s);
+      state = AsyncValue.error(appError, s);
     }
   }
 

@@ -1,11 +1,14 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 
 import '../bank/bank.dart';
 import '../database.dart';
+import '../log/logger.dart';
 import 'lyrics/format.dart';
 import 'lyrics/parser.dart';
+import 'song_fields.dart';
 
 class Song extends Insertable<Song> {
   final String uuid;
@@ -16,7 +19,11 @@ class Song extends Insertable<Song> {
   final String? variationOf;
   final List<KeyField> keyField;
 
-  Map<String, String> contentMap;
+  /// Extra song fields in their canonical (bank API v2) shape: single-value
+  /// fields as [String], multi-value fields as `List<String>`. Read it
+  /// through the [SongContentAccessors] extension - raw access is only
+  /// sanctioned in storage code.
+  Map<String, Object> contentMap;
 
   /// Records which fields the song owns in its own (raw) bank data, as
   /// opposed to fields inherited from a variation parent. Set once when the
@@ -36,15 +43,10 @@ class Song extends Insertable<Song> {
 
   factory Song.fromBankApiJson(Map<String, dynamic> json, {Bank? sourceBank}) {
     try {
-      // Check for new 'lyrics' field first, but fall back to legacy 'opensong'
-      // when lyrics is missing or blank.
-      final String? lyricsFromLyricsField = _nonBlankString(json['lyrics']);
-      final String? lyricsFromOpenSongField = _nonBlankString(json['opensong']);
-      final String? lyricsContent =
-          lyricsFromLyricsField ?? lyricsFromOpenSongField;
+      final String? lyricsContent = _nonBlankString(json['lyrics']);
 
       // Infer format from lyrics when available, otherwise default to opensong.
-      final LyricsFormat format = lyricsFromLyricsField != null
+      final LyricsFormat format = lyricsContent != null
           ? LyricsFormat.fromString(json['lyrics_format'])
           : LyricsFormat.opensong;
 
@@ -56,21 +58,30 @@ class Song extends Insertable<Song> {
       final variationOf = _nonBlankString(json['variation_of']);
 
       // Build contentMap excluding fields that have dedicated columns,
-      // tracking which entries the song owns (non-blank raw values).
-      final contentMap = <String, String>{};
+      // keeping the bank API v2 value shapes: strings for single-value
+      // fields, string lists for multi-value fields. Nulls are skipped;
+      // empty strings/lists are stored but not owned.
+      final contentMap = <String, Object>{};
       final ownedContentKeys = <String>{};
       for (final e in json.entries) {
         if (_excludedFromContentMap.contains(e.key)) continue;
-        final rawValue = e.value.toString();
-        contentMap[e.key] = rawValue;
-        if (e.value != null &&
-            rawValue.trim().isNotEmpty &&
-            rawValue != 'null') {
-          ownedContentKeys.add(e.key);
+        final value = e.value;
+        if (value == null) continue;
+        _logUnknownField(e.key);
+        if (value is List) {
+          final list = value.map((item) => item.toString()).toList();
+          contentMap[e.key] = list;
+          if (list.any((item) => item.trim().isNotEmpty)) {
+            ownedContentKeys.add(e.key);
+          }
+        } else {
+          final rawValue = value.toString();
+          contentMap[e.key] = rawValue;
+          if (rawValue.trim().isNotEmpty) ownedContentKeys.add(e.key);
         }
       }
 
-      final keyField = KeyField.fromStringList(json['key']);
+      final keyField = KeyField.fromApiList(json['key'] as List?);
 
       return Song(
         uuid: json['uuid'],
@@ -117,11 +128,37 @@ class Song extends Insertable<Song> {
     return keyField.first;
   }
 
-  int get contentHash => Object.hash(
-    jsonEncode(contentMap),
-    jsonEncode(keyField.map((e) => e.toString()).toList()),
-    sourceBank,
+  /// Deterministic hash over the song's content (title, lyrics, key and
+  /// remaining content fields), stable across processes and devices.
+  ///
+  /// Persisted into cue shares to detect content drift,
+  /// so it must not use [Object.hash] (which is salted per process) and must
+  /// ignore identity fields (uuid, sourceBank).
+  String get contentHash => contentHashOf(
+    title: title,
+    lyrics: lyrics,
+    keyField: keyField,
+    contentMap: contentMap,
   );
+
+  /// [contentHash] over explicitly given values.
+  static String contentHashOf({
+    required String title,
+    required String? lyrics,
+    required List<KeyField> keyField,
+    required Map<String, Object> contentMap,
+  }) {
+    final sortedContentMap = Map.fromEntries(
+      contentMap.entries.toList()..sort((a, b) => a.key.compareTo(b.key)),
+    );
+    final payload = jsonEncode({
+      'title': title,
+      'lyrics': lyrics,
+      'keyField': keyField.map((e) => e.toString()).toList(),
+      'contentMap': sortedContentMap,
+    });
+    return md5.convert(utf8.encode(payload)).toString();
+  }
 
   /// Whether [other] carries the same values for the fields the variation
   /// merge can change: contentMap, keyField and lyrics. Identity fields are
@@ -132,10 +169,17 @@ class Song extends Insertable<Song> {
         lyrics == other.lyrics;
   }
 
-  static bool _contentMapEquals(Map<String, String> a, Map<String, String> b) {
+  static bool _contentMapEquals(Map<String, Object> a, Map<String, Object> b) {
     if (a.length != b.length) return false;
     for (final entry in a.entries) {
-      if (b[entry.key] != entry.value) return false;
+      if (!b.containsKey(entry.key)) return false;
+      final value = entry.value;
+      final other = b[entry.key]!;
+      if (value is List && other is List) {
+        if (!_listEquals(value, other)) return false;
+      } else if (value != other) {
+        return false;
+      }
     }
     return true;
   }
@@ -173,16 +217,40 @@ class Song extends Insertable<Song> {
   }
 }
 
-/// Fields that are stored in dedicated columns and should not be duplicated in contentMap.
+/// Bank API fields the parser reads into dedicated [Song] columns.
+/// Everything else - known or unknown - lands in contentMap verbatim.
 const Set<String> _excludedFromContentMap = {
   'uuid',
   'title',
   'lyrics',
-  'opensong', // legacy field name
-  'lyricsFormat',
   'lyrics_format',
   'variation_of',
   'key',
+};
+
+/// Reports content fields outside the known vocabulary, once per field per
+/// process. New bank fields land in contentMap either way; this just makes
+/// vocabulary growth visible so new fields can be promoted into the
+/// registry deliberately.
+final Set<String> _reportedUnknownFields = {};
+
+void _logUnknownField(String key) {
+  if (defaultSongFieldRegistry.containsKey(key)) return;
+  if (_reportedUnknownFields.add(key)) {
+    log.fine(
+      'Unknown song field from bank: "$key" (stored, but has no '
+      'field definition - consider adding it to the registry)',
+    );
+  }
+}
+
+/// Bank API fields that carry multiple values as a JSON array. Derived from
+/// the field registry. Used to pick the right LIKE pattern when filtering
+/// content map values. (`key` is covered although it never enters
+/// contentMap - it has its own column.)
+final Set<String> bankApiListValueFields = {
+  for (final field in defaultSongFields)
+    if (field.type == SongFieldType.list) field.apiName,
 };
 
 /// Mandatory fields that must be present in API JSON (lyrics checked separately).
@@ -270,16 +338,26 @@ class SongFieldOwnershipConverter
   }
 }
 
-class SongContentConverter extends TypeConverter<Map<String, String>, String> {
+class SongContentConverter extends TypeConverter<Map<String, Object>, String> {
   const SongContentConverter();
 
   @override
-  Map<String, String> fromSql(String fromDb) {
-    return (jsonDecode(fromDb) as Map).cast<String, String>();
+  Map<String, Object> fromSql(String fromDb) {
+    final decoded = jsonDecode(fromDb);
+    if (decoded is! Map) {
+      throw ArgumentError('Invalid content map JSON: $fromDb');
+    }
+    return decoded.map((key, value) {
+      if (value is String) return MapEntry(key as String, value);
+      if (value is List) {
+        return MapEntry(key as String, value.map((e) => e.toString()).toList());
+      }
+      return MapEntry(key as String, value.toString());
+    });
   }
 
   @override
-  String toSql(Map<String, String> value) {
+  String toSql(Map<String, Object> value) {
     return jsonEncode(value);
   }
 }
@@ -330,6 +408,18 @@ class KeyField {
         .toList();
   }
 
+  /// Parses the bank API v2 shape: a JSON array of key strings
+  /// (e.g. `["F-dúr"]`).
+  static List<KeyField> fromApiList(List<dynamic>? values) {
+    if (values == null) return [];
+    return values
+        .map((item) => item.toString())
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .map((item) => KeyField.fromString(item)!)
+        .toList();
+  }
+
   @override
   String toString() {
     return '$pitch-$mode';
@@ -344,4 +434,57 @@ class KeyField {
 
   @override
   int get hashCode => Object.hash(pitch, mode);
+}
+
+/// Typed reads over [Song.contentMap]. The only sanctioned access outside
+/// storage code: single-value fields through [SongContentAccessors.contentString],
+/// multi-value fields through [SongContentAccessors.contentList].
+extension SongContentAccessors on Song {
+  /// The field's single string value, or null when the field is missing,
+  /// blank, or not a string (multi-value fields have no single value).
+  String? contentString(String key) {
+    final value = contentMap[key];
+    if (value is! String) return null;
+    return value.trim().isEmpty ? null : value;
+  }
+
+  /// The field's values as a list. Lists pass through; a non-blank scalar
+  /// counts as a single-element list; missing or blank yields an empty list.
+  /// Values are never split on commas - canonical data already stores lists.
+  List<String> contentList(String key) {
+    final value = contentMap[key];
+    if (value is List) return value.cast<String>();
+    if (value is String && value.trim().isNotEmpty) return [value];
+    return const [];
+  }
+
+  /// Whether the field carries any non-blank value.
+  bool hasContent(String key) {
+    final value = contentMap[key];
+    if (value is String) return value.trim().isNotEmpty;
+    if (value is List) {
+      return value.any((item) => item.toString().trim().isNotEmpty);
+    }
+    return false;
+  }
+
+  /// Human-readable rendering for details UI: scalars as-is, lists joined
+  /// with commas. Null when the field has no non-blank content.
+  String? contentDisplay(String key) {
+    final value = contentMap[key];
+    if (value is String) return value.trim().isEmpty ? null : value;
+    if (value is List) {
+      final items = value
+          .map((item) => item.toString().trim())
+          .where((item) => item.isNotEmpty)
+          .toList();
+      return items.isEmpty ? null : items.join(', ');
+    }
+    return null;
+  }
+
+  /// File references of the core sheet-asset fields.
+  String? get pdfRef => contentString('pdf');
+
+  String? get svgRef => contentString('svg');
 }

@@ -2,6 +2,7 @@ import 'package:fading_edge_scrollview/fading_edge_scrollview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:logging/logging.dart';
 
 import '../../../config/config.dart';
 import '../../../data/log/level_style.dart';
@@ -9,6 +10,7 @@ import '../../../data/log/provider.dart';
 import '../../../services/text_export/diagnostics.dart';
 import '../../../services/ui/messenger_service.dart';
 import '../centered_hint.dart';
+import '../error/card.dart';
 
 class LogViewDialog extends ConsumerStatefulWidget {
   const LogViewDialog({super.key});
@@ -103,92 +105,72 @@ class _LogViewDialogState extends ConsumerState<LogViewDialog> {
   }
 }
 
-class LogMessageCard extends ConsumerWidget {
+class LogMessageCard extends StatelessWidget {
   final LogMessage message;
 
   const LogMessageCard({super.key, required this.message});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final record = message.record;
-    final level = record.level;
-    final color = colorForLogLevel(level);
+    final error = record.error;
 
-    return SelectionArea(
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Badge(
-          isLabelVisible: !message.isRead,
-          backgroundColor: color,
-          padding: EdgeInsets.all(3),
-          child: Card(
-            elevation: message.isRead ? 1 : 4,
-            color: Color.lerp(
-              color,
-              Theme.of(context).scaffoldBackgroundColor,
-              0.8,
-            ),
-            child: Column(
+    // The log message is the card's title; an attached error contributes
+    // the body/failure/stack fields and the action buttons. Without an
+    // error the message still gets a card, styled by log level.
+    final card = error != null
+        ? LErrorCard.fromError(
+            error: error,
+            stackTrace: record.stackTrace,
+            title: record.message,
+            icon: iconForLogLevel(record.level),
+          )
+        : LErrorCard(
+            type: _typeForLogLevel(record.level),
+            title: record.message,
+            icon: iconForLogLevel(record.level),
+            showReportButton: false,
+          );
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: EdgeInsets.only(left: 12),
+            child: Row(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                ListTile(
-                  leading: Icon(
-                    iconForLogLevel(level),
-                    color: color.withAlpha(200),
-                  ),
-                  title: Text(
-                    record.message,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  subtitle: Text(
-                    '${record.time.hour}:${record.time.minute.toString().padLeft(2, '0')}',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  trailing: !message.isRead
-                      ? IconButton(
-                          icon: Icon(Icons.check),
-                          tooltip: 'Olvasottnak jelölés',
-                          onPressed: () {
-                            ref
-                                .read(logMessagesProvider.notifier)
-                                .markAsRead(message);
-                          },
-                        )
-                      : null,
-                ),
-                if (record.error != null || record.stackTrace != null)
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      left: 16,
-                      right: 16,
-                      bottom: 16,
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        if (record.error != null) Text(record.error.toString()),
-                        if (record.stackTrace != null)
-                          ConstrainedBox(
-                            constraints: BoxConstraints(maxHeight: 100),
-                            child: SingleChildScrollView(
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Text(
-                                  record.stackTrace.toString(),
-                                  style: TextStyle(fontFamily: 'Courier New'),
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
+                if (!message.isRead)
+                  Container(
+                    key: const ValueKey('log-unread-dot'),
+                    width: 8,
+                    height: 8,
+                    margin: EdgeInsets.only(right: 6),
+                    decoration: BoxDecoration(
+                      color: colorForLogLevel(record.level),
+                      shape: BoxShape.circle,
                     ),
                   ),
+                Text(_formatTime(record.time), style: TextStyle(fontSize: 12)),
               ],
             ),
           ),
-        ),
+          card,
+        ],
       ),
     );
   }
+}
+
+LErrorType _typeForLogLevel(Level level) {
+  if (level.value >= Level.SEVERE.value) return LErrorType.error;
+  if (level.value >= Level.WARNING.value) return LErrorType.warning;
+  return LErrorType.info;
+}
+
+String _formatTime(DateTime time) {
+  String two(int value) => value.toString().padLeft(2, '0');
+  return '${two(time.hour)}:${two(time.minute)}:${two(time.second)}';
 }

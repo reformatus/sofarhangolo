@@ -41,4 +41,53 @@ void main() {
       expect(cue.content.single['uuid'], 'slide-1');
     });
   });
+
+  group('Cue.reorderSlides', () {
+    // ReorderableListView.onReorderItem already adjusts newIndex for the
+    // item removed at oldIndex, so newIndex is the final index of the
+    // moved slide (no extra -1 for downward moves).
+    Cue cueWithSlides(List<String> uuids) {
+      return Cue(1, 'cue-uuid', 'Title', 'Description', 1, [
+        for (final uuid in uuids)
+          {'slideType': 'unknown', 'uuid': uuid, 'comment': null},
+      ]);
+    }
+
+    List<Object?> uuidsOf(Cue cue) => [
+      for (final entry in cue.content) entry['uuid'],
+    ];
+
+    test('moves a slide down to its final index', () {
+      final cue = cueWithSlides(['A', 'B', 'C', 'D']);
+
+      cue.reorderSlides(0, 2); // A after C
+
+      expect(uuidsOf(cue), ['B', 'C', 'A', 'D']);
+    });
+
+    test('moves a slide up to its final index', () {
+      final cue = cueWithSlides(['A', 'B', 'C', 'D']);
+
+      cue.reorderSlides(2, 0); // C before A
+
+      expect(uuidsOf(cue), ['C', 'A', 'B', 'D']);
+    });
+
+    test('moves a slide to the end', () {
+      final cue = cueWithSlides(['A', 'B', 'C', 'D']);
+
+      cue.reorderSlides(0, 3); // A after D
+
+      expect(uuidsOf(cue), ['B', 'C', 'D', 'A']);
+    });
+
+    test('applies the same order to revived slides', () async {
+      final cue = cueWithSlides(['A', 'B', 'C', 'D']);
+      await cue.getRevivedSlides();
+
+      cue.reorderSlides(0, 2); // A after C
+
+      expect(uuidsOf(cue), ['B', 'C', 'A', 'D']);
+    });
+  });
 }

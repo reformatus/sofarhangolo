@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'present/musician/page.dart';
 import '../common/error/card.dart';
 import 'edit/page.dart';
@@ -72,7 +73,6 @@ class _CueLoaderPageState extends ConsumerState<CueLoaderPage> {
           child: LErrorCard.fromError(
             error: error,
             stackTrace: stack,
-            title: 'Nem sikerült betölteni a listát',
             icon: Icons.error,
           ),
         ),

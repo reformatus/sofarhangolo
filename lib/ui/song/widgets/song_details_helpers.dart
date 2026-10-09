@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../data/song/song.dart';
-import '../../base/songs/widgets/filter/types/field_type.dart';
+import '../../../data/song/song_fields.dart';
 
 /// Invisible marker embedded at selectable text boundaries (see
 /// [SelectableDetailsList]); converted to a real line break on copy.
@@ -13,29 +13,33 @@ const selectionBreakMarker = '\u200B';
 //
 // Details are rendered plain here; the details bottom sheet wraps the whole
 // list in a single SelectionArea so selections can span items.
-List<Widget> getDetailsSummaryContent(Song song, BuildContext context) {
-  const Set<String> fieldsToShowInDetailsSummary = {
-    'composer',
-    'lyricist',
-    'translator',
-  };
-
+List<Widget> getDetailsSummaryContent(
+  Song song,
+  BuildContext context, [
+  Map<String, SongField>? registry,
+]) {
+  // Summary chips come from the effective registry: defaults in
+  // vocabulary order, then bank-defined fields. Core fields are immune
+  // to overlays; icons fall back the same way as in the details list.
+  final effectiveRegistry = registry ?? defaultSongFieldRegistry;
   List<Widget> detailsSummary = [];
-  for (String field in fieldsToShowInDetailsSummary) {
-    if (song.contentMap[field] != null && song.contentMap[field]!.isNotEmpty) {
+  for (final field in effectiveRegistry.values) {
+    if (!field.hasUse(SongFieldUse.summary)) continue;
+    final display = song.contentDisplay(field.apiName);
+    if (display != null) {
       detailsSummary.add(
         Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              songFieldsMap[field]!['icon'],
+              field.icon ?? Icons.help_outline,
               color: Theme.of(context).colorScheme.secondary,
             ),
             const SizedBox(width: 3),
             Flexible(
               fit: FlexFit.loose,
               child: Text(
-                song.contentMap[field]!,
+                display,
                 overflow: TextOverflow.ellipsis,
                 maxLines: 2,
                 softWrap: true,
@@ -49,40 +53,33 @@ List<Widget> getDetailsSummaryContent(Song song, BuildContext context) {
   return detailsSummary;
 }
 
-List<Widget> getDetailsContent(Song song, BuildContext context) {
-  const Set<String> fieldsToOmitFromDetails = {
-    'title',
-    'uuid',
-    'sourceBank',
-    'key',
-    'lyrics',
-    'opensong', // legacy
-    'lyricsFormat',
-    'first_line',
-  };
-
+List<Widget> getDetailsContent(
+  Song song,
+  BuildContext context, [
+  Map<String, SongField>? registry,
+]) {
+  final effectiveRegistry = registry ?? defaultSongFieldRegistry;
   List<Widget> detailsContent = [];
-  for (MapEntry<String, String> contentEntry in song.contentMap.entries) {
-    if (fieldsToOmitFromDetails.contains(contentEntry.key)) continue;
-    if (contentEntry.value.isNotEmpty) {
-      if (songFieldsMap.containsKey(contentEntry.key)) {
-        detailsContent.add(
-          ListTile(
-            visualDensity: VisualDensity.compact,
-            leading: Icon(songFieldsMap[contentEntry.key]!['icon']),
-            title: Text(
-              songFieldsMap[contentEntry.key]!['title_hu'],
-              style: Theme.of(context).primaryTextTheme.labelMedium,
-            ),
-            // Leading marker: line break between the item title and its value
-            // on copy. Trailing marker: line break between items on copy.
-            subtitle: Text(
-              '$selectionBreakMarker${contentEntry.value}$selectionBreakMarker',
-            ),
-            subtitleTextStyle: Theme.of(context).listTileTheme.titleTextStyle,
+  for (final field in effectiveRegistry.values) {
+    // Only fields with a definition and a details use show up; everything
+    // else is known-but-unused vocabulary or bank-custom data.
+    if (!field.hasUse(SongFieldUse.details)) continue;
+    final display = song.contentDisplay(field.apiName);
+    if (display != null) {
+      detailsContent.add(
+        ListTile(
+          visualDensity: VisualDensity.compact,
+          leading: Icon(field.icon ?? Icons.help_outline),
+          title: Text(
+            field.title,
+            style: Theme.of(context).primaryTextTheme.labelMedium,
           ),
-        );
-      }
+          // Leading marker: line break between the item title and its value
+          // on copy. Trailing marker: line break between items on copy.
+          subtitle: Text('$selectionBreakMarker$display$selectionBreakMarker'),
+          subtitleTextStyle: Theme.of(context).listTileTheme.titleTextStyle,
+        ),
+      );
     }
   }
   return detailsContent;

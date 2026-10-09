@@ -157,18 +157,20 @@ class Cue extends Insertable<Cue> {
     _serializedContent.removeWhere((entry) => entry['uuid'] == slideUuid);
   }
 
+  /// Reorders slides to match a [ReorderableListView.onReorderItem] callback.
+  ///
+  /// [newIndex] is already adjusted for the item removed at [oldIndex], so
+  /// it is the moved slide's final index and must be used as-is.
   void reorderSlides(int oldIndex, int newIndex) {
     final slides = _revivedSlides;
     if (slides != null) {
       final item = slides.removeAt(oldIndex);
-      final adjustedIndex = newIndex > oldIndex ? newIndex - 1 : newIndex;
-      slides.insert(adjustedIndex, item);
+      slides.insert(newIndex, item);
       return;
     }
 
     final item = _serializedContent.removeAt(oldIndex);
-    final adjustedIndex = newIndex > oldIndex ? newIndex - 1 : newIndex;
-    _serializedContent.insert(adjustedIndex, item);
+    _serializedContent.insert(newIndex, item);
   }
 
   Cue(

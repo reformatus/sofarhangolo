@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/song/song.dart';
+import '../../../data/song/song_fields.dart';
 import '../../../config/config.dart';
+import '../../../services/bank/banks.dart';
 import '../../base/cue_shell_inset.dart';
 import 'app_bar.dart';
 import 'body.dart';
@@ -38,8 +40,23 @@ class SongPageContent extends ConsumerWidget {
           context,
         );
 
-        final summaryContent = getDetailsSummaryContent(song, context);
-        final detailsContent = getDetailsContent(song, context);
+        // Bank overlay receptacle: fields the song's bank defines on top
+        // of the shared vocabulary join the details list and the summary
+        // chips (core fields immune).
+        final bank = ref.watch(bankByUuidProvider(song.sourceBank));
+        final detailsRegistry = bank == null
+            ? defaultSongFieldRegistry
+            : mergeSongFields(defaultSongFieldRegistry, bank.songFields);
+        final summaryContent = getDetailsSummaryContent(
+          song,
+          context,
+          detailsRegistry,
+        );
+        final detailsContent = getDetailsContent(
+          song,
+          context,
+          detailsRegistry,
+        );
 
         return Scaffold(
           backgroundColor: Theme.of(context).colorScheme.surface,

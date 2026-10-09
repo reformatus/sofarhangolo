@@ -27,14 +27,19 @@ void main() {
       final text = formatDiagnostics(
         title: 'Hiba',
         message: 'Nem sikerült betölteni.',
+        errorMessage: 'TypeError: boom',
         stack: 'stack line',
       );
 
-      expect(text, 'Hiba\n\nNem sikerült betölteni.\n\nstack line');
+      expect(
+        text,
+        'Hiba\n\nNem sikerült betölteni.\n\nTypeError: boom\n\nstack line',
+      );
     });
 
     test('skips empty parts', () {
       expect(formatDiagnostics(title: 'Hiba'), 'Hiba');
+      expect(formatDiagnostics(errorMessage: 'boom'), 'boom');
       expect(formatDiagnostics(), isEmpty);
     });
   });

@@ -25,8 +25,14 @@ Stream<AssetResult> getSongAsset(
 
   () async {
     final bank = await ref.watch(bankOfSongProvider(song).future);
+    final contentReference = song.contentString(fieldName);
+    if (contentReference == null) {
+      await controller.close();
+      return;
+    }
+
     final String sourceUrl = bank.baseUrl
-        .resolve(song.contentMap[fieldName]!)
+        .resolve(contentReference)
         .toString();
 
     final asset =

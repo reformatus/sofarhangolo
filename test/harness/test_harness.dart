@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:riverpod/misc.dart' show ProviderListenable;
 import 'package:sofarhangolo/services/http/dio_provider.dart';
 import 'package:sofarhangolo/services/platform/platform_provider.dart';
 import 'package:sofarhangolo/services/ui/messenger_service.dart';
@@ -13,6 +16,27 @@ export 'fake_platform.dart';
 export 'mock_dio.dart';
 export 'test_config.dart';
 export 'test_database.dart';
+
+/// Waits until [provider] emits a value and returns it.
+///
+/// Stream/future providers read outside a widget tree should be awaited
+/// through this helper rather than `container.read(provider.future)`,
+/// which does not complete on its own in plain (non-widget) tests.
+Future<T> waitForProviderValue<T>(
+  ProviderContainer container,
+  ProviderListenable<AsyncValue<T>> provider, {
+  Duration timeout = const Duration(seconds: 5),
+}) {
+  final completer = Completer<T>();
+  container.listen<AsyncValue<T>>(provider, (previous, next) {
+    if (next.hasError && !completer.isCompleted) {
+      completer.completeError(next.error!, next.stackTrace);
+    } else if (next.hasValue && !completer.isCompleted) {
+      completer.complete(next.value!);
+    }
+  }, fireImmediately: true);
+  return completer.future.timeout(timeout);
+}
 
 /// Creates a [ProviderContainer] with common test overrides pre-configured.
 ///

@@ -310,7 +310,7 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
     final List<Widget> shareWidgets = [];
     final song = widget.song;
     if (song != null) {
-      if (song.contentMap['pdf'] != null) {
+      if (song.pdfRef != null) {
         shareWidgets.add(
           SizedBox(
             width: double.infinity,

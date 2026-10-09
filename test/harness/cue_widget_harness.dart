@@ -56,8 +56,8 @@ class CueSongFixture {
       'uuid': songUuid,
       'title': title,
       'lyrics': lyrics,
-      'lyricsFormat': 'opensong',
-      'key': 'C-major',
+      'lyrics_format': 'opensong',
+      'key': ['C-major'],
       if (hasSvg) 'svg': '/$songUuid.svg',
       if (hasPdf) 'pdf': '/$songUuid.pdf',
     };

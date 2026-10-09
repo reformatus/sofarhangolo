@@ -12,6 +12,7 @@ class ErrorDialog extends StatelessWidget {
     required this.type,
     required this.title,
     this.message,
+    this.errorMessage,
     this.stack,
     required this.icon,
     this.showReportButton = true,
@@ -38,6 +39,7 @@ class ErrorDialog extends StatelessWidget {
       },
       title: title ?? error.title,
       message: message ?? error.userMessage,
+      errorMessage: error.details,
       stack: error.stack,
       icon:
           icon ??
@@ -55,7 +57,14 @@ class ErrorDialog extends StatelessWidget {
 
   final LErrorType type;
   final String title;
+
+  /// Friendly body text; optional.
   final String? message;
+
+  /// Technical failure, rendered in a code box; optional.
+  final String? errorMessage;
+
+  /// Stack trace, rendered in a code box; optional.
   final String? stack;
   final IconData icon;
   final bool showReportButton;
@@ -69,6 +78,7 @@ class ErrorDialog extends StatelessWidget {
         type: type,
         title: title,
         message: message,
+        errorMessage: errorMessage,
         stack: stack,
         icon: icon,
         showReportButton: false,
@@ -83,7 +93,11 @@ class ErrorDialog extends StatelessWidget {
         if (showReportButton)
           FilledButton.tonalIcon(
             onPressed: () => sendFeedbackEmail(
-              errorMessage: '$title ($message)',
+              errorMessage: [
+                title,
+                if (message != null) message,
+                if (errorMessage != null) errorMessage,
+              ].join('\n'),
               stackTrace: stack,
             ),
             label: Text('Hibajelentés'),
