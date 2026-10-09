@@ -14,7 +14,9 @@ import 'generated/schema_v5.dart' as v5;
 import 'generated/schema_v6.dart' as v6;
 import 'generated/schema_v7.dart' as v7;
 import 'generated/schema_v8.dart' as v8;
+import 'generated/schema_v9.dart' as v9;
 
+import 'package:sofarhangolo/data/bank/bank.dart';
 import 'package:sofarhangolo/data/database.dart';
 
 /// Migration tests are tagged so they can be excluded until migrations are implemented.
@@ -591,6 +593,180 @@ void main() {
           expect(bank.name, 'Migration Bank');
           expect(bank.totalSongsInBank, 2);
           expect(bank.lastUpdated, '1900-01-01T00:00:00');
+        },
+      );
+    },
+  );
+
+  test(
+    'migration from v8 to v9 adds song links, bank access and local bank',
+    () async {
+      const ownershipJson =
+          '{"contentKeys":["composer"],"keyField":true,"lyrics":true}';
+      final oldBanksData = <v8.BanksData>[
+        const v8.BanksData(
+          id: 1,
+          uuid: 'bank-1',
+          logo: null,
+          tinyLogo: null,
+          name: 'Migration Bank',
+          description: null,
+          legal: null,
+          aboutLink: null,
+          contactEmail: null,
+          baseUrl: 'https://example.com',
+          parallelUpdateJobs: 1,
+          amountOfSongsInRequest: 10,
+          noCms: 0,
+          songFields: '{}',
+          isEnabled: 1,
+          isOfflineMode: 0,
+          lastUpdated: '2026-02-14T10:00:00',
+          failedSongUuids: null,
+          totalSongsInBank: 2,
+        ),
+      ];
+      final oldSongsData = <v8.SongsData>[
+        const v8.SongsData(
+          id: 1,
+          uuid: 'song-1',
+          sourceBank: 'bank-1',
+          contentMap: '{"composer":"Composer A","genre":["Rock","Pop"]}',
+          title: 'Root Song',
+          lyrics: '[V1]\n Első sor',
+          lyricsFormat: 'opensong',
+          variationOf: null,
+          keyField: 'C-dur',
+          ownership: ownershipJson,
+        ),
+      ];
+
+      await verifier.testWithDataIntegrity(
+        oldVersion: 8,
+        newVersion: 9,
+        createOld: v8.DatabaseAtV8.new,
+        createNew: v9.DatabaseAtV9.new,
+        openTestedDatabase: LyricDatabase.new,
+        createItems: (batch, oldDb) {
+          batch.insertAll(oldDb.banks, oldBanksData);
+          batch.insertAll(oldDb.songs, oldSongsData);
+        },
+        validateItems: (newDb) async {
+          // v9 leaves the songs table alone, so v8 (JSON array) rows
+          // survive the migration byte for byte.
+          final song = (await newDb.select(newDb.songs).getSingle());
+          expect(song.uuid, 'song-1');
+          expect(song.title, 'Root Song');
+          expect(song.lyrics, '[V1]\n Első sor');
+          expect(
+            song.contentMap,
+            '{"composer":"Composer A","genre":["Rock","Pop"]}',
+          );
+          expect(song.keyField, 'C-dur');
+          expect(song.ownership, ownershipJson);
+
+          // Existing banks become remote and official; base url and the
+          // lastUpdated watermark survive (v9 forces no refetch).
+          final banks = await newDb.select(newDb.banks).get();
+          final bank = banks.singleWhere((b) => b.uuid == 'bank-1');
+          expect(bank.name, 'Migration Bank');
+          expect(bank.access, BankAccess.remote.index);
+          expect(bank.source, BankSource.official.index);
+          expect(bank.baseUrl, 'https://example.com');
+          expect(bank.lastUpdated, '2026-02-14T10:00:00');
+
+          // The built-in local bank row is created with no source and no
+          // remote endpoint.
+          final localBank = banks.singleWhere((b) => b.uuid == localBankUuid);
+          expect(localBank.name, 'Helyi dalok');
+          expect(localBank.access, BankAccess.local.index);
+          expect(localBank.source, isNull);
+          expect(localBank.baseUrl, isNull);
+
+          // v9 adds an empty song links table.
+          expect(await newDb.select(newDb.songLinks).get(), isEmpty);
+
+          // The FTS triggers survive the v9 bank-table rewrite.
+          await newDb.customStatement(
+            "INSERT INTO songs (uuid, content_map, title, lyrics, key_field) "
+            "VALUES ('song-9', '{}', 'Kegyelem', 'Békeesség', '')",
+          );
+          final matches = await newDb
+              .customSelect(
+                "SELECT rowid FROM songs_fts WHERE songs_fts MATCH 'Kegyelem'",
+              )
+              .get();
+          expect(matches, hasLength(1));
+        },
+      );
+    },
+  );
+
+  test(
+    'migration from v7 to v9 drops old-shape songs then adds local songs',
+    () async {
+      final oldBanksData = <v7.BanksData>[
+        const v7.BanksData(
+          id: 1,
+          uuid: 'bank-1',
+          logo: null,
+          tinyLogo: null,
+          name: 'Migration Bank',
+          description: null,
+          legal: null,
+          aboutLink: null,
+          contactEmail: null,
+          baseUrl: 'https://example.com',
+          parallelUpdateJobs: 1,
+          amountOfSongsInRequest: 10,
+          noCms: 0,
+          songFields: '{}',
+          isEnabled: 1,
+          isOfflineMode: 0,
+          lastUpdated: '2026-10-01T12:00:00',
+          failedSongUuids: null,
+          totalSongsInBank: 2,
+        ),
+      ];
+      // Old-shape rows: multi-value fields stored as comma-joined strings.
+      final oldSongsData = <v7.SongsData>[
+        const v7.SongsData(
+          id: 1,
+          uuid: 'song-1',
+          sourceBank: 'bank-1',
+          contentMap: '{"genre":"Rock, Pop"}',
+          title: 'Root Song',
+          lyrics: '[V1]\n Első sor',
+          lyricsFormat: 'opensong',
+          variationOf: null,
+          keyField: 'C-dur',
+          ownership: null,
+        ),
+      ];
+
+      await verifier.testWithDataIntegrity(
+        oldVersion: 7,
+        newVersion: 9,
+        createOld: v7.DatabaseAtV7.new,
+        createNew: v9.DatabaseAtV9.new,
+        openTestedDatabase: LyricDatabase.new,
+        createItems: (batch, oldDb) {
+          batch.insertAll(oldDb.banks, oldBanksData);
+          batch.insertAll(oldDb.songs, oldSongsData);
+        },
+        validateItems: (newDb) async {
+          // The v7 to v8 step drops old-shape songs; v9 adds to that.
+          expect(await newDb.select(newDb.songs).get(), isEmpty);
+
+          final banks = await newDb.select(newDb.banks).get();
+          final bank = banks.singleWhere((b) => b.uuid == 'bank-1');
+          expect(bank.access, BankAccess.remote.index);
+          expect(bank.source, BankSource.official.index);
+          // The v8 step soft-forces a refetch.
+          expect(bank.lastUpdated, '1900-01-01T00:00:00');
+
+          expect(banks.where((b) => b.uuid == localBankUuid), hasLength(1));
+          expect(await newDb.select(newDb.songLinks).get(), isEmpty);
         },
       );
     },

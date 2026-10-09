@@ -125,7 +125,7 @@ class Song extends Insertable<Song> {
     String? lyrics,
     LyricsFormat lyricsFormat = LyricsFormat.opensong,
     List<KeyField> keyField = const [],
-    Map<String, String> contentMap = const {},
+    Map<String, Object> contentMap = const {},
     String? sourceBank,
   }) {
     return Song(

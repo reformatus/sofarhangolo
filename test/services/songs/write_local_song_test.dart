@@ -44,7 +44,7 @@ void main() {
 
   Song bankSong(
     String uuid, {
-    Map<String, String> contentMap = const {},
+    Map<String, Object> contentMap = const {},
     String? lyrics,
     String? variationOf,
   }) {
