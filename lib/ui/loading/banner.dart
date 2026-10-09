@@ -56,14 +56,12 @@ class UpdatingBanner extends ConsumerWidget {
     final overallProgress = ref.watch(bankSongUpdateOverallProgressProvider);
 
     if (connection == ConnectionType.offline) {
-      Future.delayed(
-        Duration(seconds: 8),
-      ).then((_) => messengerService.hideCurrentBanner());
+      Future.delayed(Duration(seconds: 8))
+          .then((_) => messengerService.hideCurrentBanner());
       return LErrorCard(
         type: LErrorType.warning,
         title: 'Offline vagy.',
-        message:
-            'A már letöltött kottáidat és az összes dalszöveget továbbra is eléred.',
+        message: 'A már letöltött kottáidat és az összes dalszöveget továbbra is eléred.',
         icon: Icons.public_off_outlined,
         showReportButton: false,
       );
@@ -72,9 +70,8 @@ class UpdatingBanner extends ConsumerWidget {
     if (!schedulerState.isLoading &&
         bankTasks.isNotEmpty &&
         bankTasks.every((task) => task.isTerminal)) {
-      Future.delayed(
-        Duration(seconds: 3),
-      ).then((_) => messengerService.hideCurrentBanner());
+      Future.delayed(Duration(seconds: 3))
+          .then((_) => messengerService.hideCurrentBanner());
     }
 
     if (schedulerState.hasError && bankTasks.isEmpty) {
@@ -88,7 +85,6 @@ class UpdatingBanner extends ConsumerWidget {
       return LErrorCard.fromAppError(
         key: const ValueKey('scheduler-error'),
         error: appError,
-        title: 'Hiba a tárak frissítése közben',
         icon: Icons.cloud_sync_outlined,
         onRetry: () {
           ref
@@ -110,7 +106,6 @@ class UpdatingBanner extends ConsumerWidget {
       return LErrorCard.fromAppError(
         key: const ValueKey('task-error'),
         error: appError,
-        title: 'Hiba a tár frissítése közben',
         icon: Icons.cloud_sync_outlined,
         onRetry: () {
           ref.read(backgroundTaskQueueProvider.notifier).retryFailedTasks();

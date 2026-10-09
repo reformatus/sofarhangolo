@@ -68,13 +68,6 @@ class LogMessages extends _$LogMessages {
     }
     ref.notifyListeners();
   }
-
-  void markAsRead(LogMessage message) {
-    if (!message.isRead) {
-      message.isRead = true;
-      ref.notifyListeners();
-    }
-  }
 }
 
 @riverpod

@@ -156,7 +156,6 @@ class _LoadingPageState extends ConsumerState<LoadingPage> {
 
                         return LErrorCard.fromAppError(
                           error: appError,
-                          title: 'Hiba a tárak frissítése közben',
                           icon: Icons.cloud_sync_outlined,
                           onRetry: () {
                             _hasRequestedInitialRefresh = false;

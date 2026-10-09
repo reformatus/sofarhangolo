@@ -11,7 +11,7 @@ class AppError implements Exception {
   const AppError({
     required this.category,
     required this.title,
-    required this.userMessage,
+    this.userMessage,
     this.technicalMessage,
     this.stackTrace,
     this.originalError,
@@ -19,12 +19,29 @@ class AppError implements Exception {
 
   final AppErrorCategory category;
   final String title;
-  final String userMessage;
+
+  /// Friendly, always non-technical guidance. Null when the title already
+  /// carries everything friendly there is to say (unexpected app errors).
+  final String? userMessage;
   final String? technicalMessage;
   final StackTrace? stackTrace;
   final Object? originalError;
 
   bool get shouldShowTechnicalDetails => category == AppErrorCategory.frontend;
+
+  /// A copy of this error carrying a different context [title]. Used by
+  /// the layer that reports an operation's failure, so the wording lives
+  /// on the error instead of being re-invented by each UI surface.
+  AppError withTitle(String title) {
+    return AppError(
+      category: category,
+      title: title,
+      userMessage: userMessage,
+      technicalMessage: technicalMessage,
+      stackTrace: stackTrace,
+      originalError: originalError,
+    );
+  }
 
   String? get details {
     if (!shouldShowTechnicalDetails) return null;
@@ -52,9 +69,7 @@ class AppError implements Exception {
           return AppError(
             category: AppErrorCategory.network,
             title: 'Biztonsági hálózati hiba',
-            userMessage:
-                userMessage ??
-                'A szerver biztonsági tanúsítványa érvénytelen. Később próbáld újra.',
+            userMessage: userMessage ?? 'A szerver biztonsági tanúsítványa érvénytelen. Később próbáld újra.',
             technicalMessage:
                 technicalMessage ?? error.message ?? error.error?.toString(),
             stackTrace: stackTrace,
@@ -77,9 +92,7 @@ class AppError implements Exception {
           return AppError(
             category: AppErrorCategory.network,
             title: 'Hálózati hiba',
-            userMessage:
-                userMessage ??
-                'Nincs stabil kapcsolat a szerverrel. Ellenőrizd az internetkapcsolatot, majd próbáld újra.',
+            userMessage: userMessage ?? 'Nincs stabil kapcsolat a szerverrel. Ellenőrizd az internetkapcsolatot, majd próbáld újra.',
             technicalMessage:
                 technicalMessage ?? error.message ?? error.error?.toString(),
             stackTrace: stackTrace,
@@ -118,9 +131,7 @@ class AppError implements Exception {
         return AppError(
           category: AppErrorCategory.network,
           title: 'Hálózati hiba',
-          userMessage:
-              userMessage ??
-              'Nincs stabil kapcsolat a szerverrel. Ellenőrizd az internetkapcsolatot, majd próbáld újra.',
+          userMessage: userMessage ?? 'Nincs stabil kapcsolat a szerverrel. Ellenőrizd az internetkapcsolatot, majd próbáld újra.',
           technicalMessage:
               technicalMessage ?? error.message ?? error.error?.toString(),
           stackTrace: stackTrace,
@@ -136,9 +147,7 @@ class AppError implements Exception {
       return AppError(
         category: AppErrorCategory.network,
         title: 'Hálózati hiba',
-        userMessage:
-            userMessage ??
-            'Nincs stabil kapcsolat a szerverrel. Ellenőrizd az internetkapcsolatot, majd próbáld újra.',
+        userMessage: userMessage ?? 'Nincs stabil kapcsolat a szerverrel. Ellenőrizd az internetkapcsolatot, majd próbáld újra.',
         technicalMessage: technicalMessage ?? error.toString(),
         stackTrace: stackTrace,
         originalError: error,
@@ -151,9 +160,7 @@ class AppError implements Exception {
       return AppError(
         category: AppErrorCategory.frontend,
         title: 'Alkalmazáshiba',
-        userMessage:
-            userMessage ??
-            'Váratlan feldolgozási hiba történt az alkalmazásban.',
+        userMessage: userMessage,
         technicalMessage: technicalMessage ?? error.toString(),
         stackTrace: stackTrace,
         originalError: error,
@@ -163,7 +170,7 @@ class AppError implements Exception {
     return AppError(
       category: AppErrorCategory.frontend,
       title: 'Alkalmazáshiba',
-      userMessage: userMessage ?? 'Váratlan hiba történt. Kérlek próbáld újra.',
+      userMessage: userMessage,
       technicalMessage: technicalMessage ?? error.toString(),
       stackTrace: stackTrace,
       originalError: error,
@@ -173,8 +180,9 @@ class AppError implements Exception {
   @override
   String toString() {
     if (category == AppErrorCategory.frontend) {
-      return technicalMessage ?? userMessage;
+      return technicalMessage ?? userMessage ?? title;
     }
-    return '$title: $userMessage';
+    final message = userMessage;
+    return message == null ? title : '$title: $message';
   }
 }

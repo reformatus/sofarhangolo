@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
+import '../../../config/config.dart';
 import '../../../services/error/app_error.dart';
 import '../../../services/text_export/diagnostics.dart';
 import '../../../services/ui/messenger_service.dart';
 import '../../base/home/parts/feedback/send_mail.dart';
+import 'code_box.dart';
 
 class LErrorCard extends StatelessWidget {
   const LErrorCard({
@@ -11,6 +13,7 @@ class LErrorCard extends StatelessWidget {
     required this.type,
     required this.title,
     this.message,
+    this.errorMessage,
     this.stack,
     required this.icon,
     this.showReportButton = true,
@@ -37,6 +40,7 @@ class LErrorCard extends StatelessWidget {
       },
       title: title ?? error.title,
       message: message ?? error.userMessage,
+      errorMessage: error.details,
       stack: error.stack,
       icon:
           icon ??
@@ -84,7 +88,14 @@ class LErrorCard extends StatelessWidget {
 
   final LErrorType type;
   final String title;
+
+  /// Friendly body text; optional.
   final String? message;
+
+  /// Technical failure, rendered in a code box; optional.
+  final String? errorMessage;
+
+  /// Stack trace, rendered in a code box; optional.
   final String? stack;
   final IconData icon;
   final bool showReportButton;
@@ -129,7 +140,7 @@ class LErrorCard extends StatelessWidget {
 
                 contentPadding: EdgeInsets.only(left: 13, right: 8),
               ),
-              if (message != null || stack != null)
+              if (message != null || errorMessage != null || stack != null)
                 Padding(
                   padding: const EdgeInsets.only(
                     left: 16,
@@ -138,64 +149,37 @@ class LErrorCard extends StatelessWidget {
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
+                    spacing: 8,
                     children: [
                       if (message != null) Text(message!),
-                      if (stack != null)
-                        ConstrainedBox(
-                          constraints: BoxConstraints(maxHeight: 100),
-                          child: SingleChildScrollView(
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Text(
-                                stack!,
-                                style: TextStyle(
-                                  fontFamily: 'Courier New',
-                                ), // todo is available on android?
-                              ),
-                            ),
-                          ),
-                        ),
+                      if (errorMessage != null) ErrorCodeBox(errorMessage!),
+                      if (stack != null) ErrorCodeBox(stack!),
                     ],
                   ),
                 ),
-              if (onRetry != null || stack != null || showReportButton)
+              if (onRetry != null ||
+                  errorMessage != null ||
+                  stack != null ||
+                  showReportButton)
                 Padding(
-                  padding: EdgeInsets.only(left: 8, right: 8, bottom: 8),
+                  padding: const EdgeInsets.only(
+                    left: 16,
+                    right: 16,
+                    bottom: 16,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     spacing: 8,
                     children: [
+                      // The retry action owns the primary slot whenever
+                      // it is present.
                       if (onRetry != null)
                         FilledButton.icon(
                           onPressed: onRetry,
-                          icon: Icon(Icons.refresh),
+                          icon: const Icon(Icons.refresh),
                           label: Text(retryLabel ?? 'Újra'),
                         ),
-                      // Only offer copying for real errors that carry a stack
-                      // trace (see AppError.shouldShowTechnicalDetails);
-                      // benign, already handled warnings have nothing worth
-                      // copying.
-                      if (stack != null)
-                        TextButton.icon(
-                          onPressed: () => messengerService.copyToClipboard(
-                            formatDiagnostics(
-                              title: title,
-                              message: message,
-                              stack: stack,
-                            ),
-                          ),
-                          icon: Icon(Icons.copy),
-                          label: Text('Részletek másolása'),
-                        ),
-                      if (showReportButton)
-                        FilledButton.icon(
-                          onPressed: () => sendFeedbackEmail(
-                            errorMessage: '$title ($message)',
-                            stackTrace: stack,
-                          ),
-                          icon: Icon(Icons.feedback_outlined),
-                          label: Text('Hibajelentés'),
-                        ),
+                      ..._secondaryActions(context),
                     ],
                   ),
                 ),
@@ -203,6 +187,75 @@ class LErrorCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+
+  /// Copy (tertiary) and report (primary, or secondary when [onRetry]
+  /// already owns the primary slot), on one row when the screen is wider
+  /// than the mobile breakpoint, stacked otherwise.
+  List<Widget> _secondaryActions(BuildContext context) {
+    final canCopy = errorMessage != null || stack != null;
+    if (!canCopy && !showReportButton) return const [];
+
+    Widget reportButton() {
+      final icon = Icon(Icons.feedback_outlined);
+      final label = Text('Hibajelentés');
+      return onRetry == null
+          ? FilledButton.icon(onPressed: _report, icon: icon, label: label)
+          : FilledButton.tonalIcon(
+              onPressed: _report,
+              icon: icon,
+              label: label,
+            );
+    }
+
+    final actions = <Widget>[
+      if (canCopy)
+        TextButton.icon(
+          onPressed: () => messengerService.copyToClipboard(
+            formatDiagnostics(
+              title: title,
+              message: message,
+              errorMessage: errorMessage,
+              stack: stack,
+            ),
+          ),
+          icon: const Icon(Icons.copy),
+          label: const Text('Részletek másolása'),
+        ),
+      if (showReportButton) reportButton(),
+    ];
+
+    final isMobile =
+        MediaQuery.sizeOf(context).width <
+        appConfig.breakpoints.tabletFromWidth;
+
+    if (isMobile) {
+      return [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          spacing: 8,
+          children: actions,
+        ),
+      ];
+    }
+
+    return [
+      Row(
+        spacing: 8,
+        children: [for (final action in actions) Expanded(child: action)],
+      ),
+    ];
+  }
+
+  void _report() {
+    sendFeedbackEmail(
+      errorMessage: [
+        title,
+        if (message != null) message,
+        if (errorMessage != null) errorMessage,
+      ].join('\n'),
+      stackTrace: stack,
     );
   }
 }

@@ -11,16 +11,19 @@ String capStackLines(String? stack, {int maxLines = defaultMaxStackLines}) {
 }
 
 /// Formats an error's diagnostics for clipboard export and bug reports:
-/// title, user-facing message and a line-capped stack trace.
+/// title, friendly message, technical error message and a line-capped
+/// stack trace.
 String formatDiagnostics({
   String? title,
   String? message,
+  String? errorMessage,
   String? stack,
   int maxStackLines = defaultMaxStackLines,
 }) {
   return [
     if (title != null && title.isNotEmpty) title,
     if (message != null && message.isNotEmpty) message,
+    if (errorMessage != null && errorMessage.isNotEmpty) errorMessage,
     if (stack != null && stack.isNotEmpty)
       capStackLines(stack, maxLines: maxStackLines),
   ].join('\n\n');
