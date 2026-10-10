@@ -4,6 +4,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import '../../data/database.dart';
 import '../../data/song/song.dart';
 import '../../data/song/song_link.dart';
+import '../song/from_uuid.dart';
 
 part 'original_status.g.dart';
 
@@ -19,26 +20,28 @@ enum OriginalSongStatus {
   missing,
 }
 
+/// The [SongLinkType.localCopyOf] link of [song], or null when it has none.
+Future<SongLink?> _localCopyLink(Song song) {
+  return (db.songLinks.select()..where(
+        (l) =>
+            l.sourceUuid.equals(song.uuid) &
+            l.type.equals(SongLinkType.localCopyOf.index),
+      ))
+      .getSingleOrNull();
+}
+
 /// Tracks whether the bank original of a local song copy changed or vanished.
 ///
 /// Returns null when [song] has no [SongLinkType.localCopyOf] link.
 @riverpod
 Future<OriginalSongStatus?> originalSongStatus(Ref ref, Song song) async {
-  final link = await (db.songLinks.select()
-        ..where(
-          (l) =>
-              l.sourceUuid.equals(song.uuid) &
-              l.type.equals(SongLinkType.localCopyOf.index),
-        ))
-      .getSingleOrNull();
+  final link = await _localCopyLink(song);
 
   if (link == null) {
     return null;
   }
 
-  final original = await (db.songs.select()
-        ..where((s) => s.uuid.equals(link.targetUuid)))
-      .getSingleOrNull();
+  final original = await dbSongFromUuid(link.targetUuid);
 
   if (original == null) {
     return OriginalSongStatus.missing;
@@ -47,4 +50,13 @@ Future<OriginalSongStatus?> originalSongStatus(Ref ref, Song song) async {
   return original.contentHash == link.targetContentHash
       ? OriginalSongStatus.unchanged
       : OriginalSongStatus.changed;
+}
+
+/// The bank song a local copy was made from, or null when there is no
+/// [SongLinkType.localCopyOf] link or the original no longer exists.
+@riverpod
+Future<Song?> originalSong(Ref ref, Song song) async {
+  final link = await _localCopyLink(song);
+  if (link == null) return null;
+  return dbSongFromUuid(link.targetUuid);
 }

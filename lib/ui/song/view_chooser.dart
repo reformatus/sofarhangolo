@@ -13,11 +13,17 @@ class ViewChooser extends ConsumerWidget {
     required this.song,
     this.songSlide,
     required this.useDropdown,
+    this.allowUnavailableViews = false,
   });
 
   final Song song;
   final bool useDropdown;
   final SongSlide? songSlide;
+
+  /// Whether views without a backing asset (e.g. SVG/PDF on a local song)
+  /// are selectable anyway. The editor needs this to reach the attachment
+  /// views before anything is attached; the song page keeps them disabled.
+  final bool allowUnavailableViews;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -26,12 +32,12 @@ class ViewChooser extends ConsumerWidget {
       SongViewType.svg: (
         icon: Icons.music_note_outlined,
         label: 'Kotta',
-        enabled: song.hasSvg,
+        enabled: song.hasSvg || allowUnavailableViews,
       ),
       SongViewType.pdf: (
         icon: Icons.audio_file_outlined,
         label: 'PDF',
-        enabled: song.hasPdf,
+        enabled: song.hasPdf || allowUnavailableViews,
       ),
       if (song.hasChords)
         SongViewType.chords: (
@@ -43,7 +49,7 @@ class ViewChooser extends ConsumerWidget {
         SongViewType.lyrics: (
           icon: Icons.text_snippet_outlined,
           label: 'Dalszöveg',
-          enabled: song.hasLyrics,
+          enabled: song.hasLyrics || allowUnavailableViews,
         ),
     };
 

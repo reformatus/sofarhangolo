@@ -36,3 +36,16 @@ Future<void> writeLocalSongAsset(
     SongsCompanion(contentMap: Value(song.contentMap)),
   );
 }
+
+/// Removes an attachment from a local song: deletes its asset row and drops
+/// the [fieldName] contentMap entry, so asset views treat it as unattached.
+Future<void> removeLocalSongAsset(Song song, String fieldName) async {
+  await db.assets.deleteWhere(
+    (a) => a.songUuid.equals(song.uuid) & a.fieldName.equals(fieldName),
+  );
+
+  song.contentMap = {...song.contentMap}..remove(fieldName);
+  await (db.songs.update()..where((s) => s.uuid.equals(song.uuid))).write(
+    SongsCompanion(contentMap: Value(song.contentMap)),
+  );
+}

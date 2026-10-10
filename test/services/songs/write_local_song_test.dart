@@ -279,4 +279,19 @@ void main() {
       expect(stored.contentMap['pdf'], assets.single.sourceUrl);
     });
   });
+
+  group('removeLocalSongAsset', () {
+    test('deletes the asset and drops the contentMap entry', () async {
+      final song = await writeLocalSong(Song.local(title: 'Törlendő kotta'));
+      await writeLocalSongAsset(song, 'svg', Uint8List.fromList([1, 2, 3]));
+
+      await removeLocalSongAsset(song, 'svg');
+
+      final stored = await storedSong(song.uuid);
+      expect(stored.contentMap.containsKey('svg'), isFalse);
+
+      final assets = await db.assets.select().get();
+      expect(assets, isEmpty);
+    });
+  });
 }

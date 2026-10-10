@@ -7,6 +7,7 @@ Future showConfirmDialog(
   required String actionLabel,
   required IconData actionIcon,
   required Future Function() actionOnPressed,
+  String? message,
   bool dangerousAction = false,
   Key? key,
 }) async {
@@ -14,6 +15,7 @@ Future showConfirmDialog(
     context: context,
     builder: (context) => ConfirmDialog(
       title: title,
+      message: message,
       actionLabel: actionLabel,
       actionIcon: actionIcon,
       actionOnPressed: actionOnPressed,
@@ -24,6 +26,7 @@ Future showConfirmDialog(
 class ConfirmDialog extends StatefulWidget {
   const ConfirmDialog({
     required this.title,
+    this.message,
     required this.actionLabel,
     required this.actionIcon,
     required this.actionOnPressed,
@@ -32,6 +35,9 @@ class ConfirmDialog extends StatefulWidget {
   });
 
   final String title;
+
+  /// Optional body explaining the action.
+  final String? message;
   final String actionLabel;
   final IconData actionIcon;
   final Future Function() actionOnPressed;
@@ -59,6 +65,7 @@ class _ConfirmDialogState extends State<ConfirmDialog> {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: Text(widget.title),
+      content: widget.message == null ? null : Text(widget.message!),
       actions: [
         if (widget.dangerousAction) ...[
           TextButton.icon(

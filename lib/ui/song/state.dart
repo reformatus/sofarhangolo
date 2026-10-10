@@ -21,7 +21,11 @@ enum SongViewType {
 
   const SongViewType(this.type, {this.requiresAsset = false});
   factory SongViewType.fromString(String type) {
-    return SongViewType.values.firstWhere((e) => e.type == type);
+    // Lenient: an unknown/missing stored type must not abort cue revival.
+    return SongViewType.values.firstWhere(
+      (e) => e.type == type,
+      orElse: () => SongViewType.lyrics,
+    );
   }
 }
 
@@ -68,10 +72,14 @@ class ViewTypeFor extends _$ViewTypeFor {
             (song.availableViews.contains(v.name)) &&
             (!v.requiresAsset ||
                 (v.requiresAsset && downloadedAssets.contains(v.name))),
+        orElse: () => SongViewType.lyrics,
       );
     } else {
       result = songViewOrder.firstWhere(
         (v) => song.availableViews.contains(v.name),
+        // A song with no content at all (e.g. a fresh local song) still
+        // needs a view; default to the lyrics editor.
+        orElse: () => SongViewType.lyrics,
       );
     }
 
