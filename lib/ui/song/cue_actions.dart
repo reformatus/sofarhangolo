@@ -21,7 +21,7 @@ class SongCueActionState {
       activeCueSession: session,
       songInActiveCue:
           session?.slides.whereType<SongSlide>().any(
-            (slide) => slide.song.uuid == song.uuid,
+            (slide) => slide.songUuid == song.uuid,
           ) ??
           false,
     );

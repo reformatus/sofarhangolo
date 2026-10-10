@@ -2,12 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/cue/slide.dart';
+import '../../../data/song/song.dart';
+import '../../../services/song/song_content.dart';
 import '../../song/lyrics/view.dart';
 import '../../song/sheet/view.dart';
 import '../../song/state.dart';
 import '../session/session_provider.dart';
+import 'missing_song.dart';
 
-class SongSlideTile extends StatelessWidget {
+/// Resolves the current content for [slide]: live DB content once the stream
+/// has produced a value, the cached snapshot while it is still loading, or
+/// null when the song is missing on this device.
+Song? resolveLiveSong(WidgetRef ref, SongSlide slide) {
+  final async = ref.watch(songContentProvider(slide.songUuid));
+  return async.hasValue ? async.value?.song : slide.song;
+}
+
+class SongSlideTile extends ConsumerWidget {
   const SongSlideTile(
     this.slide,
     this.index, {
@@ -24,7 +35,9 @@ class SongSlideTile extends StatelessWidget {
   final int index;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final liveSong = resolveLiveSong(ref, slide);
+
     return ReorderableDelayedDragStartListener(
       index: index,
       child: MediaQuery.removeViewPadding(
@@ -33,25 +46,33 @@ class SongSlideTile extends StatelessWidget {
         removeRight: true,
         removeTop: true,
         context: context,
-        child: ListTile(
-          title: Text(slide.song.title),
-          onTap: selectCallback,
-          trailing: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              IconButton(
-                onPressed: removeCallback,
-                icon: Icon(Icons.delete_outline),
+        child: liveSong == null
+            ? MissingSongTile(
+                slide,
+                index,
+                selectCallback: selectCallback,
+                removeCallback: removeCallback,
+                isCurrent: isCurrent,
+              )
+            : ListTile(
+                title: Text(liveSong.title),
+                onTap: selectCallback,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      onPressed: removeCallback,
+                      icon: const Icon(Icons.delete_outline),
+                    ),
+                    ReorderableDragStartListener(
+                      index: index,
+                      child: const Icon(Icons.drag_handle),
+                    ),
+                  ],
+                ),
+                selected: isCurrent,
+                selectedTileColor: Theme.of(context).colorScheme.onPrimary,
               ),
-              ReorderableDragStartListener(
-                index: index,
-                child: Icon(Icons.drag_handle),
-              ),
-            ],
-          ),
-          selected: isCurrent,
-          selectedTileColor: Theme.of(context).colorScheme.onPrimary,
-        ),
       ),
     );
   }
@@ -81,11 +102,16 @@ class SongSlideView extends ConsumerWidget {
       _ => songSlide,
     };
 
+    final liveSong = resolveLiveSong(ref, currentSlide);
+    if (liveSong == null) {
+      return MissingSongView(songSlide: currentSlide);
+    }
+
     return switch (currentSlide.viewType) {
-      SongViewType.svg => SheetView.svg(currentSlide.song),
-      SongViewType.pdf => SheetView.pdf(currentSlide.song),
+      SongViewType.svg => SheetView.svg(liveSong),
+      SongViewType.pdf => SheetView.pdf(liveSong),
       SongViewType.lyrics || SongViewType.chords => LyricsView(
-        currentSlide.song,
+        liveSong,
         songSlide: currentSlide,
         forceSingleColumnLayout: true,
         textActionsEnabled: enableTextActions,

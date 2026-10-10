@@ -258,7 +258,7 @@ class _ActiveCueQuickAddButtonState
     }
 
     final songAlreadyInCue = session.slides.whereType<SongSlide>().any(
-      (slide) => slide.song.uuid == widget.song.uuid,
+      (slide) => slide.songUuid == widget.song.uuid,
     );
 
     if (songAlreadyInCue) {

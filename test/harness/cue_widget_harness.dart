@@ -66,10 +66,13 @@ class CueSongFixture {
   SongSlide toSlide(Song song) {
     return SongSlide(
       slideUuid,
-      song,
+      song.uuid,
       comment,
+      song: song,
       viewType: viewType,
       transpose: transpose,
+      sharedContentHash: song.contentHash,
+      sharedTitle: song.title,
     );
   }
 }

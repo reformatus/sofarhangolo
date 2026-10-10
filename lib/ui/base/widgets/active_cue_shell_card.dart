@@ -8,7 +8,7 @@ import '../../../data/cue/slide.dart';
 import '../../../data/song/song.dart';
 import '../../../data/song/transpose.dart';
 import '../../../services/app_links/navigation.dart';
-import '../../../services/song/from_uuid.dart';
+import '../../../services/song/song_content.dart';
 import '../../cue/cue_page_type.dart';
 import '../../cue/session/cue_session.dart';
 import '../../cue/session/session_provider.dart';
@@ -168,13 +168,16 @@ class _ActiveCueCardSongAction extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    final currentSong = ref.watch(songFromUuidProvider(currentSongUuid)).value;
+    final currentSong = ref
+        .watch(songContentProvider(currentSongUuid))
+        .value
+        ?.song;
     if (currentSong == null) {
       return const SizedBox.shrink();
     }
 
     final songAlreadyInCue = session.slides.whereType<SongSlide>().any(
-      (slide) => slide.song.uuid == currentSong.uuid,
+      (slide) => slide.songUuid == currentSong.uuid,
     );
 
     if (songAlreadyInCue) {

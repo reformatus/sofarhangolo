@@ -348,7 +348,7 @@ void main() {
 
     expect(session, isA<CueSession>());
     expect(session!.cue.uuid, cue.uuid);
-    expect(session.slides.whereType<SongSlide>().single.song.uuid, song.uuid);
+    expect(session.slides.whereType<SongSlide>().single.songUuid, song.uuid);
     expect(storedCue.content, isNotEmpty);
     expect(storedCue.content.single['slideType'], 'song');
     expect(fakeMessenger.shownSnackBars, isNotEmpty);
@@ -573,7 +573,7 @@ void main() {
       expect(updatedSession, isA<CueSession>());
       expect(
         session.slides.whereType<SongSlide>().any(
-          (slide) => slide.song.uuid == song.uuid,
+          (slide) => slide.songUuid == song.uuid,
         ),
         isTrue,
       );

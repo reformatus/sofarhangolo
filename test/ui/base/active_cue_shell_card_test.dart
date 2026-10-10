@@ -6,6 +6,7 @@ import 'package:sofarhangolo/data/cue/cue.dart';
 import 'package:sofarhangolo/data/cue/slide.dart';
 import 'package:sofarhangolo/data/database.dart';
 import 'package:sofarhangolo/data/song/song.dart';
+import 'package:sofarhangolo/services/song/song_content.dart';
 import 'package:sofarhangolo/ui/base/widgets/active_cue_shell_card.dart';
 import 'package:sofarhangolo/ui/cue/session/cue_session.dart';
 import 'package:sofarhangolo/ui/song/state.dart';
@@ -53,6 +54,13 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [
+          // Avoid a real Drift stream (it leaves a pending timer in widget
+          // tests); the card only needs the current song's content.
+          songContentProvider('song-1').overrideWith(
+            (ref) => Stream.value(SongSnapshot(song, song.contentHash)),
+          ),
+        ],
         child: MaterialApp(
           home: Scaffold(
             body: ActiveCueShellCard(
