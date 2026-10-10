@@ -415,7 +415,7 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
     if (_pdfSharing) return;
     setState(() => _pdfSharing = true);
     try {
-      await sharePdf(song, ref);
+      await sharePdf(song);
     } finally {
       if (mounted) setState(() => _pdfSharing = false);
     }

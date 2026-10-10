@@ -1,10 +1,9 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:sofarhangolo/data/log/logger.dart';
 import 'package:sofarhangolo/data/song/extensions.dart';
 import 'package:sofarhangolo/data/song/song.dart';
+import 'package:sofarhangolo/services/assets/get_song_asset.dart';
 import 'package:sofarhangolo/services/text_export/song_lyrics.dart';
-import 'package:sofarhangolo/ui/common/asset_bytes.dart';
 
 /// Shares the song's lyrics in the user-friendly text representation
 /// (pretty verse headers, no chords) via the system share sheet.
@@ -25,16 +24,14 @@ Future<void> shareRawLyrics(Song song) async {
 
 /// Shares the song's PDF sheet music via the system share sheet.
 ///
-/// Awaits the asset download through [fetchAssetBytes], so sharing works for
-/// PDFs that have not been downloaded yet. Does nothing when the song has no
-/// PDF or the download fails.
-Future<void> sharePdf(Song song, WidgetRef ref) async {
-  if (song.pdfRef == null) return;
-
+/// Fetches the bytes through the asset pipeline, so sharing works for PDFs
+/// that have not been downloaded yet. Does nothing when the song has no PDF
+/// or the download fails.
+Future<void> sharePdf(Song song) async {
   try {
-    final bytes = await fetchAssetBytes(ref, song, 'pdf');
+    final bytes = await fetchSongAsset(song, 'pdf');
     if (bytes == null) {
-      log.warning('Nem sikerült letölteni a PDF-et a megosztáshoz.');
+      log.warning('Nem sikerült betölteni a PDF-et a megosztáshoz.');
       return;
     }
 
