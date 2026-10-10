@@ -1,3 +1,4 @@
+import 'package:diacritic/diacritic.dart';
 import 'package:drift/drift.dart';
 
 import 'song_fields.dart';
@@ -159,22 +160,118 @@ class SongFtsIndex {
     return sql.replaceAll(RegExp(r'\s+'), ' ').trim().replaceAll(';', '');
   }
 
-  /// The `SELECT` list of a search query: the song's uuid (the row class has
-  /// no id), relevance rank and one snippet per searchable column (aliased
-  /// `match_<column>`). Callers join the uuids back to typed songs.
-  String get searchColumns {
-    final bm25Args = columns.map((c) => c.weight.toString()).join(', ');
-    return [
-      'songs.uuid AS uuid',
-      'bm25($tableName, $bm25Args) AS rank',
-      for (final (i, column) in columns.indexed)
-        'snippet($tableName, $i, \'$snippetStart\', \'$snippetEnd\', \'...\', 30) '
-            'AS match_${column.name}',
-    ].join(', ');
+  /// Hungarian accent folding, mirroring `removeDiacritics(...).toLowerCase()`
+  /// on the Dart side. SQLite's `lower()` folds ASCII only, so both cases of
+  /// every accented letter are mapped explicitly (a fixed Hungarian set — the
+  /// FTS tokenizer's `remove_diacritics` handles the rest when matching).
+  static const _foldReplacements = {
+    'á': 'a',
+    'é': 'e',
+    'í': 'i',
+    'ó': 'o',
+    'ö': 'o',
+    'ő': 'o',
+    'ú': 'u',
+    'ü': 'u',
+    'ű': 'u',
+  };
+
+  /// Wraps [expression] in the fold chain (see [_foldReplacements]), used for
+  /// LIKE/exact matching and folded-title ordering.
+  static String foldExpression(String expression) {
+    var sql = 'lower($expression)';
+    for (final entry in _foldReplacements.entries) {
+      sql = "replace(replace($sql, '${entry.key}', '${entry.value}'), "
+          "'${entry.key.toUpperCase()}', '${entry.value}')";
+    }
+    return sql;
   }
 
-  /// The search query's `FROM`, joining hits back to their songs.
-  String get searchFrom => 'FROM $tableName INNER JOIN songs ON $tableName.rowid = songs.id';
+  String _foldedValue(SongFtsColumn column) =>
+      foldExpression(_expression(column, prefix: 'songs.'));
+
+  /// The `snippet()` columns of the FTS subquery, aliased `snippet_<field>`.
+  String get _snippetSelects => [
+    for (final (i, column) in columns.indexed)
+      'snippet($tableName, $i, \'$snippetStart\', \'$snippetEnd\', '
+          "'...', 30) AS snippet_${column.name}",
+  ].join(', ');
+
+  /// Builds the integrated search statement: FTS ∪ LIKE ∪ exact, tiered
+  /// (0 exact, 1 LIKE, 2 FTS-only) and ordered by tier, relevance, folded
+  /// title. [fields] are the searchable columns taking part; [extraWhere] and
+  /// [extraVariables] append caller filters (tags, banks).
+  ///
+  /// The FTS part lives in a subquery because FTS5 rejects `MATCH` in an OR
+  /// over a left join; that subquery also computes `bm25` and the snippets.
+  ///
+  /// Prepared-statement variables are bound positionally, so their order must
+  /// follow the placeholders in the SQL text: exact conditions, LIKE
+  /// conditions, the FTS match, the WHERE LIKE conditions, then extras.
+  ({String sql, List<Variable> variables}) buildSearchQuery({
+    required String term,
+    required List<SongFtsColumn> fields,
+    String extraWhere = '',
+    List<Variable> extraVariables = const [],
+  }) {
+    assert(fields.isNotEmpty, 'at least one searchable field must take part');
+
+    final foldedTerm = removeDiacritics(term).toLowerCase();
+    final likePattern = '%${_escapeLike(foldedTerm)}%';
+    final variables = <Variable>[];
+
+    final exact = <String>[];
+    final like = <String>[];
+    for (final field in fields) {
+      exact.add('${_foldedValue(field)} = ?');
+      variables.add(Variable<String>(foldedTerm));
+    }
+    for (final field in fields) {
+      like.add("${_foldedValue(field)} LIKE ? ESCAPE '\\'");
+      variables.add(Variable<String>(likePattern));
+    }
+
+    final matchString = fields.length == columns.length
+        ? term
+        : '{${fields.map((field) => field.name).join(' ')}} : $term';
+    variables.add(Variable<String>(matchString));
+
+    final whereLike = <String>[];
+    for (final field in fields) {
+      whereLike.add("${_foldedValue(field)} LIKE ? ESCAPE '\\'");
+      variables.add(Variable<String>(likePattern));
+    }
+    variables.addAll(extraVariables);
+
+    final sql =
+        'SELECT songs.uuid AS uuid, '
+        'hit.rank AS rank, '
+        'CASE WHEN ${exact.join(' OR ')} THEN 0 '
+        'WHEN ${like.join(' OR ')} THEN 1 ELSE 2 END AS tier, '
+        '${[
+          for (final column in columns)
+            'hit.snippet_${column.name} AS ${matchAlias(column)}',
+        ].join(', ')} '
+        'FROM songs '
+        'LEFT JOIN ('
+        'SELECT rowid AS id, '
+        'bm25($tableName, ${columns.map((c) => c.weight).join(', ')}) AS rank, '
+        '$_snippetSelects '
+        'FROM $tableName WHERE $tableName MATCH ?'
+        ') AS hit ON hit.id = songs.id '
+        'WHERE hit.id IS NOT NULL OR ${whereLike.join(' OR ')}'
+        '${extraWhere.isEmpty ? '' : ' AND ($extraWhere)'} '
+        'ORDER BY tier, COALESCE(hit.rank, 0), '
+        '${foldExpression('songs.title')}';
+
+    return (sql: sql, variables: variables);
+  }
+
+  /// Escapes LIKE wildcards so the term is matched literally.
+  static String _escapeLike(String term) => term
+      .replaceAll(r'\', r'\\')
+      .replaceAll('%', r'\%')
+      .replaceAll('_', r'\_');
 
   /// Snippet column alias for [column].
   String matchAlias(SongFtsColumn column) => 'match_${column.name}';

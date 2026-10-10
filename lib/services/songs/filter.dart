@@ -210,12 +210,16 @@ Stream<List<SongResult>> searchSongs({
 }) {
   final index = SongFtsIndex.registry;
   final allColumns = [for (final column in index.columns) column.name];
-  final selected = searchFields.where(allColumns.contains).toList();
-  final matchString = selected.isEmpty || selected.length == allColumns.length
-      ? searchString
-      : '{${selected.join(' ')}} : $searchString';
+  final selected = searchFields.where(allColumns.contains).toSet();
+  final fields = selected.isEmpty
+      ? index.columns
+      : [
+          for (final column in index.columns)
+            if (selected.contains(column.name)) column,
+        ];
+  assert(fields.isNotEmpty, 'search fields must intersect the index columns');
 
-  final variables = <Variable>[Variable<String>(matchString)];
+  final variables = <Variable>[];
   final clauses = <String>[];
 
   for (final entry in filters.entries) {
@@ -238,15 +242,15 @@ Stream<List<SongResult>> searchSongs({
     variables.addAll(bankFilters.map(Variable<String>.new));
   }
 
-  final extraWhere = clauses.isEmpty ? '' : ' AND (${clauses.join(' AND ')})';
-  final sql =
-      'SELECT ${index.searchColumns} '
-      '${index.searchFrom} '
-      'WHERE ${SongFtsIndex.tableName} MATCH ?$extraWhere '
-      'ORDER BY rank';
+  final query = index.buildSearchQuery(
+    term: searchString,
+    fields: fields,
+    extraWhere: clauses.join(' AND '),
+    extraVariables: variables,
+  );
 
   return db
-      .customSelect(sql, variables: variables, readsFrom: {db.songs})
+      .customSelect(query.sql, variables: query.variables, readsFrom: {db.songs})
       .watch()
       .asyncMap((hits) async {
         if (hits.isEmpty) return const <SongResult>[];
@@ -272,7 +276,8 @@ Stream<List<SongResult>> searchSongs({
                         ?.split(',') ??
                     const <String>[],
                 match: SongMatch(
-                  rank: hit.read<double>('rank'),
+                  tier: hit.read<int>('tier'),
+                  rank: hit.readNullable<double>('rank') ?? 0,
                   snippets: {
                     for (final column in index.columns)
                       column.name: hit.readNullable<String>(
@@ -293,13 +298,15 @@ class SongResult {
   SongResult(this.song, {required this.downloadedAssets, this.match});
 }
 
-/// Relevance metadata for a song matched through the search index: the bm25
-/// rank and one snippet per searchable field, keyed by field name.
+/// Relevance metadata for a song matched through the search index: the match
+/// tier (0 exact, 1 substring, 2 FTS-only), the bm25 rank, and one snippet per
+/// searchable field, keyed by field name.
 class SongMatch {
+  final int tier;
   final double rank;
   final Map<String, String?> snippets;
 
-  SongMatch({required this.rank, required this.snippets});
+  SongMatch({required this.tier, required this.rank, required this.snippets});
 
   String? get matchTitle => snippets['title'];
   String? get matchLyrics => snippets['lyrics'];

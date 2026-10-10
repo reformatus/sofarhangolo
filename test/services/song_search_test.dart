@@ -54,12 +54,30 @@ void main() {
     ).first;
   }
 
-  test('finds hits in every searchable field and ranks them by group', () async {
-    await db.batch((batch) => batch.insertAll(db.songs, [
-      songWith('title-hit', 'Találj meg engem'),
-      songWith('people-hit', 'Másik dal', contentMap: {'composer': 'Találj'}),
-      songWith('lyrics-hit', 'Harmadik', lyrics: 'találj a szövegben'),
-    ]));
+  test('whole-value matches rank above substring matches', () async {
+    await db.batch(
+      (batch) => batch.insertAll(db.songs, [
+        songWith('substring', 'Találj meg engem'),
+        songWith('exact', 'Másik dal', contentMap: {'composer': 'Találj'}),
+      ]),
+    );
+
+    final results = await search('talalj');
+
+    // The composer is the term exactly (tier 0), the title only contains it.
+    expect(results.map((r) => r.song.uuid).toList(), ['exact', 'substring']);
+    expect(results[0].match?.tier, 0);
+    expect(results[1].match?.tier, 1);
+  });
+
+  test('substring hits rank by field group', () async {
+    await db.batch(
+      (batch) => batch.insertAll(db.songs, [
+        songWith('title-hit', 'Találj meg engem'),
+        songWith('people-hit', 'Másik dal', contentMap: {'composer': 'Találj meg'}),
+        songWith('lyrics-hit', 'Harmadik', lyrics: 'találj a szövegben'),
+      ]),
+    );
 
     final results = await search('talalj');
 
@@ -69,6 +87,32 @@ void main() {
       'people-hit',
       'lyrics-hit',
     ]);
+  });
+
+  test('folds accents for exact and substring matching', () async {
+    await db.into(db.songs).insert(songWith('acc', 'Áldál téged'));
+
+    // Folded, the whole title equals the term (tier 0).
+    final results = await search('aldal');
+
+    expect(results.map((r) => r.song.uuid).toList(), ['acc']);
+  });
+
+  test('falls back to substring matching below the trigram minimum', () async {
+    await db.batch(
+      (batch) => batch.insertAll(db.songs, [
+        songWith('short', 'Az Úr'),
+        songWith('unrelated', 'Másik dal'),
+      ]),
+    );
+
+    // Two characters: the trigram index cannot match, LIKE still must.
+    final results = await search('Úr');
+
+    expect(results.map((r) => r.song.uuid).toList(), ['short']);
+    // Substring tier, and no FTS hit to rank by.
+    expect(results.single.match?.tier, 1);
+    expect(results.single.match?.rank, 0);
   });
 
   test('reports per-field snippets with the highlight tags', () async {
