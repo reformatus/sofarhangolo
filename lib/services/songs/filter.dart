@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 // ignore: experimental_member_use
 import 'package:drift/extensions/json1.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/key/state.dart';
 
@@ -24,71 +25,162 @@ final List<String> fullTextSearchFields = [
     if (field.hasSearchUse) field.apiName,
 ];
 
-// todo write test
+/// Filterable fields that at least one song carries a value for, with the
+/// number of such songs.
+///
+/// The counts are aggregated in SQLite (`json_each` over `content_map` plus
+/// the dedicated `key` column), so opening the filter UI never has to load
+/// every song into Dart.
 @Riverpod(keepAlive: true)
 Future<Map<String, ({SongField field, int count})>> existingFilterableFields(
   Ref ref,
-) async {
-  final banks = await ref.watch(watchAllBanksProvider.future);
-  final registry = mergeSongFields(defaultSongFieldRegistry, {
-    for (final bank in banks)
-      if (bank.songFields.isNotEmpty) ...bank.songFields,
-  });
-  return buildExistingFilterableFields(
-    await ref.watch(allSongsProvider.future),
-    registry,
-  );
+) {
+  return ref.watch(_existingFilterableFieldsStream.future);
 }
 
-Map<String, ({SongField field, int count})> buildExistingFilterableFields(
-  Iterable<Song> songs, [
-  Map<String, SongField>? registry,
-]) {
+/// Aggregate stream behind [existingFilterableFields], recomputed whenever the
+/// bank overlays or the `songs` table change.
+final _existingFilterableFieldsStream =
+    StreamProvider<Map<String, ({SongField field, int count})>>((ref) async* {
+      final banks = await ref.watch(watchAllBanksProvider.future);
+      final registry = mergeSongFields(defaultSongFieldRegistry, {
+        for (final bank in banks)
+          if (bank.songFields.isNotEmpty) ...bank.songFields,
+      });
+      yield* buildExistingFilterableFields(registry);
+    });
+
+/// Reactive stream of the filter-card metadata for [registry].
+///
+/// Only fields at least one song has are returned: registry fields without a
+/// filter use are skipped, a text field counts songs with a non-blank value, a
+/// list field counts songs with at least one non-blank element, and the
+/// pseudo-field `key` (backed by the `key_field` column, not `content_map`)
+/// counts songs with a key.
+Stream<Map<String, ({SongField field, int count})>>
+buildExistingFilterableFields([Map<String, SongField>? registry]) {
   final effectiveRegistry = registry ?? defaultSongFieldRegistry;
-  Map<String, ({SongField field, int count})> fields = {};
+  final query = _existingFilterableFieldsQuery(effectiveRegistry);
+  if (query == null) {
+    return Stream.value(const <String, ({SongField field, int count})>{});
+  }
+  return db
+      .customSelect(
+        query.sql,
+        variables: query.variables,
+        readsFrom: {db.songs},
+      )
+      .watch()
+      .map((rows) => _readExistingFilterableFields(rows, effectiveRegistry));
+}
 
-  for (var song in songs) {
-    if (song.keyField.isNotEmpty) {
-      final keyDef = effectiveRegistry['key']!;
-      final existing = fields['key'];
-      fields['key'] = (field: keyDef, count: (existing?.count ?? 0) + 1);
-    }
+/// The single aggregate query behind [buildExistingFilterableFields].
+///
+/// `json_each(content_map)` yields one row per field a song stores, so
+/// `COUNT(DISTINCT songs.id)` counts songs rather than values. Array values
+/// are expanded through a nested `json_each` to require at least one non-blank
+/// element; `json('[]')` keeps that nested call valid for scalar rows. The
+/// `key` pseudo-field comes from `key_field` and is unioned in.
+({String sql, List<Variable> variables})? _existingFilterableFieldsQuery(
+  Map<String, SongField> registry,
+) {
+  final contentFields = [
+    for (final field in registry.values)
+      if (field.hasFilterUse && field.apiName != 'key') field.apiName,
+  ];
 
-    for (var field in song.contentMap.keys) {
-      final fieldDef = effectiveRegistry[field];
-      if (fieldDef == null || !fieldDef.hasFilterUse) continue;
-      if (!song.hasContent(field)) continue;
-      final existing = fields[field];
-      fields[field] = (field: fieldDef, count: (existing?.count ?? 0) + 1);
-    }
+  final selects = <String>[];
+  final variables = <Variable>[];
+
+  if (contentFields.isNotEmpty) {
+    final placeholders = List.filled(contentFields.length, '?').join(', ');
+    variables.addAll(contentFields.map(Variable<String>.new));
+    selects.add('''
+      SELECT entry.key AS field, COUNT(DISTINCT songs.id) AS song_count
+      FROM songs, json_each(songs.content_map) AS entry
+      WHERE entry.key IN ($placeholders)
+        AND (
+          (entry.type = 'array' AND EXISTS (
+            SELECT 1
+            FROM json_each(
+              CASE WHEN entry.type = 'array' THEN entry.value ELSE json('[]') END
+            ) AS element
+            WHERE TRIM(CAST(element.value AS TEXT)) <> ''
+          ))
+          OR (entry.type <> 'array' AND TRIM(CAST(entry.value AS TEXT)) <> '')
+        )
+      GROUP BY entry.key
+    ''');
   }
 
+  if (registry['key'] != null) {
+    selects.add('''
+      SELECT 'key' AS field, COUNT(*) AS song_count
+      FROM songs
+      WHERE TRIM(COALESCE(key_field, '')) <> ''
+      HAVING COUNT(*) > 0
+    ''');
+  }
+
+  if (selects.isEmpty) return null;
+  return (sql: selects.join('\nUNION ALL\n'), variables: variables);
+}
+
+Map<String, ({SongField field, int count})> _readExistingFilterableFields(
+  List<QueryRow> rows,
+  Map<String, SongField> registry,
+) {
+  final fields = <String, ({SongField field, int count})>{};
+  for (final row in rows) {
+    final name = row.read<String>('field');
+    final field = registry[name];
+    if (field == null || !field.hasFilterUse) continue;
+    fields[name] = (field: field, count: row.read<int>('song_count'));
+  }
   return fields;
 }
 
+/// Sorted distinct non-blank values of a filter field across every song.
+///
+/// List fields contribute each element; both scalar and element values are
+/// trimmed, so the chip values line up with what the filters match.
 @Riverpod(keepAlive: true)
-Future<List<String>> selectableValuesForFilterableField(
-  Ref ref,
-  String field,
-) async {
-  final allSongs = Stream.fromIterable(
-    await ref.watch(allSongsProvider.future),
-  );
-  Set<String> values = {};
-
-  await for (Song song in allSongs) {
-    values.addAll(song.contentList(field));
-  }
-
-  values.remove("");
-  final list = values.toList();
-  list.sort();
-  return list;
+Future<List<String>> selectableValuesForFilterableField(Ref ref, String field) {
+  return ref.watch(_selectableValuesStream(field).future);
 }
 
-@Riverpod(keepAlive: true)
-Stream<List<Song>> allSongs(Ref ref) {
-  return db.select(db.songs).watch();
+final _selectableValuesStream = StreamProvider.family<List<String>, String>(
+  (ref, field) => _watchSelectableValues(field),
+);
+
+Stream<List<String>> _watchSelectableValues(String field) {
+  // Two branches because scalar values are plain text (not valid JSON, so
+  // `json_each` would reject them) while list values are JSON arrays.
+  const sql = '''
+    SELECT DISTINCT value FROM (
+      SELECT TRIM(CAST(element.value AS TEXT)) AS value
+      FROM songs, json_each(songs.content_map) AS entry,
+           json_each(
+             CASE WHEN entry.type = 'array' THEN entry.value ELSE json('[]') END
+           ) AS element
+      WHERE entry.key = ?
+      UNION
+      SELECT TRIM(CAST(entry.value AS TEXT)) AS value
+      FROM songs, json_each(songs.content_map) AS entry
+      WHERE entry.key = ? AND entry.type <> 'array'
+    )
+    WHERE value <> ''
+    ORDER BY value
+  ''';
+
+  return db
+      .customSelect(
+        sql,
+        variables: [Variable<String>(field), Variable<String>(field)],
+        readsFrom: {db.songs},
+      )
+      .watch()
+      .map((rows) => [for (final row in rows) row.read<String>('value')]);
 }
 
 /// Number of songs in the collection - the "total" in the filters subtitle.
