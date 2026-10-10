@@ -93,3 +93,22 @@ Future<Song?> localCopyOf(Song song) async {
         ..where((s) => s.uuid.equals(links.first.sourceUuid)))
       .getSingleOrNull();
 }
+
+/// Watches [localCopyOf] for [song], so UI can react to a copy appearing or
+/// disappearing.
+@riverpod
+Stream<Song?> localCopyFor(Ref ref, Song song) {
+  return (db.songLinks.select()
+        ..where(
+          (l) =>
+              l.targetUuid.equals(song.uuid) &
+              l.type.equals(SongLinkType.localCopyOf.index),
+        ))
+      .watch()
+      .asyncMap((links) async {
+        if (links.isEmpty) return null;
+        return (db.songs.select()
+              ..where((s) => s.uuid.equals(links.first.sourceUuid)))
+            .getSingleOrNull();
+      });
+}

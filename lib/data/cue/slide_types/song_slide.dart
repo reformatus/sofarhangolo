@@ -91,6 +91,20 @@ class SongSlide extends Slide {
     sharedTitle: sharedTitle ?? fresh?.title,
   );
 
+  /// Re-points this slide at [song] (e.g. the local copy of the bank song),
+  /// carrying the slide's view/transpose settings over and refreshing the
+  /// shared metadata to [song]'s content.
+  SongSlide retarget(Song song) => SongSlide(
+    uuid,
+    song.uuid,
+    comment,
+    song: song,
+    viewType: viewType,
+    transpose: transpose,
+    sharedContentHash: song.contentHash,
+    sharedTitle: song.title,
+  );
+
   @override
   SongSlide copyWith({
     SongViewType? viewType,
