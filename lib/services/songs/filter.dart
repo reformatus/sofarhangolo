@@ -184,7 +184,7 @@ Stream<List<SongResult>> filteredSongs(Ref ref) {
         );
   }
 
-  return _searchSongs(
+  return searchSongs(
     searchString: searchString,
     searchFields: searchFields,
     filters: filters,
@@ -196,7 +196,12 @@ Stream<List<SongResult>> filteredSongs(Ref ref) {
 /// Searches through the app-managed FTS index (see [SongFtsIndex]). The index
 /// columns, the bm25 weights and the per-column snippets are all generated
 /// from the field registry, so no query here hardcodes a searchable field.
-Stream<List<SongResult>> _searchSongs({
+///
+/// Two phases: a custom select reads the dynamic hit columns (uuid, rank and
+/// snippets) in rank order, then a normal typed select resolves those songs.
+/// A single query cannot be typed: `readTable` needs drift-generated table
+/// metadata, which the registry-dynamic index deliberately does not have.
+Stream<List<SongResult>> searchSongs({
   required String searchString,
   required List<String> searchFields,
   required Map<String, List<String>> filters,
@@ -246,31 +251,26 @@ Stream<List<SongResult>> _searchSongs({
       .asyncMap((hits) async {
         if (hits.isEmpty) return const <SongResult>[];
 
-        final ids = [for (final hit in hits) hit.read<int>('id')];
-        final songRows = await (db.selectOnly(db.songs)
-              ..addColumns(db.songs.$columns)
-              ..addColumns([subqueryExpression(downloadedAssetsSubquery)])
-              ..where(db.songs.id.isIn(ids)))
-            .get();
-
-        final songsById = {
-          for (final row in songRows)
-            row.read(db.songs.id): (
-              song: row.readTable(db.songs),
-              assets:
-                  row.rawData
-                      .readNullableWithType(DriftSqlType.string, 'c0')
-                      ?.split(',') ??
-                  const <String>[],
-            ),
+        final uuids = [for (final hit in hits) hit.read<String>('uuid')];
+        final rows =
+            await (db.select(db.songs)
+                  .addColumns([subqueryExpression(downloadedAssetsSubquery)])
+                  ..where(db.songs.uuid.isIn(uuids)))
+                .get();
+        final songsByUuid = {
+          for (final row in rows) row.readTable(db.songs).uuid: row,
         };
 
         return [
           for (final hit in hits)
-            if (songsById[hit.read<int>('id')] case final entry?)
+            if (songsByUuid[hit.read<String>('uuid')] case final row?)
               SongResult(
-                entry.song,
-                downloadedAssets: entry.assets,
+                row.readTable(db.songs),
+                downloadedAssets:
+                    row.rawData
+                        .readNullableWithType(DriftSqlType.string, 'c0')
+                        ?.split(',') ??
+                    const <String>[],
                 match: SongMatch(
                   rank: hit.read<double>('rank'),
                   snippets: {

@@ -159,12 +159,13 @@ class SongFtsIndex {
     return sql.replaceAll(RegExp(r'\s+'), ' ').trim().replaceAll(';', '');
   }
 
-  /// The `SELECT` list of a search query: rowid, relevance rank and one
-  /// snippet per searchable column (aliased `match_<column>`).
+  /// The `SELECT` list of a search query: the song's uuid (the row class has
+  /// no id), relevance rank and one snippet per searchable column (aliased
+  /// `match_<column>`). Callers join the uuids back to typed songs.
   String get searchColumns {
     final bm25Args = columns.map((c) => c.weight.toString()).join(', ');
     return [
-      'songs.id AS id',
+      'songs.uuid AS uuid',
       'bm25($tableName, $bm25Args) AS rank',
       for (final (i, column) in columns.indexed)
         'snippet($tableName, $i, \'$snippetStart\', \'$snippetEnd\', \'...\', 30) '
