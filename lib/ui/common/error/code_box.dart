@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../common/monospace.dart';
+
 /// Scrollable monospace box for technical text (error messages, stacks).
 class ErrorCodeBox extends StatelessWidget {
   const ErrorCodeBox(this.text, {super.key});
@@ -13,12 +15,7 @@ class ErrorCodeBox extends StatelessWidget {
       child: SingleChildScrollView(
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
-          child: Text(
-            text,
-            style: TextStyle(
-              fontFamily: 'Courier New',
-            ), // todo is available on android?
-          ),
+          child: Text(text, style: monospaceTextStyle),
         ),
       ),
     );

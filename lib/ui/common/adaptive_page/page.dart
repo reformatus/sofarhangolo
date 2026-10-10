@@ -360,7 +360,10 @@ class _AdaptivePageState extends State<AdaptivePage>
                               children: [
                                 if (!tabletOrBigger) _buildBody(),
                                 Container(
-                                  height: 50,
+                                  // No fixed height: the bar sizes to its
+                                  // controls so they keep their natural
+                                  // (Material 48px) height instead of being
+                                  // squeezed into a set strip.
                                   padding: EdgeInsets.symmetric(vertical: 4),
                                   child: Row(
                                     children: [
@@ -378,10 +381,13 @@ class _AdaptivePageState extends State<AdaptivePage>
                                           padding: EdgeInsets.symmetric(
                                             horizontal: 5,
                                           ),
-                                          child: ListView(
+                                          child: SingleChildScrollView(
                                             scrollDirection: Axis.horizontal,
-                                            children:
-                                                widget.actionBarChildren ?? [],
+                                            child: Row(
+                                              children:
+                                                  widget.actionBarChildren ??
+                                                  const <Widget>[],
+                                            ),
                                           ),
                                         ),
                                       ),
