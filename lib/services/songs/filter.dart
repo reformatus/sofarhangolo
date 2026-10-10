@@ -90,25 +90,52 @@ Stream<List<Song>> allSongs(Ref ref) {
   return db.select(db.songs).watch();
 }
 
+/// Number of songs in the collection - the "total" in the filters subtitle.
+@Riverpod(keepAlive: true)
+Stream<int> songTotalCount(Ref ref) {
+  return db
+      .customSelect('SELECT COUNT(*) AS count FROM songs')
+      .watch()
+      .map((rows) => rows.first.read<int>('count'));
+}
+
+/// Number of songs matching the current search and filters - the "filtered"
+/// count in the filters subtitle (see [countSongs]).
+@Riverpod(keepAlive: true)
+Stream<int> songMatchCount(Ref ref) {
+  return countSongs(
+    searchString: sanitize(ref.watch(searchStringStateProvider)),
+    searchFields: ref.watch(searchFieldsStateProvider),
+    filters: ref.watch(multiselectTagsFilterStateProvider),
+    bankFilters: ref.watch(banksFilterStateProvider),
+    keyFilters: ref.watch(keyFilterStateProvider),
+  );
+}
+
 const snippetTags = (
   start: SongFtsIndex.snippetStart,
   end: SongFtsIndex.snippetEnd,
 );
 
-bool matchesKeyFilters(Song song, KeyFilters keyFilters) {
+bool matchesKeyFilters(Song song, KeyFilters keyFilters) =>
+    matchesKeyField(song.keyField, keyFilters);
+
+/// Whether a song's key fields satisfy the key filter, mirroring
+/// [matchesKeyFilters] for callers that only have the raw key field.
+bool matchesKeyField(List<KeyField> keyField, KeyFilters keyFilters) {
   if (keyFilters.isEmpty) return true;
 
   final matchesCompleteKey =
       keyFilters.keys.isNotEmpty &&
-      song.keyField.any((key) => keyFilters.keys.contains(key));
+      keyField.any((key) => keyFilters.keys.contains(key));
 
   final matchesPitchGroup =
       keyFilters.pitches.isEmpty ||
-      song.keyField.any((key) => keyFilters.pitches.contains(key.pitch));
+      keyField.any((key) => keyFilters.pitches.contains(key.pitch));
 
   final matchesModeGroup =
       keyFilters.modes.isEmpty ||
-      song.keyField.any((key) => keyFilters.modes.contains(key.mode));
+      keyField.any((key) => keyFilters.modes.contains(key.mode));
 
   final matchesPartialKeyGroup =
       (keyFilters.pitches.isNotEmpty || keyFilters.modes.isNotEmpty) &&
@@ -223,6 +250,93 @@ Stream<List<SongResult>> filteredSongs(Ref ref) {
   );
 }
 
+/// The searchable columns selected by [searchFields]; all of them when the
+/// selection is empty, and the known subset otherwise.
+List<SongFtsColumn> searchableColumns(List<String> searchFields) {
+  final selected = searchFields.toSet();
+  final fields = [
+    for (final column in SongFtsIndex.registry.columns)
+      if (selected.isEmpty || selected.contains(column.name)) column,
+  ];
+  assert(fields.isNotEmpty, 'search fields must intersect the index columns');
+  return fields;
+}
+
+/// SQL `WHERE` for the tag and bank filters, shared by the search query and the
+/// match count so both see the same rows.
+({String where, List<Variable> variables}) filterWhere(
+  Map<String, List<String>> filters,
+  Set<String> bankFilters,
+) {
+  final variables = <Variable>[];
+  final clauses = <String>[];
+
+  for (final entry in filters.entries) {
+    final valueClauses = <String>[];
+    for (final value in entry.value) {
+      // Quoted matching for list fields, plain for text fields — mirrors the
+      // drift expression filter used without a search.
+      final likePattern = bankApiListValueFields.contains(entry.key)
+          ? '%"$value"%'
+          : '%$value%';
+      valueClauses.add(
+        "json_extract(songs.content_map, '\$.${entry.key}') LIKE ?",
+      );
+      variables.add(Variable<String>(likePattern));
+    }
+    if (valueClauses.isNotEmpty) clauses.add('(${valueClauses.join(' OR ')})');
+  }
+  if (bankFilters.isNotEmpty) {
+    clauses.add('(${bankFilters.map((_) => 'songs.source_bank = ?').join(' OR ')})');
+    variables.addAll(bankFilters.map(Variable<String>.new));
+  }
+
+  return (where: clauses.join(' AND '), variables: variables);
+}
+
+/// Total number of songs matching the current search and filters.
+///
+/// The key filter is applied in Dart exactly as [searchSongs] applies it, so
+/// the count agrees with the results even though those are paginated.
+Stream<int> countSongs({
+  required String searchString,
+  required List<String> searchFields,
+  required Map<String, List<String>> filters,
+  required Set<String> bankFilters,
+  required KeyFilters keyFilters,
+}) {
+  final extra = filterWhere(filters, bankFilters);
+  final query = SongFtsIndex.registry.countQuery(
+    term: searchString.isEmpty ? null : searchString,
+    fields: searchableColumns(searchFields),
+    extraWhere: extra.where,
+    extraVariables: extra.variables,
+  );
+
+  return db
+      .customSelect(
+        query.sql,
+        variables: query.variables,
+        readsFrom: {db.songs},
+      )
+      .watch()
+      .map(
+        (rows) => rows
+            .where(
+              (row) => matchesKeyField(
+                _keyFieldOf(row.readNullable<String>('key_field')),
+                keyFilters,
+              ),
+            )
+            .length,
+      );
+}
+
+List<KeyField> _keyFieldOf(String? raw) {
+  if (raw == null || raw.isEmpty) return const [];
+  return const KeyFieldConverter().fromSql(raw);
+}
+
 /// Searches through the app-managed FTS index (see [SongFtsIndex]). The index
 /// columns, the bm25 weights and the per-column snippets are all generated
 /// from the field registry, so no query here hardcodes a searchable field.
@@ -240,45 +354,15 @@ Stream<List<SongResult>> searchSongs({
   required int limit,
 }) {
   final index = SongFtsIndex.registry;
-  final allColumns = [for (final column in index.columns) column.name];
-  final selected = searchFields.where(allColumns.contains).toSet();
-  final fields = selected.isEmpty
-      ? index.columns
-      : [
-          for (final column in index.columns)
-            if (selected.contains(column.name)) column,
-        ];
-  assert(fields.isNotEmpty, 'search fields must intersect the index columns');
-
-  final variables = <Variable>[];
-  final clauses = <String>[];
-
-  for (final entry in filters.entries) {
-    final valueClauses = <String>[];
-    for (final value in entry.value) {
-      // Quoted matching for list fields, plain for text fields — mirrors the
-      // drift expression filter above.
-      final likePattern = bankApiListValueFields.contains(entry.key)
-          ? '%"$value"%'
-          : '%$value%';
-      valueClauses.add(
-        "json_extract(songs.content_map, '\$.${entry.key}') LIKE ?",
-      );
-      variables.add(Variable<String>(likePattern));
-    }
-    if (valueClauses.isNotEmpty) clauses.add('(${valueClauses.join(' OR ')})');
-  }
-  if (bankFilters.isNotEmpty) {
-    clauses.add('(${bankFilters.map((_) => 'songs.source_bank = ?').join(' OR ')})');
-    variables.addAll(bankFilters.map(Variable<String>.new));
-  }
+  final fields = searchableColumns(searchFields);
+  final extra = filterWhere(filters, bankFilters);
 
   final query = index.buildSearchQuery(
     term: searchString,
     fields: fields,
     limit: limit,
-    extraWhere: clauses.join(' AND '),
-    extraVariables: variables,
+    extraWhere: extra.where,
+    extraVariables: extra.variables,
   );
 
   final foldedTerm = SongFtsIndex.foldTerm(searchString);

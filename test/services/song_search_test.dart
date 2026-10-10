@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sofarhangolo/data/database.dart';
 import 'package:sofarhangolo/data/song/song.dart';
 import 'package:sofarhangolo/services/songs/filter.dart';
+import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/key/state.dart';
 
 /// End-to-end coverage of the registry-driven search query, which had none
 /// before (the bug this guards against: resolving hits to typed songs through
@@ -33,11 +34,12 @@ void main() {
     String title, {
     String? lyrics,
     Map<String, Object> contentMap = const {},
+    List<KeyField> keyField = const [],
   }) => Song(
     uuid: uuid,
     title: title,
     lyrics: lyrics,
-    keyField: const [],
+    keyField: keyField,
     contentMap: contentMap,
   );
 
@@ -162,6 +164,51 @@ void main() {
     expect(
       firstPage.map((r) => r.song.uuid),
       all.take(2).map((r) => r.song.uuid),
+    );
+  });
+
+  Future<int> count({
+    String term = '',
+    Map<String, List<String>> filters = const {},
+    KeyFilters keyFilters = noKeyFilters,
+  }) {
+    return countSongs(
+      searchString: term,
+      searchFields: const [],
+      filters: filters,
+      bankFilters: const {},
+      keyFilters: keyFilters,
+    ).first;
+  }
+
+  test('counts every match, independently of the pagination limit', () async {
+    await db.batch(
+      (batch) => batch.insertAll(db.songs, [
+        songWith('a', 'Találj meg'),
+        songWith('b', 'Találj velem'),
+        songWith('c', 'Találj értem'),
+        songWith('d', 'Másik dal'),
+      ]),
+    );
+
+    // The list may be paginated down to fewer results than exist.
+    expect(await search('talalj', limit: 2), hasLength(2));
+    expect(await count(term: 'talalj'), 3);
+    expect(await count(), 4);
+  });
+
+  test('counts respect the key filter', () async {
+    await db.batch(
+      (batch) => batch.insertAll(db.songs, [
+        songWith('c-major', 'Első', keyField: [KeyField('C', 'dúr')]),
+        songWith('d-major', 'Második', keyField: [KeyField('D', 'dúr')]),
+      ]),
+    );
+
+    expect(await count(), 2);
+    expect(
+      await count(keyFilters: (pitches: {'C'}, modes: {}, keys: {})),
+      1,
     );
   });
 

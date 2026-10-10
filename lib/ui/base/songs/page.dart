@@ -93,7 +93,8 @@ class _SongsPageState extends ConsumerState<SongsPage> {
     required bool isLoading,
   }) {
     // A running fetch that asks for more than is currently displayed.
-    final showFooter = isLoading && results.length < ref.watch(songResultsLimitProvider);
+    final showFooter =
+        isLoading && results.length < ref.watch(songResultsLimitProvider);
 
     return ListView.builder(
       itemCount: results.length + (showFooter ? 1 : 0),
@@ -401,9 +402,9 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                                 automaticallyImplyLeading: false,
                                 backgroundColor: _areAllFiltersEmpty
                                     ? Theme.of(context).colorScheme.surface
-                                    : Theme.of(
-                                        context,
-                                      ).colorScheme.secondaryContainer,
+                                    : Theme.of(context)
+                                          .colorScheme
+                                          .secondaryContainer,
                               ),
                               Expanded(
                                 child:
@@ -468,47 +469,72 @@ class FiltersTitle extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final total = ref.watch(songTotalCountProvider).value;
+    final matches = ref.watch(songMatchCountProvider).value;
+    final filtering =
+        ref.watch(searchStringStateProvider).trim().isNotEmpty ||
+        filterState.isNotEmpty ||
+        keyFilterState.isNotEmpty ||
+        banksFilterState.isNotEmpty;
+    final subtitle = total == null
+        ? null
+        : filtering && matches != null
+        ? '$matches találat / $total dal'
+        : '$total dal';
+
     return AnimatedSize(
       duration: Durations.medium1,
       curve: Curves.easeInOutCubicEmphasized,
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              (filterState.isEmpty && keyFilterState.isEmpty)
-                  ? 'Szűrők'
-                  : ([
-                      if (keyFilterState.isNotEmpty)
-                        [
-                          if (keyFilterState.keys.isNotEmpty)
-                            keyFilterState.keys
-                                .map(displayKeyField)
-                                .join(' vagy '),
-                          if (keyFilterState.pitches.isNotEmpty ||
-                              keyFilterState.modes.isNotEmpty)
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  (filterState.isEmpty && keyFilterState.isEmpty)
+                      ? 'Szűrők'
+                      : ([
+                          if (keyFilterState.isNotEmpty)
                             [
-                              if (keyFilterState.pitches.isNotEmpty)
-                                'alaphangja ${keyFilterState.pitches.map(displayKeyPitch).join(' vagy ')}',
-                              if (keyFilterState.modes.isNotEmpty)
-                                'hangsora ${keyFilterState.modes.map(displayKeyMode).join(' vagy ')}',
-                            ].join(' és '),
-                        ].join(', vagy '),
-                      if (filterState.isNotEmpty)
-                        filterState.values
-                            .map((e) => e.join(' vagy '))
-                            .join(', és '),
-                    ].join(', valamint ')),
-              style: TextStyle(
-                color: (filterState.isEmpty && keyFilterState.isEmpty)
-                    ? null
-                    : Theme.of(context).colorScheme.onSecondaryContainer,
-                fontSize: (filterState.isEmpty && keyFilterState.isEmpty)
-                    ? null
-                    : Theme.of(context).textTheme.bodyMedium!.fontSize,
-              ),
-              softWrap: true,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
+                              if (keyFilterState.keys.isNotEmpty)
+                                keyFilterState.keys
+                                    .map(displayKeyField)
+                                    .join(' vagy '),
+                              if (keyFilterState.pitches.isNotEmpty ||
+                                  keyFilterState.modes.isNotEmpty)
+                                [
+                                  if (keyFilterState.pitches.isNotEmpty)
+                                    'alaphangja ${keyFilterState.pitches.map(displayKeyPitch).join(' vagy ')}',
+                                  if (keyFilterState.modes.isNotEmpty)
+                                    'hangsora ${keyFilterState.modes.map(displayKeyMode).join(' vagy ')}',
+                                ].join(' és '),
+                            ].join(', vagy '),
+                          if (filterState.isNotEmpty)
+                            filterState.values
+                                .map((e) => e.join(' vagy '))
+                                .join(', és '),
+                        ].join(', valamint ')),
+                  style: TextStyle(
+                    color: (filterState.isEmpty && keyFilterState.isEmpty)
+                        ? null
+                        : Theme.of(context).colorScheme.onSecondaryContainer,
+                    fontSize: (filterState.isEmpty && keyFilterState.isEmpty)
+                        ? null
+                        : Theme.of(context).textTheme.bodyMedium!.fontSize,
+                  ),
+                  softWrap: true,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (subtitle != null)
+                  Text(
+                    subtitle,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
             ),
           ),
           ...banksFilterState

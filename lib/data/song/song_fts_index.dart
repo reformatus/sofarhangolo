@@ -279,6 +279,59 @@ class SongFtsIndex {
     return (sql: sql, variables: variables);
   }
 
+  /// A `SELECT songs.key_field` query over every row matching the current
+  /// search (when [term] is non-empty) and [extraWhere] filters - no ordering,
+  /// snippets or limit. Used to count matches: the key filter is applied in
+  /// Dart (see filter.dart), so counting needs each row's key field.
+  ({String sql, List<Variable> variables}) countQuery({
+    String? term,
+    List<SongFtsColumn> fields = const [],
+    String extraWhere = '',
+    List<Variable> extraVariables = const [],
+  }) {
+    final searching = term != null && term.isNotEmpty;
+    final variables = <Variable>[];
+    final conditions = <String>[];
+
+    var from = 'FROM songs';
+    if (searching) {
+      assert(fields.isNotEmpty, 'at least one searchable field must take part');
+      // Textual order: the MATCH inside the join subquery first, then the
+      // LIKE conditions, then the caller's filters.
+      variables.add(
+        Variable<String>(
+          fields.length == columns.length
+              ? term
+              : '{${fields.map((field) => field.name).join(' ')}} : $term',
+        ),
+      );
+      from =
+          'FROM songs LEFT JOIN (SELECT rowid AS id FROM $tableName '
+          'WHERE $tableName MATCH ?) AS hit ON hit.id = songs.id';
+
+      final like = <String>[];
+      final likePattern = '%${_escapeLike(foldTerm(term))}%';
+      for (final field in fields) {
+        like.add("${_foldedValue(field)} LIKE ? ESCAPE '\\'");
+        variables.add(Variable<String>(likePattern));
+      }
+      conditions.add('(hit.id IS NOT NULL OR ${like.join(' OR ')})');
+    }
+
+    if (extraWhere.isNotEmpty) {
+      conditions.add('($extraWhere)');
+      variables.addAll(extraVariables);
+    }
+
+    final where = conditions.isEmpty
+        ? ''
+        : ' WHERE ${conditions.join(' AND ')}';
+    return (
+      sql: 'SELECT songs.key_field AS key_field $from$where',
+      variables: variables,
+    );
+  }
+
   /// Escapes LIKE wildcards so the term is matched literally.
   static String _escapeLike(String term) => term
       .replaceAll(r'\', r'\\')
