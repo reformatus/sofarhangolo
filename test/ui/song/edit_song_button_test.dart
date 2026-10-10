@@ -162,6 +162,8 @@ void main() {
     // The dialog mentions the copy and offers the primary "edit existing".
     expect(find.textContaining('már készült helyi másolat'), findsOneWidget);
     expect(find.text('Meglévő másolat szerkesztése'), findsOneWidget);
+    // Creating a fresh copy is the demoted tertiary action.
+    expect(find.text('Új másolat szerkesztése'), findsOneWidget);
 
     await tester.tap(find.text('Meglévő másolat szerkesztése'));
     await tester.pumpAndSettle();

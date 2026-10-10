@@ -58,7 +58,9 @@ class EditSongButton extends StatelessWidget {
         message: existingCopy == null
             ? _newCopyMessage
             : _existingCopyMessage(existingCopy),
-        actionLabel: 'Másolat szerkesztése',
+        actionLabel: existingCopy == null
+            ? 'Másolat szerkesztése'
+            : 'Új másolat szerkesztése',
         actionIcon: Icons.edit_outlined,
         actionOnPressed: () async {
           try {
