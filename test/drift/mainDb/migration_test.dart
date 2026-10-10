@@ -17,55 +17,6 @@ import 'generated/schema_v8.dart' as v8;
 
 import 'package:sofarhangolo/data/database.dart';
 
-/// Like `SchemaVerifier.testWithDataIntegrity`, but without the schema
-/// validation. The app-managed search index is not part of drift's schema, so
-/// drift cannot compare pre-v9 target schemas — its introspection trips over
-/// the fts5 shadow tables of the historical schema (see the matrix note
-/// above). The data assertions these tests make are still worth running.
-Future<void> migrationData<
-  OldDatabase extends GeneratedDatabase,
-  NewDatabase extends GeneratedDatabase
->({
-  required SchemaVerifier verifier,
-  required int oldVersion,
-  required int newVersion,
-  required OldDatabase Function(QueryExecutor) createOld,
-  required NewDatabase Function(QueryExecutor) createNew,
-  required GeneratedDatabase Function(QueryExecutor) openTestedDatabase,
-  required void Function(Batch, OldDatabase) createItems,
-  required Future<void> Function(NewDatabase) validateItems,
-}) async {
-  final schema = await verifier.schemaAt(oldVersion);
-
-  final oldDb = createOld(schema.newConnection());
-  await oldDb.customStatement('PRAGMA foreign_keys = OFF');
-  await oldDb.batch((batch) => createItems(batch, oldDb));
-  await oldDb.close();
-
-  final migrated = openTestedDatabase(schema.newConnection());
-  await migrated.executor.ensureOpen(_TargetVersionUser(newVersion, migrated));
-  await migrated.close();
-
-  final newDb = createNew(schema.newConnection());
-  await validateItems(newDb);
-  await newDb.close();
-}
-
-/// Opens the tested database as if its schema version were [version], so the
-/// app's migration steps run up to that version (mirrors drift's own
-/// delegating user used by `migrateAndValidate`).
-class _TargetVersionUser extends QueryExecutorUser {
-  _TargetVersionUser(this.schemaVersion, this.inner);
-
-  @override
-  final int schemaVersion;
-  final QueryExecutorUser inner;
-
-  @override
-  Future<void> beforeOpen(QueryExecutor executor, OpeningDetails details) =>
-      inner.beforeOpen(executor, details);
-}
-
 /// Migration tests are tagged so they can be excluded until migrations are implemented.
 /// Run with: flutter test --exclude-tags=migration
 @Tags(['migration'])
@@ -78,25 +29,20 @@ void main() {
   });
 
   group('simple database migrations', () {
-    // These simple tests verify schema updates with a simple (no data)
-    // migration, ensuring the written migrations properly alter the schema.
-    //
-    // Only migrations to the current version are validated. The search index
-    // is app-managed and deliberately not part of drift's schema
-    // (see song_fts_index.dart); drift only filters fts5 shadow tables for
-    // virtual tables the database declares, so comparing an intermediate
-    // (pre-v9) target schema trips over the unparseable shadow tables of the
-    // historical schema's fts index. Every migration step still runs by
-    // migrating each starting point up to the current version.
+    // These simple tests verify all possible schema updates with a simple (no
+    // data) migration. This is a quick way to ensure that written database
+    // migrations properly alter the schema.
     const versions = GeneratedHelper.versions;
-    final currentVersion = versions.last;
-    for (final fromVersion in versions) {
-      if (fromVersion == currentVersion) continue;
-      test('from $fromVersion to $currentVersion', () async {
-        final schema = await verifier.schemaAt(fromVersion);
-        final db = LyricDatabase(schema.newConnection());
-        await verifier.migrateAndValidate(db, currentVersion);
-        await db.close();
+    for (final (i, fromVersion) in versions.indexed) {
+      group('from $fromVersion', () {
+        for (final toVersion in versions.skip(i + 1)) {
+          test('to $toVersion', () async {
+            final schema = await verifier.schemaAt(fromVersion);
+            final db = LyricDatabase(schema.newConnection());
+            await verifier.migrateAndValidate(db, toVersion);
+            await db.close();
+          });
+        }
       });
     }
   });
@@ -157,8 +103,7 @@ void main() {
       const v2.SongsFtsData(title: 'Migration Song', lyrics: '[V1]\n Első sor'),
     ];
 
-    await migrationData(
-      verifier: verifier,
+    await verifier.testWithDataIntegrity(
       oldVersion: 1,
       newVersion: 2,
       createOld: v1.DatabaseAtV1.new,
@@ -278,8 +223,7 @@ void main() {
       const v4.SongsFtsData(title: 'Migration Song', lyrics: '[V3]\n Első sor'),
     ];
 
-    await migrationData(
-      verifier: verifier,
+    await verifier.testWithDataIntegrity(
       oldVersion: 3,
       newVersion: 4,
       createOld: v3.DatabaseAtV3.new,
@@ -359,8 +303,7 @@ void main() {
       ),
     ];
 
-    await migrationData(
-      verifier: verifier,
+    await verifier.testWithDataIntegrity(
       oldVersion: 6,
       newVersion: 7,
       createOld: v6.DatabaseAtV6.new,
@@ -444,8 +387,7 @@ void main() {
       ),
     ];
 
-    await migrationData(
-      verifier: verifier,
+    await verifier.testWithDataIntegrity(
       oldVersion: 5,
       newVersion: 7,
       createOld: v5.DatabaseAtV5.new,
@@ -504,8 +446,7 @@ void main() {
       ),
     ];
 
-    await migrationData(
-      verifier: verifier,
+    await verifier.testWithDataIntegrity(
       oldVersion: 6,
       newVersion: 7,
       createOld: v6.DatabaseAtV6.new,
@@ -610,8 +551,7 @@ void main() {
         ),
       ];
 
-      await migrationData(
-      verifier: verifier,
+      await verifier.testWithDataIntegrity(
         oldVersion: 7,
         newVersion: 8,
         createOld: v7.DatabaseAtV7.new,

@@ -16,10 +16,12 @@ import '../assets/downloaded.dart';
 
 part 'filter.g.dart';
 
-// Searchable fields come from the registry-driven index layout; the selector
-// UI lists them uniformly.
+// Searchable fields come from the field registry; the selector UI lists them
+// uniformly. Only title and lyrics are backed by the FTS index (song.drift) -
+// the rest are matched by expression over `songs` (see [SongFtsIndex]).
 final List<String> fullTextSearchFields = [
-  for (final column in SongFtsIndex.registry.columns) column.name,
+  for (final field in defaultSongFieldRegistry.values)
+    if (field.hasSearchUse) field.apiName,
 ];
 
 // todo write test
@@ -317,15 +319,18 @@ Expression<bool> keyFilterExpression(Songs songs, KeyFilters keyFilters) {
   return Expression.or(parts);
 }
 
-/// The searchable columns selected by [searchFields]; all of them when the
+/// The searchable field names selected by [searchFields]; all of them when the
 /// selection is empty, and the known subset otherwise.
-List<SongFtsColumn> searchableColumns(List<String> searchFields) {
+List<String> searchableFields(List<String> searchFields) {
   final selected = searchFields.toSet();
   final fields = [
-    for (final column in SongFtsIndex.registry.columns)
-      if (selected.isEmpty || selected.contains(column.name)) column,
+    for (final field in fullTextSearchFields)
+      if (selected.isEmpty || selected.contains(field)) field,
   ];
-  assert(fields.isNotEmpty, 'search fields must intersect the index columns');
+  assert(
+    fields.isNotEmpty,
+    'search fields must intersect the searchable fields',
+  );
   return fields;
 }
 
@@ -406,9 +411,9 @@ Stream<int> countSongs({
   required KeyFilters keyFilters,
 }) {
   final extra = filterWhere(filters, bankFilters, keyFilters);
-  final query = SongFtsIndex.registry.countQuery(
+  final query = SongFtsIndex.countQuery(
     term: searchString.isEmpty ? null : searchString,
-    fields: searchableColumns(searchFields),
+    fields: searchableFields(searchFields),
     extraWhere: extra.where,
     extraVariables: extra.variables,
   );
@@ -423,14 +428,13 @@ Stream<int> countSongs({
       .map((rows) => rows.first.read<int>('count'));
 }
 
-/// Searches through the app-managed FTS index (see [SongFtsIndex]). The index
-/// columns, the bm25 weights and the per-column snippets are all generated
-/// from the field registry, so no query here hardcodes a searchable field.
+/// Searches the drift-owned FTS index (see [SongFtsIndex]): `title` and
+/// `lyrics` are matched by FTS5, every other searchable field by a folded LIKE
+/// or exact equality over `songs`, so the index layout stays static.
 ///
-/// Two phases: a custom select reads the dynamic hit columns (uuid, rank and
-/// snippets) in rank order, then a normal typed select resolves those songs.
-/// A single query cannot be typed: `readTable` needs drift-generated table
-/// metadata, which the registry-dynamic index deliberately does not have.
+/// Two phases: a custom select reads the hit columns (uuid, rank, tier and
+/// snippets), then a normal typed select resolves those songs. A single query
+/// cannot be typed: the FTS columns drift cannot join into `readTable`.
 Stream<List<SongResult>> searchSongs({
   required String searchString,
   required List<String> searchFields,
@@ -439,11 +443,10 @@ Stream<List<SongResult>> searchSongs({
   required KeyFilters keyFilters,
   required int limit,
 }) {
-  final index = SongFtsIndex.registry;
-  final fields = searchableColumns(searchFields);
+  final fields = searchableFields(searchFields);
   final extra = filterWhere(filters, bankFilters, keyFilters);
 
-  final query = index.buildSearchQuery(
+  final query = SongFtsIndex.buildSearchQuery(
     term: searchString,
     fields: fields,
     limit: limit,
@@ -487,7 +490,7 @@ Stream<List<SongResult>> searchSongs({
                   matches: _matchedFields(
                     row.readTable(db.songs),
                     hit,
-                    index,
+                    fields,
                     foldedTerm,
                   ),
                 ),
@@ -505,20 +508,24 @@ Stream<List<SongResult>> searchSongs({
 Map<String, String> _matchedFields(
   Song song,
   QueryRow hit,
-  SongFtsIndex index,
+  List<String> fields,
   String foldedTerm,
 ) {
   final matched = <String, String>{};
-  for (final column in index.columns) {
-    final ftsSnippet = hit.readNullable<String>(index.matchAlias(column));
+  for (final field in fields) {
+    // Only the FTS-backed fields have a snippet column; the rest fall back to
+    // a Dart snippet around the folded match.
+    final ftsSnippet = SongFtsIndex.isFtsField(field)
+        ? hit.readNullable<String>(SongFtsIndex.matchAlias(field))
+        : null;
     if (ftsSnippet != null && ftsSnippet.contains(SongFtsIndex.snippetStart)) {
-      matched[column.name] = ftsSnippet;
+      matched[field] = ftsSnippet;
       continue;
     }
-    final value = _fieldValue(song, column.name);
+    final value = _fieldValue(song, field);
     if (value == null) continue;
     final snippet = _snippetFor(value, foldedTerm);
-    if (snippet != null) matched[column.name] = snippet;
+    if (snippet != null) matched[field] = snippet;
   }
   return matched;
 }

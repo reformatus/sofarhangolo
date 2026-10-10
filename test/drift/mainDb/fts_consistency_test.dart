@@ -16,8 +16,6 @@ void main() {
 
   setUp(() async {
     db = LyricDatabase(NativeDatabase.memory());
-    // The search index is app-managed; create it like the app does at startup.
-    await db.ensureSearchIndex();
   });
 
   tearDown(() async {
@@ -48,9 +46,7 @@ void main() {
     await upsert(songWith('a', 'Első dal', 'Kiss Áron'));
 
     final matches = await db
-        .customSelect(
-          "SELECT rowid FROM songs_fts WHERE songs_fts MATCH 'composer : aron'",
-        )
+        .customSelect("SELECT rowid FROM songs_fts WHERE songs_fts MATCH 'elso'")
         .get();
     expect(matches, hasLength(1));
   });

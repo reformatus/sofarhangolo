@@ -3,164 +3,58 @@ import 'package:drift/drift.dart';
 
 import 'song_fields.dart';
 
-/// One column of the unified search index. Predefined fields (title, lyrics)
-/// read from dedicated `songs` columns; mapped fields read from contentMap
-/// through `json_extract`.
+/// One column of the drift-declared search index (see song.drift). Its position
+/// in [SongFtsIndex.columns] is the `snippet()` column index and the bm25
+/// weight position.
 class SongFtsColumn {
   final String name;
-  final String? jsonPath;
   final SongSearchGroup group;
 
-  const SongFtsColumn(this.name, this.jsonPath, this.group);
+  const SongFtsColumn(this.name, this.group);
 
-  bool get isCore => jsonPath == null;
-
-  /// Relative bm25 multiplier for this column.
   double get weight => group.weight;
 }
 
-/// The unified search index, derived from the field registry.
+/// Builds the unified text search query on top of the drift-owned FTS index.
 ///
-/// FTS5 columns are fixed per table, so a registry-dynamic layout cannot use
-/// drift's generated table metadata — the index is app-managed: [ddl] is
-/// generated from the registry, [ensure] reconciles the database against it on
-/// open, and queries select columns from the same list. Drift still provides
-/// the typed side: song rows are read through `selectOnly` + `readTable`.
+/// Only `title` and `lyrics` live in `songs_fts` (song.drift) - the two long
+/// columns the index is actually worth. Every other searchable field is matched
+/// by expression over `songs` (folded LIKE and exact equality), so the index
+/// layout is static and needs no dynamic DDL or runtime reconciliation.
+///
+/// Hits are tiered - 0 exact, 1 substring, 2 FTS-only - then ordered by bm25,
+/// the folded title and finally the rowid, so LIMIT/OFFSET pages stay stable.
+/// The FTS part lives in a subquery because FTS5 rejects `MATCH` inside an OR
+/// over a left join; that subquery also computes `bm25` and the snippets.
 class SongFtsIndex {
-  static const viewName = 'songs_fts_content';
   static const tableName = 'songs_fts';
-  static const triggerNames = ['songs_ai', 'songs_ad', 'songs_au'];
   static const snippetStart = '<?';
   static const snippetEnd = '?>';
 
-  final List<SongFtsColumn> columns;
+  /// The FTS columns, in song.drift's declaration order.
+  static const List<SongFtsColumn> columns = [
+    SongFtsColumn('title', SongSearchGroup.title),
+    SongFtsColumn('lyrics', SongSearchGroup.lyrics),
+  ];
 
-  const SongFtsIndex(this.columns);
-
-  /// Builds the index layout from the registry: every field marked with the
-  /// text search use, in registry order. Title and lyrics are core fields, so
-  /// they are backed by their own columns.
-  factory SongFtsIndex.fromRegistry([Map<String, SongField>? registry]) {
-    return SongFtsIndex([
-      for (final field in (registry ?? defaultSongFieldRegistry).values)
-        if (field.hasSearchUse)
-          SongFtsColumn(
-            field.apiName,
-            field.core ? null : field.apiName,
-            field.searchGroup ?? SongSearchGroup.metadata,
-          ),
-    ]);
-  }
-
-  static final SongFtsIndex registry = SongFtsIndex.fromRegistry();
-
-  String get _columnNames => columns.map((c) => c.name).join(', ');
-
-  /// Expression reading one column's value, either bare (view) or from a
-  /// `new`/`old` row (triggers). Core columns read their dedicated column,
-  /// mapped ones `json_extract` their contentMap entry.
-  String _expression(SongFtsColumn column, {String prefix = ''}) {
-    final jsonPath = column.jsonPath;
-    return jsonPath == null
-        ? '$prefix${column.name}'
-        : "json_extract(${prefix}content_map, '\$.$jsonPath')";
-  }
-
-  String _rowValues(String row) => [
-    row == 'new' ? 'new.id' : 'old.id',
-    for (final column in columns) _expression(column, prefix: '$row.'),
-  ].join(', ');
-
-  String get _viewSelect => [
-    'id',
-    for (final column in columns)
-      if (column.isCore)
-        column.name
-      else
-        '${_expression(column)} AS ${column.name}',
-  ].join(', ');
-
-  /// DDL for every object the index owns, keyed by object name. Comparing the
-  /// generated statements against `sqlite_master` doubles as the layout
-  /// signature, so [ensure] needs no extra bookkeeping.
-  Map<String, String> get ddl => {
-    viewName: 'CREATE VIEW $viewName AS SELECT $_viewSelect FROM songs',
-    tableName:
-        'CREATE VIRTUAL TABLE $tableName USING fts5'
-        "($_columnNames, content='$viewName', content_rowid='id', "
-        "tokenize='trigram remove_diacritics 1')",
-    'songs_ai':
-        'CREATE TRIGGER songs_ai AFTER INSERT ON songs BEGIN '
-        'INSERT INTO $tableName(rowid, $_columnNames) '
-        'VALUES (${_rowValues('new')}); END',
-    'songs_ad':
-        'CREATE TRIGGER songs_ad AFTER DELETE ON songs BEGIN '
-        'INSERT INTO $tableName($tableName, rowid, $_columnNames) '
-        "VALUES ('delete', ${_rowValues('old')}); END",
-    'songs_au':
-        'CREATE TRIGGER songs_au AFTER UPDATE ON songs BEGIN '
-        'INSERT INTO $tableName($tableName, rowid, $_columnNames) '
-        "VALUES ('delete', ${_rowValues('old')}); "
-        'INSERT INTO $tableName(rowid, $_columnNames) '
-        'VALUES (${_rowValues('new')}); END',
+  static final Set<String> _ftsFieldNames = {
+    for (final column in columns) column.name,
   };
 
-  /// Reconciles the search index with [ddl]. Cheap no-op when the database
-  /// already carries the current layout; otherwise drops and recreates the
-  /// index objects and rebuilds the index from the content view.
-  ///
-  /// Returns whether anything was rebuilt, for logging and tests.
-  Future<bool> ensure(DatabaseConnectionUser db) async {
-    final ddl = this.ddl;
-    final expected = {
-      for (final entry in ddl.entries) entry.key: _canonical(entry.value),
-    };
+  /// Fields backed by a dedicated `songs` column; every other searchable field
+  /// is read from `content_map`.
+  static const Set<String> coreFields = {'title', 'lyrics'};
 
-    final placeholders = List.filled(expected.length, '?').join(', ');
-    final rows = await db
-        .customSelect(
-          'SELECT name, sql FROM sqlite_master WHERE name IN ($placeholders)',
-          variables: [for (final name in expected.keys) Variable<String>(name)],
-        )
-        .get();
-    final actual = {
-      for (final row in rows)
-        row.read<String>('name'): _canonical(row.read<String?>('sql') ?? ''),
-    };
+  static bool isFtsField(String field) => _ftsFieldNames.contains(field);
 
-    final upToDate =
-        actual.length == expected.length &&
-        expected.entries.every((e) => actual[e.key] == e.value);
-    if (upToDate) return false;
-
-    // Triggers reference the index, so drop them first; recreate view first
-    // (the index names it as its content source) and rebuild at the end.
-    for (final name in triggerNames) {
-      await db.customStatement('DROP TRIGGER IF EXISTS $name');
-    }
-    await db.customStatement('DROP TABLE IF EXISTS $tableName');
-    await db.customStatement('DROP VIEW IF EXISTS $viewName');
-
-    await db.customStatement(ddl[viewName]!);
-    await db.customStatement(ddl[tableName]!);
-    for (final name in triggerNames) {
-      await db.customStatement(ddl[name]!);
-    }
-    await db.customStatement(
-      "INSERT INTO $tableName($tableName) VALUES('rebuild')",
-    );
-    return true;
-  }
-
-  /// Collapses whitespace and drops a trailing semicolon so generated DDL
-  /// compares equal to what SQLite stores in `sqlite_master`.
-  static String _canonical(String sql) {
-    return sql.replaceAll(RegExp(r'\s+'), ' ').trim().replaceAll(';', '');
-  }
+  /// The SQL expression reading [field]'s searchable value.
+  static String valueExpression(String field) => coreFields.contains(field)
+      ? 'songs.$field'
+      : "json_extract(songs.content_map, '\$.$field')";
 
   /// Hungarian accent folding, mirroring `removeDiacritics(...).toLowerCase()`
   /// on the Dart side. SQLite's `lower()` folds ASCII only, so both cases of
-  /// every accented letter are mapped explicitly (a fixed Hungarian set — the
+  /// every accented letter are mapped explicitly (a fixed Hungarian set - the
   /// FTS tokenizer's `remove_diacritics` handles the rest when matching).
   static const _foldReplacements = {
     'á': 'a',
@@ -186,36 +80,55 @@ class SongFtsIndex {
     return sql;
   }
 
-  String _foldedValue(SongFtsColumn column) =>
-      foldExpression(_expression(column, prefix: 'songs.'));
+  static String _foldedValue(String field) =>
+      foldExpression(valueExpression(field));
 
-  /// The `snippet()` columns of the FTS subquery, aliased `snippet_<field>`.
-  String get _snippetSelects => [
+  /// The `snippet()` columns of the FTS subquery, aliased `match_<field>`.
+  static String get _snippetSelects => [
     for (final (i, column) in columns.indexed)
       'snippet($tableName, $i, \'$snippetStart\', \'$snippetEnd\', '
-          "'...', 30) AS snippet_${column.name}",
+          "'...', 30) AS ${matchAlias(column.name)}",
   ].join(', ');
 
   /// Folds a search term the same way [foldExpression] folds database values:
   /// diacritics removed, lowercased.
   static String foldTerm(String term) => removeDiacritics(term).toLowerCase();
 
+  /// Escapes LIKE wildcards so the term is matched literally.
+  static String _escapeLike(String term) => term
+      .replaceAll(r'\', r'\\')
+      .replaceAll('%', r'\%')
+      .replaceAll('_', r'\_');
+
+  /// Snippet column alias for [field].
+  static String matchAlias(String field) => 'match_$field';
+
+  /// The FTS columns among [fields], in declaration order.
+  static List<String> _ftsFieldsOf(List<String> fields) => [
+    for (final column in columns)
+      if (fields.contains(column.name)) column.name,
+  ];
+
+  /// The `{a b} : term` match string restricting MATCH to [ftsFields]; the bare
+  /// term when every column takes part.
+  static String _matchString(String term, List<String> ftsFields) =>
+      ftsFields.length == columns.length
+      ? term
+      : '{${ftsFields.join(' ')}} : $term';
+
   /// Builds the integrated search statement: FTS ∪ LIKE ∪ exact, tiered
   /// (0 exact, 1 LIKE, 2 FTS-only) and ordered by tier, relevance, folded
   /// title (then rowid, so [limit]/[offset] pages are stable). [fields] are
-  /// the searchable columns taking part; [extraWhere] and [extraVariables]
-  /// append caller filters (tags, banks).
-  ///
-  /// The FTS part lives in a subquery because FTS5 rejects `MATCH` in an OR
-  /// over a left join; that subquery also computes `bm25` and the snippets.
+  /// the searchable field names taking part; [extraWhere] and [extraVariables]
+  /// append caller filters (tags, banks, key).
   ///
   /// Prepared-statement variables are bound positionally, so their order must
   /// follow the placeholders in the SQL text: exact conditions, LIKE
   /// conditions, the FTS match, the WHERE LIKE conditions, extras, then the
   /// limit and offset.
-  ({String sql, List<Variable> variables}) buildSearchQuery({
+  static ({String sql, List<Variable> variables}) buildSearchQuery({
     required String term,
-    required List<SongFtsColumn> fields,
+    required List<String> fields,
     required int limit,
     int offset = 0,
     String extraWhere = '',
@@ -225,6 +138,9 @@ class SongFtsIndex {
 
     final foldedTerm = foldTerm(term);
     final likePattern = '%${_escapeLike(foldedTerm)}%';
+    final ftsFields = _ftsFieldsOf(fields);
+    final hasFts = ftsFields.isNotEmpty;
+
     final variables = <Variable>[];
 
     final exact = <String>[];
@@ -238,10 +154,17 @@ class SongFtsIndex {
       variables.add(Variable<String>(likePattern));
     }
 
-    final matchString = fields.length == columns.length
-        ? term
-        : '{${fields.map((field) => field.name).join(' ')}} : $term';
-    variables.add(Variable<String>(matchString));
+    var from = 'FROM songs';
+    if (hasFts) {
+      variables.add(Variable<String>(_matchString(term, ftsFields)));
+      from =
+          'FROM songs LEFT JOIN ('
+          'SELECT rowid AS id, '
+          'bm25($tableName, ${columns.map((c) => c.weight).join(', ')}) AS rank, '
+          '$_snippetSelects '
+          'FROM $tableName WHERE $tableName MATCH ?'
+          ') AS hit ON hit.id = songs.id';
+    }
 
     final whereLike = <String>[];
     for (final field in fields) {
@@ -253,22 +176,30 @@ class SongFtsIndex {
       ..add(Variable<int>(limit))
       ..add(Variable<int>(offset));
 
+    final matchCondition = hasFts
+        ? '(hit.id IS NOT NULL OR ${whereLike.join(' OR ')})'
+        : '(${whereLike.join(' OR ')})';
+    final rankColumn = hasFts ? 'hit.rank AS rank' : 'NULL AS rank';
+    final matches = [
+      for (final column in columns)
+        hasFts
+            ? 'hit.${matchAlias(column.name)} AS ${matchAlias(column.name)}'
+            : 'NULL AS ${matchAlias(column.name)}',
+    ].join(', ');
+    // A bare integer in ORDER BY is a column ordinal, so use NULL as the
+    // neutral constant when there is no FTS rank.
+    final rankOrder = hasFts ? 'COALESCE(hit.rank, 0)' : 'NULL';
+
     final sql =
         'SELECT songs.uuid AS uuid, '
-        'hit.rank AS rank, '
+        '$rankColumn, '
         'CASE WHEN ${exact.join(' OR ')} THEN 0 '
         'WHEN ${like.join(' OR ')} THEN 1 ELSE 2 END AS tier, '
-        '${[for (final column in columns) 'hit.snippet_${column.name} AS ${matchAlias(column)}'].join(', ')} '
-        'FROM songs '
-        'LEFT JOIN ('
-        'SELECT rowid AS id, '
-        'bm25($tableName, ${columns.map((c) => c.weight).join(', ')}) AS rank, '
-        '$_snippetSelects '
-        'FROM $tableName WHERE $tableName MATCH ?'
-        ') AS hit ON hit.id = songs.id '
-        'WHERE (hit.id IS NOT NULL OR ${whereLike.join(' OR ')})'
+        '$matches '
+        '$from '
+        'WHERE $matchCondition'
         '${extraWhere.isEmpty ? '' : ' AND ($extraWhere)'} '
-        'ORDER BY tier, COALESCE(hit.rank, 0), '
+        'ORDER BY tier, $rankOrder, '
         '${foldExpression('songs.title')}, songs.id '
         'LIMIT ? OFFSET ?';
 
@@ -278,9 +209,9 @@ class SongFtsIndex {
   /// A `SELECT COUNT(*)` query over every row matching the current search (when
   /// [term] is non-empty) and [extraWhere] filters - no ordering, snippets or
   /// limit. Used for the result count in the filters subtitle.
-  ({String sql, List<Variable> variables}) countQuery({
+  static ({String sql, List<Variable> variables}) countQuery({
     String? term,
-    List<SongFtsColumn> fields = const [],
+    List<String> fields = const [],
     String extraWhere = '',
     List<Variable> extraVariables = const [],
   }) {
@@ -293,16 +224,14 @@ class SongFtsIndex {
       assert(fields.isNotEmpty, 'at least one searchable field must take part');
       // Textual order: the MATCH inside the join subquery first, then the
       // LIKE conditions, then the caller's filters.
-      variables.add(
-        Variable<String>(
-          fields.length == columns.length
-              ? term
-              : '{${fields.map((field) => field.name).join(' ')}} : $term',
-        ),
-      );
-      from =
-          'FROM songs LEFT JOIN (SELECT rowid AS id FROM $tableName '
-          'WHERE $tableName MATCH ?) AS hit ON hit.id = songs.id';
+      final ftsFields = _ftsFieldsOf(fields);
+      final hasFts = ftsFields.isNotEmpty;
+      if (hasFts) {
+        variables.add(Variable<String>(_matchString(term, ftsFields)));
+        from =
+            'FROM songs LEFT JOIN (SELECT rowid AS id FROM $tableName '
+            'WHERE $tableName MATCH ?) AS hit ON hit.id = songs.id';
+      }
 
       final like = <String>[];
       final likePattern = '%${_escapeLike(foldTerm(term))}%';
@@ -310,7 +239,11 @@ class SongFtsIndex {
         like.add("${_foldedValue(field)} LIKE ? ESCAPE '\\'");
         variables.add(Variable<String>(likePattern));
       }
-      conditions.add('(hit.id IS NOT NULL OR ${like.join(' OR ')})');
+      conditions.add(
+        hasFts
+            ? '(hit.id IS NOT NULL OR ${like.join(' OR ')})'
+            : '(${like.join(' OR ')})',
+      );
     }
 
     if (extraWhere.isNotEmpty) {
@@ -323,13 +256,4 @@ class SongFtsIndex {
         : ' WHERE ${conditions.join(' AND ')}';
     return (sql: 'SELECT COUNT(*) AS count $from$where', variables: variables);
   }
-
-  /// Escapes LIKE wildcards so the term is matched literally.
-  static String _escapeLike(String term) => term
-      .replaceAll(r'\', r'\\')
-      .replaceAll('%', r'\%')
-      .replaceAll('_', r'\_');
-
-  /// Snippet column alias for [column].
-  String matchAlias(SongFtsColumn column) => 'match_${column.name}';
 }

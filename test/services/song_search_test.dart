@@ -22,7 +22,6 @@ void main() {
   setUp(() async {
     testDb = LyricDatabase(NativeDatabase.memory());
     db = testDb;
-    await db.ensureSearchIndex();
   });
 
   tearDown(() async {
@@ -74,7 +73,7 @@ void main() {
     expect(results[1].match?.tier, 1);
   });
 
-  test('substring hits rank by field group', () async {
+  test('FTS hits rank by bm25, expression-only hits last', () async {
     await db.batch(
       (batch) => batch.insertAll(db.songs, [
         songWith('title-hit', 'Találj meg engem'),
@@ -89,11 +88,13 @@ void main() {
 
     final results = await search('talalj');
 
-    // title (10) > people (5) > lyrics (1)
+    // Only title and lyrics are in the FTS index. Their bm25 weights (10, 1)
+    // rank them, while the composer hit is a LIKE-only match (no FTS rank)
+    // and sorts after them.
     expect(results.map((r) => r.song.uuid).toList(), [
       'title-hit',
-      'people-hit',
       'lyrics-hit',
+      'people-hit',
     ]);
   });
 

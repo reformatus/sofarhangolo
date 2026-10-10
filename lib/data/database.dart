@@ -19,7 +19,6 @@ import 'database.steps.dart';
 import 'preferences/storage.dart';
 import 'song/lyrics/format.dart';
 import 'song/song.dart';
-import 'song/song_fts_index.dart';
 
 part 'database.g.dart';
 
@@ -27,6 +26,7 @@ late LyricDatabase db;
 
 @DriftDatabase(
   tables: [Songs, Banks, Assets, Cues, PreferenceStorage],
+  include: {'song/song.drift'},
 )
 class LyricDatabase extends _$LyricDatabase {
   // LyricDatabase() : super(_openConnection()); //used for debugging
@@ -34,15 +34,7 @@ class LyricDatabase extends _$LyricDatabase {
     : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 9;
-
-  /// Reconciles the app-managed search index (see [SongFtsIndex]) with the
-  /// registry. Called once at startup; a no-op unless the index layout changed.
-  ///
-  /// Deliberately not in [MigrationStrategy.beforeOpen]: the index is not part
-  /// of drift's schema, so running it during migration tests would leave
-  /// unexpected objects behind in the validated database.
-  Future<bool> ensureSearchIndex() => SongFtsIndex.registry.ensure(this);
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration {
@@ -132,18 +124,6 @@ class LyricDatabase extends _$LyricDatabase {
           // written back in the new shape.
           await customStatement(
             "UPDATE banks SET last_updated = '1900-01-01T00:00:00'",
-          );
-        },
-        from8To9: (m, schema) async {
-          // The unified search index became app-managed (see
-          // song_fts_index.dart): drift no longer models it, so drop the
-          // objects v8 owned here. SongFtsIndex.ensure recreates the
-          // registry-driven index on every open, including this one.
-          for (final name in SongFtsIndex.triggerNames) {
-            await customStatement('DROP TRIGGER IF EXISTS $name');
-          }
-          await customStatement(
-            'DROP TABLE IF EXISTS ${SongFtsIndex.tableName}',
           );
         },
       ),
