@@ -460,6 +460,7 @@ class CueShellPanel extends StatelessWidget {
     this.onOpenCueEditor,
     this.onClose,
     this.showDragHandle = false,
+    this.openEditorOnSlideSelect = false,
     super.key,
   });
 
@@ -468,6 +469,12 @@ class CueShellPanel extends StatelessWidget {
   final VoidCallback? onOpenCueEditor;
   final VoidCallback? onClose;
   final bool showDragHandle;
+
+  /// Whether selecting a slide should navigate to the cue editor at that
+  /// slide. Used by the persistent cue sidebar (and tablet drawer) so a tap
+  /// takes the user to that slide in the cue; the mobile bottom sheet keeps
+  /// just changing the cue's current slide.
+  final bool openEditorOnSlideSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -516,6 +523,9 @@ class CueShellPanel extends StatelessWidget {
                         ref
                             .read(activeCueSessionProvider.notifier)
                             .goToSlide(slide.uuid);
+                        if (openEditorOnSlideSelect) {
+                          _openCueEditor(context, slideUuid: slide.uuid);
+                        }
                       },
                     ),
                   ),

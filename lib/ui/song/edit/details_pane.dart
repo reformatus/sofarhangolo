@@ -46,7 +46,7 @@ class _OriginalSongCard extends ConsumerWidget {
     final (statusIcon, statusLabel) = switch (status) {
       OriginalSongStatus.unchanged => (
         Icons.check_circle_outline,
-        'Megegyezik az eredetivel.',
+        'Nem változott.',
       ),
       OriginalSongStatus.changed => (
         Icons.sync_problem_outlined,

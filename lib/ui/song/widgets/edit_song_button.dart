@@ -40,12 +40,11 @@ class EditSongButton extends StatelessWidget {
       builder: (context) => ConfirmDialog(
         title: 'Dal szerkesztése',
         message:
-            'Ez a dal egy táblából származik, ezért nem szerkeszthető '
+            'Ez a dal egy daltárból származik, ezért nem szerkeszthető '
             'közvetlenül. A szerkesztéshez egy helyi másolat készül, ami a '
             '„Helyi dalok” közé kerül.\n\n'
-            'A másolat független az eredetitől: a tábla frissítései nem '
-            'írják felül. Az eredetit továbbra is figyeljük, és jelezzük, '
-            'ha eltér a másolattól.',
+            'A másolat független az eredetitől: a daltár frissítései nem '
+            'írják felül.',
         actionLabel: 'Másolat szerkesztése',
         actionIcon: Icons.edit_outlined,
         actionOnPressed: () async {
