@@ -112,6 +112,22 @@ class ActiveCueShellCard extends StatelessWidget {
         final maxWidth = mediaQuery.size.width >= 700 ? 620.0 : double.infinity;
         final targetHeight = math.min(mediaQuery.size.height * 0.78, 640.0);
 
+        // Close the sheet first, then open the cue editor at the chosen slide
+        // (pushing while the sheet is open would strand it underneath).
+        void openEditorAt(String? slideUuid) {
+          Navigator.of(sheetContext).pop();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!context.mounted) return;
+            context.push(
+              cueRoutePath(
+                session.cue.uuid,
+                CuePageType.edit,
+                slideUuid: slideUuid,
+              ),
+            );
+          });
+        }
+
         return Align(
           alignment: Alignment.bottomCenter,
           child: ConstrainedBox(
@@ -128,19 +144,8 @@ class ActiveCueShellCard extends StatelessWidget {
               ),
               child: CueShellPanel(
                 session: session,
-                onOpenCueEditor: () {
-                  Navigator.of(sheetContext).pop();
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (!context.mounted) return;
-                    context.push(
-                      cueRoutePath(
-                        session.cue.uuid,
-                        CuePageType.edit,
-                        slideUuid: session.currentSlideUuid,
-                      ),
-                    );
-                  });
-                },
+                onOpenCueEditor: () => openEditorAt(session.currentSlideUuid),
+                onSlideSelected: (slide) => openEditorAt(slide.uuid),
                 onClose: () => Navigator.of(sheetContext).pop(),
                 showDragHandle: true,
               ),
@@ -458,6 +463,7 @@ class CueShellPanel extends StatelessWidget {
     required this.session,
     this.listVisible = true,
     this.onOpenCueEditor,
+    this.onSlideSelected,
     this.onClose,
     this.showDragHandle = false,
     this.openEditorOnSlideSelect = false,
@@ -467,13 +473,19 @@ class CueShellPanel extends StatelessWidget {
   final CueSession session;
   final bool listVisible;
   final VoidCallback? onOpenCueEditor;
+
+  /// Overrides the default slide-selection behaviour entirely. The panel
+  /// always jumps the cue to the tapped slide first; this then decides what
+  /// else happens. The mobile sheet uses it to dismiss itself before
+  /// navigating.
+  final ValueChanged<Slide>? onSlideSelected;
+
   final VoidCallback? onClose;
   final bool showDragHandle;
 
   /// Whether selecting a slide should navigate to the cue editor at that
-  /// slide. Used by the persistent cue sidebar (and tablet drawer) so a tap
-  /// takes the user to that slide in the cue; the mobile bottom sheet keeps
-  /// just changing the cue's current slide.
+  /// slide, so a tap takes the user to that slide in the cue. Used by the
+  /// persistent cue sidebar and the tablet drawer.
   final bool openEditorOnSlideSelect;
 
   @override
@@ -523,7 +535,10 @@ class CueShellPanel extends StatelessWidget {
                         ref
                             .read(activeCueSessionProvider.notifier)
                             .goToSlide(slide.uuid);
-                        if (openEditorOnSlideSelect) {
+                        final handler = onSlideSelected;
+                        if (handler != null) {
+                          handler(slide);
+                        } else if (openEditorOnSlideSelect) {
                           _openCueEditor(context, slideUuid: slide.uuid);
                         }
                       },

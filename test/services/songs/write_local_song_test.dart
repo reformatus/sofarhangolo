@@ -152,7 +152,7 @@ void main() {
       addTearDown(container.dispose);
 
       expect(
-        await container.read(originalSongStatusProvider(original).future),
+        await readStatus(container, original),
         isNull,
       );
     });
@@ -166,7 +166,7 @@ void main() {
       addTearDown(container.dispose);
 
       expect(
-        await container.read(originalSongStatusProvider(copy).future),
+        await readStatus(container, copy),
         OriginalSongStatus.unchanged,
       );
     });
@@ -185,7 +185,7 @@ void main() {
       addTearDown(container.dispose);
 
       expect(
-        await container.read(originalSongStatusProvider(copy).future),
+        await readStatus(container, copy),
         OriginalSongStatus.changed,
       );
     });
@@ -201,9 +201,62 @@ void main() {
       addTearDown(container.dispose);
 
       expect(
-        await container.read(originalSongStatusProvider(copy).future),
+        await readStatus(container, copy),
         OriginalSongStatus.missing,
       );
+    });
+
+    test('is live: re-emits when the original changes or disappears', () async {
+      final original = bankSong(
+        'orig-live',
+        lyrics: '<song><lyrics>a</lyrics></song>',
+      );
+      await db.into(db.songs).insert(original);
+      final copy = await copySongToLocal(original);
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final sub = container.listen(
+        originalSongStatusProvider(copy),
+        (_, _) {},
+      );
+      addTearDown(sub.close);
+
+      OriginalSongStatus? status() =>
+          container.read(originalSongStatusProvider(copy)).value;
+
+      await _until(() => status() == OriginalSongStatus.unchanged);
+
+      await (db.songs.update()..where((s) => s.uuid.equals(original.uuid)))
+          .write(
+            SongsCompanion(lyrics: Value('<song><lyrics>b</lyrics></song>')),
+          );
+      await _until(() => status() == OriginalSongStatus.changed);
+
+      await (db.songs.delete()..where((s) => s.uuid.equals(original.uuid))).go();
+      await _until(() => status() == OriginalSongStatus.missing);
+    });
+  });
+
+  group('originalSong', () {
+    test('reflects a live title change of the original', () async {
+      final original = bankSong('orig-title');
+      await db.into(db.songs).insert(original);
+      final copy = await copySongToLocal(original);
+
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final sub = container.listen(originalSongProvider(copy), (_, _) {});
+      addTearDown(sub.close);
+
+      String? title() =>
+          container.read(originalSongProvider(copy)).value?.title;
+
+      await _until(() => title() == 'Song orig-title');
+
+      await (db.songs.update()..where((s) => s.uuid.equals(original.uuid)))
+          .write(const SongsCompanion(title: Value('Új cím')));
+      await _until(() => title() == 'Új cím');
     });
   });
 
@@ -294,4 +347,33 @@ void main() {
       expect(assets, isEmpty);
     });
   });
+}
+
+/// Reads the first value of [originalSongStatusProvider] while keeping it
+/// alive: the provider is auto-dispose, so a bare `read(...future)` without a
+/// listener disposes it mid-load.
+Future<OriginalSongStatus?> readStatus(
+  ProviderContainer container,
+  Song song,
+) async {
+  final sub = container.listen(originalSongStatusProvider(song), (_, _) {});
+  addTearDown(sub.close);
+  return container.read(originalSongStatusProvider(song).future);
+}
+
+/// Polls [predicate] until it holds, failing after a short timeout.
+///
+/// Drift streams emit asynchronously, so live-provider tests wait for the
+/// expected value rather than assuming a single microtask.
+Future<void> _until(
+  bool Function() predicate, {
+  Duration timeout = const Duration(seconds: 5),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (!predicate()) {
+    if (DateTime.now().isAfter(deadline)) {
+      throw StateError('Condition not met before $timeout elapsed');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
 }
