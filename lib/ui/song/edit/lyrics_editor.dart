@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../common/error/card.dart';
-import '../../common/error/dialog.dart';
+import '../../../config/config.dart';
 import '../../common/monospace.dart';
 
 /// Full-bleed, monospace lyrics editor for the OpenSong format.
@@ -104,22 +104,63 @@ class _OpenSongLyricsEditorState extends State<OpenSongLyricsEditor> {
   }
 }
 
-/// Opens the OpenSong format help using the project's shared dialog.
+/// Opens the OpenSong format help, matching the app's other dialogs: a title
+/// bar with a close button on the right.
 Future<void> showOpenSongHelpDialog(BuildContext context) {
-  return showDialog(
-    context: context,
-    builder: (context) => const ErrorDialog(
-      type: LErrorType.info,
-      title: 'OpenSong formátum',
-      message:
-          'A dalszöveg szakaszokból áll. Minden szakasz egy szögletes '
-          'zárójeles címkével kezdődik egy saját sorban, például [Verze] '
-          'vagy [Refrén].\n\n'
-          'A ponttal (.) kezdődő sorok akkordsorok: a bennük lévő akkordok '
-          'a következő szöveges sorhoz tartoznak, és szóközökkel igazodnak '
-          'a hangzatokhoz.',
-      icon: Icons.help_outline,
-      showReportButton: false,
-    ),
-  );
+  return showDialog(context: context, builder: (context) => const _OpenSongHelpDialog());
+}
+
+class _OpenSongHelpDialog extends StatelessWidget {
+  const _OpenSongHelpDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      clipBehavior: Clip.antiAlias,
+      insetPadding: const EdgeInsets.all(10),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: appConfig.breakpoints.tabletFromWidth,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AppBar(
+              title: const Text('OpenSong formátum'),
+              automaticallyImplyLeading: false,
+              actions: [
+                IconButton(
+                  onPressed: context.pop,
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+              actionsPadding: const EdgeInsets.only(right: 8),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  spacing: 12,
+                  children: [
+                    Text(
+                      'A dalszöveg szakaszokból áll. Minden szakasz egy '
+                      'szögletes zárójeles címkével kezdődik egy saját sorban, '
+                      'például [Verze] vagy [Refrén].',
+                    ),
+                    Text(
+                      'A ponttal (.) kezdődő sorok akkordsorok: a bennük lévő '
+                      'akkordok a következő szöveges sorhoz tartoznak, és '
+                      'szóközökkel igazodnak a hangzatokhoz.',
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

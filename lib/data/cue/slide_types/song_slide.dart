@@ -34,8 +34,13 @@ class SongSlide extends Slide {
       sharedContentHash != null &&
       live.contentHash != sharedContentHash;
 
-  /// [contentDiffersFrom] against the currently cached song.
-  bool get contentDifferent => contentDiffersFrom(song);
+  /// Whether [live] differs from what was added AND the change came from
+  /// someone other than the user. A bank-owned song can only change through a
+  /// bank update (editing copies to local first), so it is worth warning
+  /// about; a local song can only have been changed by the user themselves,
+  /// which needs no warning.
+  bool contentChangedByOthers(Song? live) =>
+      contentDiffersFrom(live) && live!.sourceBank != localBankUuid;
 
   @override
   String get title => song?.title ?? sharedTitle ?? 'Hiányzó dal';

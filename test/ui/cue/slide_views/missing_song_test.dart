@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sofarhangolo/data/cue/slide.dart';
 import 'package:sofarhangolo/data/song/song.dart';
 import 'package:sofarhangolo/services/song/song_content.dart';
+import 'package:sofarhangolo/ui/cue/slide_views/missing_song.dart';
 import 'package:sofarhangolo/ui/cue/slide_views/song.dart';
 import 'package:sofarhangolo/ui/song/state.dart';
 
@@ -34,7 +35,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('A dal nem található'), findsOneWidget);
+    // Single shared wording, shown on the centered card.
+    expect(find.text(missingSongTitle), findsOneWidget);
+    expect(find.text(missingSongMessage), findsOneWidget);
+    // The delete action lives on the centered card, not a sidebar.
+    expect(find.text(missingSongRemoveLabel), findsOneWidget);
   });
 
   testWidgets('a present song renders normally', (tester) async {
@@ -66,6 +71,6 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('A dal nem található'), findsNothing);
+    expect(find.text(missingSongTitle), findsNothing);
   });
 }

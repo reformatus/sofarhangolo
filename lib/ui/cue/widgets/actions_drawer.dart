@@ -49,8 +49,10 @@ class _ActionsDrawerState extends ConsumerState<ActionsDrawer> {
     );
   }
 
-  /// Actions for the current song slide. When the referenced song is missing,
-  /// only an explanatory card and a remove action are offered.
+  /// Actions for the current song slide.
+  ///
+  /// A missing song is handled entirely by the centered slide view (single
+  /// wording + its own remove action), so the drawer adds nothing there.
   List<Widget> _songSlideActions(
     BuildContext context,
     WidgetRef ref,
@@ -58,31 +60,15 @@ class _ActionsDrawerState extends ConsumerState<ActionsDrawer> {
   ) {
     final liveSong = resolveLiveSong(ref, songSlide);
 
-    if (liveSong == null) {
-      return [
-        const LErrorCard(
-          type: LErrorType.warning,
-          title: 'A dal nem található',
-          icon: Icons.music_off,
-          message:
-              'Ez a dal nincs meg ezen az eszközön. Eltávolíthatod a listából.',
-          showReportButton: false,
-        ),
-        const SizedBox(height: 8),
-        FilledButton.tonalIcon(
-          onPressed: () => ref
-              .read(activeCueSessionProvider.notifier)
-              .removeSlide(songSlide.uuid),
-          icon: const Icon(Icons.delete_outline),
-          label: const Text('Eltávolítás a listából'),
-        ),
-      ];
-    }
+    if (liveSong == null) return const [];
+
+    // Only warn about drift for changes the user did not make themselves.
+    final changedByOther = songSlide.contentChangedByOthers(liveSong);
 
     return [
-      if (songSlide.contentDiffersFrom(liveSong)) ...[
+      if (changedByOther) ...[
         const LErrorCard(
-          type: LErrorType.warning,
+          type: LErrorType.info,
           title: 'Dal megváltozott',
           icon: Icons.edit_square,
           message: 'A dal tartalma megváltozott a listához adás óta.',
