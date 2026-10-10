@@ -40,9 +40,7 @@ class SongFtsIndex {
   /// Builds the index layout from the registry: every field marked with the
   /// text search use, in registry order. Title and lyrics are core fields, so
   /// they are backed by their own columns.
-  factory SongFtsIndex.fromRegistry([
-    Map<String, SongField>? registry,
-  ]) {
+  factory SongFtsIndex.fromRegistry([Map<String, SongField>? registry]) {
     return SongFtsIndex([
       for (final field in (registry ?? defaultSongFieldRegistry).values)
         if (field.hasSearchUse)
@@ -181,7 +179,8 @@ class SongFtsIndex {
   static String foldExpression(String expression) {
     var sql = 'lower($expression)';
     for (final entry in _foldReplacements.entries) {
-      sql = "replace(replace($sql, '${entry.key}', '${entry.value}'), "
+      sql =
+          "replace(replace($sql, '${entry.key}', '${entry.value}'), "
           "'${entry.key.toUpperCase()}', '${entry.value}')";
     }
     return sql;
@@ -259,10 +258,7 @@ class SongFtsIndex {
         'hit.rank AS rank, '
         'CASE WHEN ${exact.join(' OR ')} THEN 0 '
         'WHEN ${like.join(' OR ')} THEN 1 ELSE 2 END AS tier, '
-        '${[
-          for (final column in columns)
-            'hit.snippet_${column.name} AS ${matchAlias(column)}',
-        ].join(', ')} '
+        '${[for (final column in columns) 'hit.snippet_${column.name} AS ${matchAlias(column)}'].join(', ')} '
         'FROM songs '
         'LEFT JOIN ('
         'SELECT rowid AS id, '
@@ -270,7 +266,7 @@ class SongFtsIndex {
         '$_snippetSelects '
         'FROM $tableName WHERE $tableName MATCH ?'
         ') AS hit ON hit.id = songs.id '
-        'WHERE hit.id IS NOT NULL OR ${whereLike.join(' OR ')}'
+        'WHERE (hit.id IS NOT NULL OR ${whereLike.join(' OR ')})'
         '${extraWhere.isEmpty ? '' : ' AND ($extraWhere)'} '
         'ORDER BY tier, COALESCE(hit.rank, 0), '
         '${foldExpression('songs.title')}, songs.id '
@@ -279,10 +275,9 @@ class SongFtsIndex {
     return (sql: sql, variables: variables);
   }
 
-  /// A `SELECT songs.key_field` query over every row matching the current
-  /// search (when [term] is non-empty) and [extraWhere] filters - no ordering,
-  /// snippets or limit. Used to count matches: the key filter is applied in
-  /// Dart (see filter.dart), so counting needs each row's key field.
+  /// A `SELECT COUNT(*)` query over every row matching the current search (when
+  /// [term] is non-empty) and [extraWhere] filters - no ordering, snippets or
+  /// limit. Used for the result count in the filters subtitle.
   ({String sql, List<Variable> variables}) countQuery({
     String? term,
     List<SongFtsColumn> fields = const [],
@@ -326,10 +321,7 @@ class SongFtsIndex {
     final where = conditions.isEmpty
         ? ''
         : ' WHERE ${conditions.join(' AND ')}';
-    return (
-      sql: 'SELECT songs.key_field AS key_field $from$where',
-      variables: variables,
-    );
+    return (sql: 'SELECT COUNT(*) AS count $from$where', variables: variables);
   }
 
   /// Escapes LIKE wildcards so the term is matched literally.

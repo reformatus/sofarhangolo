@@ -78,7 +78,11 @@ void main() {
     await db.batch(
       (batch) => batch.insertAll(db.songs, [
         songWith('title-hit', 'Találj meg engem'),
-        songWith('people-hit', 'Másik dal', contentMap: {'composer': 'Találj meg'}),
+        songWith(
+          'people-hit',
+          'Másik dal',
+          contentMap: {'composer': 'Találj meg'},
+        ),
         songWith('lyrics-hit', 'Harmadik', lyrics: 'találj a szövegben'),
       ]),
     );
@@ -122,10 +126,12 @@ void main() {
   });
 
   test('reports per-field snippets with the highlight tags', () async {
-    await db.batch((batch) => batch.insertAll(db.songs, [
-      songWith('title-hit', 'Találj meg engem'),
-      songWith('people-hit', 'Másik dal', contentMap: {'composer': 'Találj'}),
-    ]));
+    await db.batch(
+      (batch) => batch.insertAll(db.songs, [
+        songWith('title-hit', 'Találj meg engem'),
+        songWith('people-hit', 'Másik dal', contentMap: {'composer': 'Találj'}),
+      ]),
+    );
 
     final results = await search('talalj');
     final byUuid = {for (final r in results) r.song.uuid: r.match};
@@ -136,10 +142,12 @@ void main() {
   });
 
   test('restricts the match to the selected fields', () async {
-    await db.batch((batch) => batch.insertAll(db.songs, [
-      songWith('title-hit', 'Találj meg engem'),
-      songWith('people-hit', 'Másik dal', contentMap: {'composer': 'Találj'}),
-    ]));
+    await db.batch(
+      (batch) => batch.insertAll(db.songs, [
+        songWith('title-hit', 'Találj meg engem'),
+        songWith('people-hit', 'Másik dal', contentMap: {'composer': 'Találj'}),
+      ]),
+    );
 
     final results = await search('talalj', fields: ['composer']);
 
@@ -206,10 +214,7 @@ void main() {
     );
 
     expect(await count(), 2);
-    expect(
-      await count(keyFilters: (pitches: {'C'}, modes: {}, keys: {})),
-      1,
-    );
+    expect(await count(keyFilters: (pitches: {'C'}, modes: {}, keys: {})), 1);
   });
 
   test('returns typed songs with their assets', () async {
@@ -219,5 +224,41 @@ void main() {
 
     expect(results.single.song.title, 'Találj meg');
     expect(results.single.downloadedAssets, isEmpty);
+  });
+
+  test('the key filter applies in the search path too', () async {
+    await db.batch(
+      (batch) => batch.insertAll(db.songs, [
+        songWith('c-major', 'Találj meg', keyField: [KeyField('C', 'dúr')]),
+        songWith('a-minor', 'Találj velem', keyField: [KeyField('A', 'moll')]),
+        songWith('no-key', 'Találj értem'),
+      ]),
+    );
+
+    Future<Set<String>> uuids(KeyFilters keyFilters) => searchSongs(
+      searchString: 'talalj',
+      searchFields: const [],
+      filters: const {},
+      bankFilters: const {},
+      keyFilters: keyFilters,
+      limit: 50,
+    ).first.then((results) => results.map((r) => r.song.uuid).toSet());
+
+    expect(await uuids(noKeyFilters), {'c-major', 'a-minor', 'no-key'});
+    expect(
+      await uuids((pitches: {'C'}, modes: <String>{}, keys: <KeyField>{})),
+      {'c-major'},
+    );
+    expect(await uuids((pitches: {'A'}, modes: {'moll'}, keys: <KeyField>{})), {
+      'a-minor',
+    });
+    expect(
+      await uuids((
+        pitches: <String>{},
+        modes: <String>{},
+        keys: {KeyField('C', 'dúr')},
+      )),
+      {'c-major'},
+    );
   });
 }

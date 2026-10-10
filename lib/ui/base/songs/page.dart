@@ -69,8 +69,6 @@ class _SongsPageState extends ConsumerState<SongsPage> {
   void _loadMoreIfNeeded(int index, int loadedCount, bool isLoading) {
     if (index < loadedCount - 1) return;
     if (isLoading) return;
-    // Only the search path paginates - the plain filtered list is unbounded.
-    if (ref.read(searchStringStateProvider).trim().isEmpty) return;
     // The last page was not full, so there is nothing left to load.
     if (loadedCount < ref.read(songResultsLimitProvider)) return;
 

@@ -1,4 +1,3 @@
-import 'package:diacritic/diacritic.dart';
 import 'package:drift/drift.dart';
 // ignore: experimental_member_use
 import 'package:drift/extensions/json1.dart';
@@ -172,74 +171,38 @@ class SongResultsLimit extends _$SongResultsLimit {
 
 @Riverpod(keepAlive: true)
 Stream<List<SongResult>> filteredSongs(Ref ref) {
-  final String searchString = sanitize(ref.watch(searchStringStateProvider));
-  final List<String> searchFields = ref.watch(searchFieldsStateProvider);
-  final int limit = ref.watch(songResultsLimitProvider);
-  final Map<String, List<String>> filters = ref.watch(
-    multiselectTagsFilterStateProvider,
+  return songResults(
+    searchString: sanitize(ref.watch(searchStringStateProvider)),
+    searchFields: ref.watch(searchFieldsStateProvider),
+    filters: ref.watch(multiselectTagsFilterStateProvider),
+    bankFilters: ref.watch(banksFilterStateProvider),
+    keyFilters: ref.watch(keyFilterStateProvider),
+    limit: ref.watch(songResultsLimitProvider),
   );
-  final KeyFilters keyFilters = ref.watch(keyFilterStateProvider);
-  final Set<String> bankFilters = ref.watch(banksFilterStateProvider);
+}
 
-  Expression<bool> filterExpression(Songs songs) {
-    return Expression.and(
-      filters.entries
-          .map((entry) {
-            final fieldData = songs.contentMap.jsonExtract<String>(
-              '\$.${entry.key}',
-            );
-            // json_extract unquotes scalars but keeps array elements
-            // quoted, so list fields match on the quoted element (avoids
-            // substring hits inside longer values) while text fields match
-            // plainly.
-            return Expression.or(
-              entry.value.map((value) {
-                final likePattern = bankApiListValueFields.contains(entry.key)
-                    ? '%"$value"%'
-                    : '%$value%';
-                return fieldData.like(likePattern);
-              }),
-            );
-          })
-          .followedBy([
-            if (bankFilters.isNotEmpty)
-              Expression.or(bankFilters.map((b) => songs.sourceBank.equals(b))),
-          ]),
+/// The one paginated query behind the songs page.
+///
+/// [limit] always applies - with or without a search term - so the page grows
+/// its window by the same rule in both cases (see [SongResultsLimit]). Without
+/// a term the songs are ordered by folded title; with one, by the relevance
+/// order of [searchSongs]. Both apply the same tag, bank and key filters.
+Stream<List<SongResult>> songResults({
+  required String searchString,
+  required List<String> searchFields,
+  required Map<String, List<String>> filters,
+  required Set<String> bankFilters,
+  required KeyFilters keyFilters,
+  required int limit,
+}) {
+  if (searchString.isEmpty) {
+    return filteredSongsPage(
+      filters: filters,
+      bankFilters: bankFilters,
+      keyFilters: keyFilters,
+      limit: limit,
     );
   }
-
-  if (searchString.isEmpty) {
-    return ((db.select(db.songs).addColumns([
-                subqueryExpression(downloadedAssetsSubquery),
-              ])
-              // Sort afterwards to handle diacritics
-              // ..orderBy([OrderingTerm.asc(db.songs.title)])
-              ..where(filterExpression(db.songs)))
-            .watch())
-        .map(
-          (resultList) =>
-              resultList
-                  .map(
-                    (result) => SongResult(
-                      result.readTable(db.songs),
-                      downloadedAssets:
-                          (result.rawData.readNullableWithType(
-                            DriftSqlType.string,
-                            'c0',
-                          ))?.split(',') ??
-                          [],
-                    ),
-                  )
-                  .where((result) => matchesKeyFilters(result.song, keyFilters))
-                  .toList()
-                ..sort(
-                  (a, b) =>
-                      removeDiacritics(a.song.title)
-                          .compareTo(removeDiacritics(b.song.title)),
-                ),
-        );
-  }
-
   return searchSongs(
     searchString: searchString,
     searchFields: searchFields,
@@ -248,6 +211,110 @@ Stream<List<SongResult>> filteredSongs(Ref ref) {
     keyFilters: keyFilters,
     limit: limit,
   );
+}
+
+/// `songs.title` folded for a diacritic-insensitive order - the SQL equivalent
+/// of the Dart `removeDiacritics(...).compareTo(...)` sort it replaces (see
+/// [SongFtsIndex.foldExpression]).
+final String foldedTitle = SongFtsIndex.foldExpression('songs.title');
+
+/// The plain listing: songs matching the filters only, ordered by folded title
+/// and paged with [limit].
+Stream<List<SongResult>> filteredSongsPage({
+  required Map<String, List<String>> filters,
+  required Set<String> bankFilters,
+  required KeyFilters keyFilters,
+  required int limit,
+}) {
+  return (db.select(db.songs).addColumns([
+          subqueryExpression(downloadedAssetsSubquery),
+        ])
+        ..where(filterExpression(db.songs, filters, bankFilters, keyFilters))
+        ..orderBy([
+          OrderingTerm.asc(CustomExpression<String>(foldedTitle)),
+          OrderingTerm.asc(db.songs.id),
+        ])
+        ..limit(limit))
+      .watch()
+      .map(
+        (rows) => [
+          for (final row in rows)
+            SongResult(
+              row.readTable(db.songs),
+              downloadedAssets:
+                  row.rawData
+                      .readNullableWithType(DriftSqlType.string, 'c0')
+                      ?.split(',') ??
+                  const <String>[],
+            ),
+        ],
+      );
+}
+
+/// Drift expression for the tag and bank filters plus the key filter, used by
+/// the plain listing ([filteredSongsPage]).
+Expression<bool> filterExpression(
+  Songs songs,
+  Map<String, List<String>> filters,
+  Set<String> bankFilters,
+  KeyFilters keyFilters,
+) {
+  return Expression.and(
+    filters.entries
+        .map((entry) {
+          final fieldData = songs.contentMap.jsonExtract<String>(
+            '\$.${entry.key}',
+          );
+          // json_extract unquotes scalars but keeps array elements
+          // quoted, so list fields match on the quoted element (avoids
+          // substring hits inside longer values) while text fields match
+          // plainly.
+          return Expression.or(
+            entry.value.map((value) {
+              final likePattern = bankApiListValueFields.contains(entry.key)
+                  ? '%"$value"%'
+                  : '%$value%';
+              return fieldData.like(likePattern);
+            }),
+          );
+        })
+        .followedBy([
+          if (bankFilters.isNotEmpty)
+            Expression.or(bankFilters.map((b) => songs.sourceBank.equals(b))),
+          keyFilterExpression(songs, keyFilters),
+        ]),
+  );
+}
+
+/// SQL mirror of [matchesKeyFilters]: `key_field` stores a song's keys as
+/// `pitch-mode` joined with ', '. A complete key is a plain substring, a pitch
+/// anchors on the trailing dash and a mode on the leading one. Pitch and mode
+/// may be satisfied by different keys, exactly as [matchesKeyFilters] allows.
+Expression<bool> keyFilterExpression(Songs songs, KeyFilters keyFilters) {
+  if (keyFilters.isEmpty) return const Constant(true);
+
+  final parts = <Expression<bool>>[];
+  if (keyFilters.keys.isNotEmpty) {
+    parts.add(
+      Expression.or(
+        keyFilters.keys.map((key) => songs.keyField.like('%$key%')),
+      ),
+    );
+  }
+  if (keyFilters.pitches.isNotEmpty || keyFilters.modes.isNotEmpty) {
+    final pitch = keyFilters.pitches.isEmpty
+        ? const Constant(true)
+        : Expression.or(
+            keyFilters.pitches.map((pitch) => songs.keyField.like('%$pitch-%')),
+          );
+    final mode = keyFilters.modes.isEmpty
+        ? const Constant(true)
+        : Expression.or(
+            keyFilters.modes.map((mode) => songs.keyField.like('%-$mode%')),
+          );
+    parts.add(pitch & mode);
+  }
+  return Expression.or(parts);
 }
 
 /// The searchable columns selected by [searchFields]; all of them when the
@@ -262,11 +329,12 @@ List<SongFtsColumn> searchableColumns(List<String> searchFields) {
   return fields;
 }
 
-/// SQL `WHERE` for the tag and bank filters, shared by the search query and the
-/// match count so both see the same rows.
+/// SQL `WHERE` for the tag, bank and key filters, shared by the search query
+/// and the match count so both see the same rows.
 ({String where, List<Variable> variables}) filterWhere(
   Map<String, List<String>> filters,
   Set<String> bankFilters,
+  KeyFilters keyFilters,
 ) {
   final variables = <Variable>[];
   final clauses = <String>[];
@@ -287,8 +355,40 @@ List<SongFtsColumn> searchableColumns(List<String> searchFields) {
     if (valueClauses.isNotEmpty) clauses.add('(${valueClauses.join(' OR ')})');
   }
   if (bankFilters.isNotEmpty) {
-    clauses.add('(${bankFilters.map((_) => 'songs.source_bank = ?').join(' OR ')})');
+    clauses.add(
+      '(${bankFilters.map((_) => 'songs.source_bank = ?').join(' OR ')})',
+    );
     variables.addAll(bankFilters.map(Variable<String>.new));
+  }
+  if (keyFilters.isNotEmpty) {
+    // Mirrors [matchesKeyFilters] / [keyFilterExpression]: complete keys are
+    // plain substrings, a pitch anchors on the trailing dash, a mode on the
+    // leading one, and pitch/mode may come from different keys.
+    final keyClauses = <String>[];
+    if (keyFilters.keys.isNotEmpty) {
+      keyClauses.add(
+        '(${keyFilters.keys.map((_) => 'songs.key_field LIKE ?').join(' OR ')})',
+      );
+      variables.addAll(
+        keyFilters.keys.map((key) => Variable<String>('%$key%')),
+      );
+    }
+    if (keyFilters.pitches.isNotEmpty || keyFilters.modes.isNotEmpty) {
+      final pitch = keyFilters.pitches.isEmpty
+          ? '1'
+          : '(${keyFilters.pitches.map((_) => 'songs.key_field LIKE ?').join(' OR ')})';
+      variables.addAll(
+        keyFilters.pitches.map((pitch) => Variable<String>('%$pitch-%')),
+      );
+      final mode = keyFilters.modes.isEmpty
+          ? '1'
+          : '(${keyFilters.modes.map((_) => 'songs.key_field LIKE ?').join(' OR ')})';
+      variables.addAll(
+        keyFilters.modes.map((mode) => Variable<String>('%-$mode%')),
+      );
+      keyClauses.add('($pitch AND $mode)');
+    }
+    clauses.add('(${keyClauses.join(' OR ')})');
   }
 
   return (where: clauses.join(' AND '), variables: variables);
@@ -296,8 +396,8 @@ List<SongFtsColumn> searchableColumns(List<String> searchFields) {
 
 /// Total number of songs matching the current search and filters.
 ///
-/// The key filter is applied in Dart exactly as [searchSongs] applies it, so
-/// the count agrees with the results even though those are paginated.
+/// Uses the same [filterWhere] predicates as the page query, so the count
+/// agrees with the results even though those are paginated.
 Stream<int> countSongs({
   required String searchString,
   required List<String> searchFields,
@@ -305,7 +405,7 @@ Stream<int> countSongs({
   required Set<String> bankFilters,
   required KeyFilters keyFilters,
 }) {
-  final extra = filterWhere(filters, bankFilters);
+  final extra = filterWhere(filters, bankFilters, keyFilters);
   final query = SongFtsIndex.registry.countQuery(
     term: searchString.isEmpty ? null : searchString,
     fields: searchableColumns(searchFields),
@@ -320,21 +420,7 @@ Stream<int> countSongs({
         readsFrom: {db.songs},
       )
       .watch()
-      .map(
-        (rows) => rows
-            .where(
-              (row) => matchesKeyField(
-                _keyFieldOf(row.readNullable<String>('key_field')),
-                keyFilters,
-              ),
-            )
-            .length,
-      );
-}
-
-List<KeyField> _keyFieldOf(String? raw) {
-  if (raw == null || raw.isEmpty) return const [];
-  return const KeyFieldConverter().fromSql(raw);
+      .map((rows) => rows.first.read<int>('count'));
 }
 
 /// Searches through the app-managed FTS index (see [SongFtsIndex]). The index
@@ -355,7 +441,7 @@ Stream<List<SongResult>> searchSongs({
 }) {
   final index = SongFtsIndex.registry;
   final fields = searchableColumns(searchFields);
-  final extra = filterWhere(filters, bankFilters);
+  final extra = filterWhere(filters, bankFilters, keyFilters);
 
   final query = index.buildSearchQuery(
     term: searchString,
@@ -368,17 +454,19 @@ Stream<List<SongResult>> searchSongs({
   final foldedTerm = SongFtsIndex.foldTerm(searchString);
 
   return db
-      .customSelect(query.sql, variables: query.variables, readsFrom: {db.songs})
+      .customSelect(
+        query.sql,
+        variables: query.variables,
+        readsFrom: {db.songs},
+      )
       .watch()
       .asyncMap((hits) async {
         if (hits.isEmpty) return const <SongResult>[];
 
         final uuids = [for (final hit in hits) hit.read<String>('uuid')];
-        final rows =
-            await (db.select(db.songs)
-                  .addColumns([subqueryExpression(downloadedAssetsSubquery)])
-                  ..where(db.songs.uuid.isIn(uuids)))
-                .get();
+        final rows = await (db.select(db.songs).addColumns([
+          subqueryExpression(downloadedAssetsSubquery),
+        ])..where(db.songs.uuid.isIn(uuids))).get();
         final songsByUuid = {
           for (final row in rows) row.readTable(db.songs).uuid: row,
         };
@@ -404,7 +492,7 @@ Stream<List<SongResult>> searchSongs({
                   ),
                 ),
               ),
-        ].where((result) => matchesKeyFilters(result.song, keyFilters)).toList();
+        ];
       });
 }
 
@@ -452,7 +540,9 @@ String? _snippetFor(String value, String foldedTerm) {
   const context = 20;
   final start = index - context < 0 ? 0 : index - context;
   final matchEnd = index + foldedTerm.length;
-  final end = matchEnd + context > value.length ? value.length : matchEnd + context;
+  final end = matchEnd + context > value.length
+      ? value.length
+      : matchEnd + context;
 
   return '${start > 0 ? '...' : ''}${value.substring(start, index)}'
       '${SongFtsIndex.snippetStart}${value.substring(index, matchEnd)}'

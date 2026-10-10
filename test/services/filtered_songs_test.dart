@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sofarhangolo/data/database.dart';
 import 'package:sofarhangolo/data/song/song.dart';
 import 'package:sofarhangolo/services/songs/filter.dart';
+import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/key/state.dart';
 import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/multiselect-tags/state.dart';
 import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/search/state.dart';
 
@@ -75,6 +76,28 @@ void main() {
       await testDb
           .into(testDb.songs)
           .insert(_song('s3', 'Magyar song', {'language': 'magyar'}));
+      // Songs with key fields, for the key-filter parity test.
+      await testDb
+          .into(testDb.songs)
+          .insert(
+            _song('k1', 'K1', {
+              'key': ['C-dúr'],
+            }),
+          );
+      await testDb
+          .into(testDb.songs)
+          .insert(
+            _song('k2', 'K2', {
+              'key': ['A-moll'],
+            }),
+          );
+      await testDb
+          .into(testDb.songs)
+          .insert(
+            _song('k3', 'K3', {
+              'key': ['C-dúr', 'A-moll'],
+            }),
+          );
     });
 
     tearDownAll(() async {
@@ -134,6 +157,59 @@ void main() {
         }),
         isEmpty,
       );
+    });
+
+    // The plain listing (no search) shares this group's database, since
+    // downloadedAssetsSubquery is global.
+    const noKeyFilters = (
+      pitches: <String>{},
+      modes: <String>{},
+      keys: <KeyField>{},
+    );
+
+    Future<List<SongResult>> page({
+      int limit = 100,
+      KeyFilters keyFilters = noKeyFilters,
+    }) => filteredSongsPage(
+      filters: const {},
+      bankFilters: const {},
+      keyFilters: keyFilters,
+      limit: limit,
+    ).first;
+
+    test('is paginated and ordered by folded title', () async {
+      final all = await page();
+      expect(all, hasLength(6));
+
+      final firstPage = await page(limit: 2);
+      expect(firstPage, hasLength(2));
+      // A page is a prefix of the full, deterministically ordered listing.
+      expect(
+        firstPage.map((r) => r.song.uuid),
+        all.take(2).map((r) => r.song.uuid),
+      );
+    });
+
+    test('SQL key filter mirrors matchesKeyFilters', () async {
+      final songs = await (db.select(db.songs)).get();
+      final cases = <KeyFilters>[
+        (pitches: {'C'}, modes: <String>{}, keys: <KeyField>{}),
+        (pitches: <String>{}, modes: {'moll'}, keys: <KeyField>{}),
+        (pitches: {'C'}, modes: {'moll'}, keys: <KeyField>{}),
+        (pitches: {'A'}, modes: {'moll'}, keys: <KeyField>{}),
+        (pitches: <String>{}, modes: <String>{}, keys: {KeyField('C', 'dúr')}),
+      ];
+
+      for (final keyFilters in cases) {
+        final expected = songs
+            .where((song) => matchesKeyFilters(song, keyFilters))
+            .map((song) => song.uuid)
+            .toSet();
+        final actual = (await page(keyFilters: keyFilters))
+            .map((r) => r.song.uuid)
+            .toSet();
+        expect(actual, expected, reason: 'key filter $keyFilters');
+      }
     });
   });
 }
