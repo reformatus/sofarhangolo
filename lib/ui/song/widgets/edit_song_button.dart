@@ -23,10 +23,17 @@ class EditSongButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLocal) {
+      return FilledButton.tonalIcon(
+        onPressed: () => _edit(context),
+        icon: const Icon(Icons.edit_outlined),
+        label: const Text('Szerkesztés'),
+      );
+    }
     return TextButton.icon(
       onPressed: () => _edit(context),
       icon: const Icon(Icons.edit_outlined),
-      label: const Text('Szerkesztés'),
+      label: const Text('Másolat szerkesztése'),
     );
   }
 
@@ -65,6 +72,9 @@ class EditSongButton extends StatelessWidget {
 
     final created = copy;
     if (created == null || !context.mounted) return;
+    // Put the copy's page under the editor, so going back from the editor
+    // lands on the freshly created (and edited) copy rather than the original.
+    context.push('/song/${created.uuid}');
     context.push('/song/local/${created.uuid}');
   }
 }
