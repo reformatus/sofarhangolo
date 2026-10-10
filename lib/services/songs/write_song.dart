@@ -3,10 +3,18 @@ import 'package:uuid/v4.dart';
 
 import '../../data/bank/bank.dart';
 import '../../data/database.dart';
+import '../../data/log/logger.dart';
 import '../../data/song/song.dart';
 import '../../data/song/song_link.dart';
+import '../assets/pick_asset.dart';
+import '../assets/write_song_asset.dart';
 import '../bank/banks.dart';
 import 'delete_for_song.dart';
+
+/// Fetches the bytes of an attachment field for [song] (e.g. by downloading it
+/// from the song's bank). Returns null when the field has no attachment.
+typedef AssetFetcher =
+    Future<Uint8List?> Function(Song song, String fieldName);
 
 /// Creates a new local song, or updates an existing one by uuid.
 ///
@@ -53,15 +61,18 @@ Future<Song> writeLocalSong(Song song) async {
 ///
 /// The copy:
 /// - gets a fresh uuid and lives in the local bank,
-/// - loses asset references (`svg`/`pdf`) from its content, so asset views
-///   never try to fetch the original's bank assets for it,
+/// - carries its own copies of [song]'s `svg`/`pdf` attachments, fetched with
+///   [fetchAsset] and stored as local assets, so the copy keeps its sheet
+///   music/PDF independently of the bank. This is best-effort: a field that
+///   fails to fetch is logged and skipped so the copy is still created. Pass
+///   a null [fetchAsset] to skip attachments entirely,
 /// - does not keep [Song.variationOf], so bank updates never treat it as a
 ///   variation of the original,
 /// - is linked back to [song] with a [SongLinkType.localCopyOf] link that
 ///   also remembers the original's [Song.contentHash] at copy time, so the
 ///   UI can detect when the original changed since the copy was made.
-Future<Song> copySongToLocal(Song song) async {
-  final local = await writeLocalSong(
+Future<Song> copySongToLocal(Song song, {AssetFetcher? fetchAsset}) async {
+  final copy = await writeLocalSong(
     Song(
       uuid: UuidV4().generate(),
       title: song.title,
@@ -77,14 +88,42 @@ Future<Song> copySongToLocal(Song song) async {
 
   await db.songLinks.insert().insert(
     SongLinksCompanion.insert(
-      sourceUuid: local.uuid,
+      sourceUuid: copy.uuid,
       type: SongLinkType.localCopyOf,
       targetUuid: song.uuid,
       targetContentHash: Value(song.contentHash),
     ),
   );
 
-  return local;
+  if (fetchAsset != null) {
+    await _copyAttachments(song, copy, fetchAsset);
+  }
+
+  return copy;
+}
+
+/// Copies the attachments [original] currently has onto [copy] as local
+/// assets. A field that fails to fetch is logged and skipped.
+Future<void> _copyAttachments(
+  Song original,
+  Song copy,
+  AssetFetcher fetchAsset,
+) async {
+  for (final field in assetFieldExtensions.keys) {
+    if (original.contentString(field) == null) continue;
+
+    try {
+      final bytes = await fetchAsset(original, field);
+      if (bytes == null) continue;
+      await writeLocalSongAsset(copy, field, bytes);
+    } catch (error, stackTrace) {
+      log.warning(
+        'Nem sikerült átmásolni a(z) $field csatolmányt a másolatba.',
+        error,
+        stackTrace,
+      );
+    }
+  }
 }
 
 /// Deletes a local song together with its links and any cached assets.

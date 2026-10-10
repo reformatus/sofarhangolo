@@ -124,10 +124,70 @@ void main() {
       expect(stored.sourceBank, localBankUuid);
       expect(stored.title, original.title);
       expect(stored.lyrics, original.lyrics);
-      // Asset views must not fetch the original's bank assets.
+      // Without an asset fetcher nothing is carried: bank asset references are
+      // never copied over verbatim (see the attachment tests below).
       expect(stored.contentMap, isNot(contains('svg')));
       // Bank updates must not treat the copy as a variation of the original.
       expect(stored.variationOf, isNull);
+    });
+
+    test('carries the original attachments into the copy', () async {
+      final original = bankSong(
+        'orig-assets',
+        contentMap: {'svg': 'orig.svg', 'pdf': 'orig.pdf'},
+      );
+      await db.into(db.songs).insert(original);
+
+      final fetched = <String>[];
+      final copy = await copySongToLocal(
+        original,
+        fetchAsset: (song, field) async {
+          fetched.add(field);
+          return Uint8List.fromList([field.codeUnitAt(0)]);
+        },
+      );
+
+      expect(fetched, containsAll(<String>['svg', 'pdf']));
+
+      final stored = await storedSong(copy.uuid);
+      expect(stored.contentMap['svg'], startsWith('local://'));
+      expect(stored.contentMap['pdf'], startsWith('local://'));
+
+      // The bytes live as assets owned by the copy, not the original.
+      final assets = await db.assets.select().get();
+      expect(assets, hasLength(2));
+      expect(assets.every((asset) => asset.songUuid == copy.uuid), isTrue);
+    });
+
+    test('still creates the copy when an attachment cannot be fetched', () async {
+      final original = bankSong('orig-fail', contentMap: {'svg': 'orig.svg'});
+      await db.into(db.songs).insert(original);
+
+      final copy = await copySongToLocal(
+        original,
+        fetchAsset: (song, field) async => throw StateError('offline'),
+      );
+
+      final stored = await storedSong(copy.uuid);
+      expect(stored.uuid, copy.uuid);
+      expect(stored.contentMap, isNot(contains('svg')));
+      expect(await db.assets.select().get(), isEmpty);
+    });
+
+    test('does not fetch attachments the original does not have', () async {
+      final original = bankSong('orig-none');
+      await db.into(db.songs).insert(original);
+
+      var fetchCalls = 0;
+      await copySongToLocal(
+        original,
+        fetchAsset: (song, field) async {
+          fetchCalls += 1;
+          return null;
+        },
+      );
+
+      expect(fetchCalls, 0);
     });
 
     test('records the original and its content hash in a link', () async {
