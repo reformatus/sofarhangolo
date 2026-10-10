@@ -206,6 +206,7 @@ class _ChipsField extends StatefulWidget {
 class _ChipsFieldState extends State<_ChipsField> {
   final StringTagController<String> _tagsController = StringTagController();
   List<String> _latest = const [];
+  FocusNode? _inputFocusNode;
 
   @override
   void initState() {
@@ -219,6 +220,10 @@ class _ChipsFieldState extends State<_ChipsField> {
     if (listEquals(tags, _latest)) return;
     _latest = tags;
     widget.onChanged(tags);
+    // Keep the caret in the input so the next value can be typed right away.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _inputFocusNode?.requestFocus();
+    });
   }
 
   @override
@@ -226,6 +231,27 @@ class _ChipsFieldState extends State<_ChipsField> {
     _tagsController.removeListener(_onTagsChanged);
     _tagsController.dispose();
     super.dispose();
+  }
+
+  /// Enter selects the highlighted suggestion; with no match it commits the
+  /// typed text as a chip (comma also commits free text).
+  void _submit(
+    String text,
+    InputFieldValues<String> values,
+    VoidCallback onFieldSubmitted,
+  ) {
+    final query = text.trim().toLowerCase();
+    final chosen = _tagsController.getTags ?? const <String>[];
+    final hasMatch =
+        query.isNotEmpty &&
+        widget.suggestions.any(
+          (s) => !chosen.contains(s) && s.toLowerCase().contains(query),
+        );
+    if (hasMatch) {
+      onFieldSubmitted();
+    } else {
+      values.onTagSubmitted(text);
+    }
   }
 
   @override
@@ -249,48 +275,74 @@ class _ChipsFieldState extends State<_ChipsField> {
             textEditingController: textController,
             focusNode: focusNode,
             textSeparators: const [','],
-            inputFieldBuilder: (context, values) => LayoutBuilder(
-              builder: (context, constraints) => TextField(
-                controller: values.textEditingController,
-                focusNode: values.focusNode,
-                decoration: _fieldDecoration(widget.field).copyWith(
-                  errorText: values.error,
-                  // Chips live inside the field, to the left of the cursor.
-                  prefixIconConstraints: BoxConstraints(
-                    maxWidth: constraints.maxWidth * 0.6,
+            inputFieldBuilder: (context, values) {
+              _inputFocusNode = values.focusNode;
+              return LayoutBuilder(
+                builder: (context, constraints) => InputDecorator(
+                  decoration: InputDecoration(
+                    label: _fieldLabel(widget.field),
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                    errorText: values.error,
                   ),
-                  prefixIcon: values.tags.isEmpty
-                      ? null
-                      : SingleChildScrollView(
-                          controller: values.tagScrollController,
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              for (final tag in values.tags)
-                                Padding(
-                                  padding: const EdgeInsets.only(left: 4),
-                                  child: InputChip(
-                                    label: Text(tag),
-                                    visualDensity: VisualDensity.compact,
-                                    materialTapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                    onDeleted: () => values.onTagRemoved(tag),
-                                  ),
-                                ),
-                            ],
-                          ),
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      for (final tag in values.tags)
+                        InputChip(
+                          label: Text(tag),
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize:
+                              MaterialTapTargetSize.shrinkWrap,
+                          onDeleted: () => values.onTagRemoved(tag),
                         ),
+                      ConstrainedBox(
+                        // Empty: fill the box like a normal field. With chips:
+                        // sit inline after them, wrapping onto the next line.
+                        constraints: BoxConstraints(
+                          minWidth: 80,
+                          maxWidth: values.tags.isEmpty
+                              ? constraints.maxWidth
+                              : 160,
+                        ),
+                        child: TextField(
+                          controller: values.textEditingController,
+                          focusNode: values.focusNode,
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.symmetric(vertical: 8),
+                          ),
+                          onChanged: values.onTagChanged,
+                          onSubmitted: (text) =>
+                              _submit(text, values, onFieldSubmitted),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-                onChanged: values.onTagChanged,
-                // Enter selects the highlighted suggestion (no-op when none
-                // is showing); comma commits free text.
-                onSubmitted: (_) => onFieldSubmitted(),
-              ),
-            ),
+              );
+            },
           ),
     );
   }
+}
+
+/// A field label carrying the field's icon, used as the floating label of the
+/// chip input.
+Widget _fieldLabel(SongField field) {
+  final icon = field.icon;
+  if (icon == null) return Text(field.title);
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      Icon(icon, size: 16),
+      const SizedBox(width: 4),
+      Text(field.title),
+    ],
+  );
 }
 
 /// The core `key` field: a multi-value picker over the fixed pitch/mode

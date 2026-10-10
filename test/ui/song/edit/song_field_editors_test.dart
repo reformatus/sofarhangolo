@@ -213,6 +213,73 @@ void main() {
     expect(find.widgetWithText(InputChip, 'dicsőítés'), findsOneWidget);
   });
 
+  testWidgets('chips field commits free text on Enter when nothing matches', (
+    tester,
+  ) async {
+    final field = _field('content_tags');
+    final changes = <Object?>[];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          selectableValuesForFilterableFieldProvider(
+            field.apiName,
+          ).overrideWith((ref) async => const ['dicsőítés', 'karácsony']),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: SongContentFieldEditor(
+              field: field,
+              value: null,
+              onChanged: changes.add,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'ismeretlen');
+    await tester.pumpAndSettle();
+
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(changes.last, const ['ismeretlen']);
+  });
+
+  testWidgets('chips field keeps the caret in the input after adding one', (
+    tester,
+  ) async {
+    final field = _field('content_tags');
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          selectableValuesForFilterableFieldProvider(
+            field.apiName,
+          ).overrideWith((ref) async => const <String>[]),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: SongContentFieldEditor(
+              field: field,
+              value: null,
+              onChanged: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'dicsőítés,');
+    await tester.pumpAndSettle();
+
+    final input = tester.widget<TextField>(find.byType(TextField));
+    expect(input.focusNode?.hasFocus, isTrue);
+  });
+
   testWidgets('key field adds the chosen key to the song', (tester) async {
     final changes = <List<KeyField>>[];
 
