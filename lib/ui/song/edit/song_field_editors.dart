@@ -380,62 +380,96 @@ class _SongKeyFieldState extends State<SongKeyField> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+    final field = defaultSongFieldRegistry['key']!;
+    return InputDecorator(
+      decoration: InputDecoration(
+        label: _fieldLabel(field),
+        border: const OutlineInputBorder(),
+        isDense: true,
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) => Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
-            const Icon(Icons.piano, size: 18),
-            const SizedBox(width: 8),
-            Text('Hangnem', style: theme.textTheme.titleSmall),
+            for (final key in _keys)
+              InputChip(
+                label: Text(displayKeyField(key)),
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                onDeleted: () => _remove(key),
+              ),
+            _controls(context, constraints.maxWidth),
           ],
         ),
-        const SizedBox(height: 8),
-        if (_keys.isEmpty)
-          Text('Nincs hangnem megadva.', style: theme.textTheme.bodySmall)
-        else
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
-            children: [
-              for (final key in _keys)
-                InputChip(
-                  label: Text(displayKeyField(key)),
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  onDeleted: () => _remove(key),
-                ),
-            ],
-          ),
-        const SizedBox(height: 8),
-        DropdownButton<String>(
-          value: _pitch,
-          isExpanded: true,
-          items: [
-            for (final pitch in keyPitchValues)
-              DropdownMenuItem(value: pitch, child: Text(displayKeyPitch(pitch))),
+      ),
+    );
+  }
+
+  /// The grouped interactive part that stands in for the cursor input: pitch
+  /// and mode dropdowns plus an add button, in one bordered unit.
+  Widget _controls(BuildContext context, double maxWidth) {
+    final colors = Theme.of(context).colorScheme;
+    return SizedBox(
+      width: maxWidth,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: colors.outlineVariant),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              flex: 4,
+              child: DropdownButton<String>(
+                value: _pitch,
+                isExpanded: true,
+                underline: const SizedBox.shrink(),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                items: [
+                  for (final pitch in keyPitchValues)
+                    DropdownMenuItem(
+                      value: pitch,
+                      child: Text(
+                        displayKeyPitch(pitch),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onChanged: (value) => setState(() => _pitch = value ?? _pitch),
+              ),
+            ),
+            Container(width: 1, height: 24, color: colors.outlineVariant),
+            Expanded(
+              flex: 5,
+              child: DropdownButton<String>(
+                value: _mode,
+                isExpanded: true,
+                underline: const SizedBox.shrink(),
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                items: [
+                  for (final mode in keyModeValues)
+                    DropdownMenuItem(
+                      value: mode,
+                      child: Text(
+                        displayKeyMode(mode),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onChanged: (value) => setState(() => _mode = value ?? _mode),
+              ),
+            ),
+            IconButton(
+              onPressed: _add,
+              icon: const Icon(Icons.add),
+              tooltip: 'Hangnem hozzáadása',
+              visualDensity: VisualDensity.compact,
+            ),
           ],
-          onChanged: (value) => setState(() => _pitch = value ?? _pitch),
         ),
-        DropdownButton<String>(
-          value: _mode,
-          isExpanded: true,
-          items: [
-            for (final mode in keyModeValues)
-              DropdownMenuItem(value: mode, child: Text(displayKeyMode(mode))),
-          ],
-          onChanged: (value) => setState(() => _mode = value ?? _mode),
-        ),
-        Align(
-          alignment: AlignmentDirectional.centerEnd,
-          child: FilledButton.tonalIcon(
-            onPressed: _add,
-            icon: const Icon(Icons.add),
-            label: const Text('Hozzáadás'),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

@@ -280,22 +280,49 @@ void main() {
     expect(input.focusNode?.hasFocus, isTrue);
   });
 
-  testWidgets('key field adds the chosen key to the song', (tester) async {
+  testWidgets('key field adds the chosen key in a narrow pane', (tester) async {
     final changes = <List<KeyField>>[];
 
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
-          body: SongKeyField(initialKeys: const [], onChanged: changes.add),
+          body: Center(
+            child: SizedBox(
+              width: 240,
+              child: SongKeyField(initialKeys: const [], onChanged: changes.add),
+            ),
+          ),
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Hozzáadás'));
+    await tester.tap(find.byIcon(Icons.add));
     await tester.pumpAndSettle();
 
     expect(changes.single, [KeyField('C', 'dur')]);
     expect(find.widgetWithText(InputChip, 'C-dúr'), findsOneWidget);
+  });
+
+  testWidgets('key field wraps its chips without overflow', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 240,
+              child: SongKeyField(
+                initialKeys: [KeyField('C', 'dur'), KeyField('G', 'moll')],
+                onChanged: (_) {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(InputChip, 'C-dúr'), findsOneWidget);
+    expect(find.widgetWithText(InputChip, 'G-moll'), findsOneWidget);
   });
 }
