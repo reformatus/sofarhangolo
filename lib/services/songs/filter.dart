@@ -8,6 +8,7 @@ import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/key/state.dart';
 import '../../data/database.dart';
 import '../../data/song/song.dart';
 import '../../data/song/song_fields.dart';
+import '../../data/song/song_fts_index.dart';
 import '../bank/banks.dart';
 import '../../ui/base/songs/widgets/filter/types/bank/state.dart';
 import '../../ui/base/songs/widgets/filter/types/multiselect-tags/state.dart';
@@ -16,8 +17,11 @@ import '../assets/downloaded.dart';
 
 part 'filter.g.dart';
 
-// far future todo: implement dynamic fts table generation based on bank data and dynamic selectable fts columns
-const List<String> fullTextSearchFields = ['title', 'lyrics'];
+// Searchable fields come from the registry-driven index layout; the selector
+// UI lists them uniformly.
+final List<String> fullTextSearchFields = [
+  for (final column in SongFtsIndex.registry.columns) column.name,
+];
 
 // todo write test
 @Riverpod(keepAlive: true)
@@ -121,8 +125,6 @@ Stream<List<SongResult>> filteredSongs(Ref ref) {
   final KeyFilters keyFilters = ref.watch(keyFilterStateProvider);
   final Set<String> bankFilters = ref.watch(banksFilterStateProvider);
 
-  String ftsMatchString = '{${searchFields.join(' ')}} : $searchString';
-
   Expression<bool> filterExpression(Songs songs) {
     return Expression.and(
       filters.entries
@@ -180,39 +182,125 @@ Stream<List<SongResult>> filteredSongs(Ref ref) {
                           .compareTo(removeDiacritics(b.song.title)),
                 ),
         );
-  } else {
-    return db
-        .songFulltextSearch(
-          (_, _) => subqueryExpression(downloadedAssetsSubquery),
-          ftsMatchString,
-          (_, songs) => filterExpression(songs),
-        )
-        .watch()
-        .map(
-          (results) =>
-              results
-                  .map(
-                    (result) => SongResult(
-                      result.song,
-                      result: result,
-                      downloadedAssets: result.assets?.split(',') ?? [],
-                    ),
-                  )
-                  .where((result) => matchesKeyFilters(result.song, keyFilters))
-                  .toList()
-                ..sort(
-                  (a, b) =>
-                      removeDiacritics(a.song.title)
-                          .compareTo(removeDiacritics(b.song.title)),
-                ),
-        );
   }
+
+  return _searchSongs(
+    searchString: searchString,
+    searchFields: searchFields,
+    filters: filters,
+    bankFilters: bankFilters,
+    keyFilters: keyFilters,
+  );
+}
+
+/// Searches through the app-managed FTS index (see [SongFtsIndex]). The index
+/// columns, the bm25 weights and the per-column snippets are all generated
+/// from the field registry, so no query here hardcodes a searchable field.
+Stream<List<SongResult>> _searchSongs({
+  required String searchString,
+  required List<String> searchFields,
+  required Map<String, List<String>> filters,
+  required Set<String> bankFilters,
+  required KeyFilters keyFilters,
+}) {
+  final index = SongFtsIndex.registry;
+  final allColumns = [for (final column in index.columns) column.name];
+  final selected = searchFields.where(allColumns.contains).toList();
+  final matchString = selected.isEmpty || selected.length == allColumns.length
+      ? searchString
+      : '{${selected.join(' ')}} : $searchString';
+
+  final variables = <Variable>[Variable<String>(matchString)];
+  final clauses = <String>[];
+
+  for (final entry in filters.entries) {
+    final valueClauses = <String>[];
+    for (final value in entry.value) {
+      // Quoted matching for list fields, plain for text fields — mirrors the
+      // drift expression filter above.
+      final likePattern = bankApiListValueFields.contains(entry.key)
+          ? '%"$value"%'
+          : '%$value%';
+      valueClauses.add(
+        "json_extract(songs.content_map, '\$.${entry.key}') LIKE ?",
+      );
+      variables.add(Variable<String>(likePattern));
+    }
+    if (valueClauses.isNotEmpty) clauses.add('(${valueClauses.join(' OR ')})');
+  }
+  if (bankFilters.isNotEmpty) {
+    clauses.add('(${bankFilters.map((_) => 'songs.source_bank = ?').join(' OR ')})');
+    variables.addAll(bankFilters.map(Variable<String>.new));
+  }
+
+  final extraWhere = clauses.isEmpty ? '' : ' AND (${clauses.join(' AND ')})';
+  final sql =
+      'SELECT ${index.searchColumns} '
+      '${index.searchFrom} '
+      'WHERE ${SongFtsIndex.tableName} MATCH ?$extraWhere '
+      'ORDER BY rank';
+
+  return db
+      .customSelect(sql, variables: variables, readsFrom: {db.songs})
+      .watch()
+      .asyncMap((hits) async {
+        if (hits.isEmpty) return const <SongResult>[];
+
+        final ids = [for (final hit in hits) hit.read<int>('id')];
+        final songRows = await (db.selectOnly(db.songs)
+              ..addColumns(db.songs.$columns)
+              ..addColumns([subqueryExpression(downloadedAssetsSubquery)])
+              ..where(db.songs.id.isIn(ids)))
+            .get();
+
+        final songsById = {
+          for (final row in songRows)
+            row.read(db.songs.id): (
+              song: row.readTable(db.songs),
+              assets:
+                  row.rawData
+                      .readNullableWithType(DriftSqlType.string, 'c0')
+                      ?.split(',') ??
+                  const <String>[],
+            ),
+        };
+
+        return [
+          for (final hit in hits)
+            if (songsById[hit.read<int>('id')] case final entry?)
+              SongResult(
+                entry.song,
+                downloadedAssets: entry.assets,
+                match: SongMatch(
+                  rank: hit.read<double>('rank'),
+                  snippets: {
+                    for (final column in index.columns)
+                      column.name: hit.readNullable<String>(
+                        index.matchAlias(column),
+                      ),
+                  },
+                ),
+              ),
+        ].where((result) => matchesKeyFilters(result.song, keyFilters)).toList();
+      });
 }
 
 class SongResult {
   final Song song;
   final List<String> downloadedAssets;
-  final SongFulltextSearchResult? result;
+  final SongMatch? match;
 
-  SongResult(this.song, {required this.downloadedAssets, this.result});
+  SongResult(this.song, {required this.downloadedAssets, this.match});
+}
+
+/// Relevance metadata for a song matched through the search index: the bm25
+/// rank and one snippet per searchable field, keyed by field name.
+class SongMatch {
+  final double rank;
+  final Map<String, String?> snippets;
+
+  SongMatch({required this.rank, required this.snippets});
+
+  String? get matchTitle => snippets['title'];
+  String? get matchLyrics => snippets['lyrics'];
 }

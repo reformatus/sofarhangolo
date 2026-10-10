@@ -19,6 +19,7 @@ import 'database.steps.dart';
 import 'preferences/storage.dart';
 import 'song/lyrics/format.dart';
 import 'song/song.dart';
+import 'song/song_fts_index.dart';
 
 part 'database.g.dart';
 
@@ -26,7 +27,6 @@ late LyricDatabase db;
 
 @DriftDatabase(
   tables: [Songs, Banks, Assets, Cues, PreferenceStorage],
-  include: {'song/song.drift', '../services/songs/filter.drift'},
 )
 class LyricDatabase extends _$LyricDatabase {
   // LyricDatabase() : super(_openConnection()); //used for debugging
@@ -34,7 +34,15 @@ class LyricDatabase extends _$LyricDatabase {
     : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
+
+  /// Reconciles the app-managed search index (see [SongFtsIndex]) with the
+  /// registry. Called once at startup; a no-op unless the index layout changed.
+  ///
+  /// Deliberately not in [MigrationStrategy.beforeOpen]: the index is not part
+  /// of drift's schema, so running it during migration tests would leave
+  /// unexpected objects behind in the validated database.
+  Future<bool> ensureSearchIndex() => SongFtsIndex.registry.ensure(this);
 
   @override
   MigrationStrategy get migration {
@@ -126,13 +134,34 @@ class LyricDatabase extends _$LyricDatabase {
             "UPDATE banks SET last_updated = '1900-01-01T00:00:00'",
           );
         },
+        from8To9: (m, schema) async {
+          // The unified search index became app-managed (see
+          // song_fts_index.dart): drift no longer models it, so drop the
+          // objects v8 owned here. SongFtsIndex.ensure recreates the
+          // registry-driven index on every open, including this one.
+          for (final name in SongFtsIndex.triggerNames) {
+            await customStatement('DROP TRIGGER IF EXISTS $name');
+          }
+          await customStatement(
+            'DROP TABLE IF EXISTS ${SongFtsIndex.tableName}',
+          );
+        },
       ),
     );
   }
 
   static QueryExecutor _openConnection() {
+    // `flutter run --dart-define=LYRIC_DB_PATH=/path/to/lyric3.sqlite` opens
+    // a throwaway database instead of the user's real one, so a test build
+    // can run next to a stable install. An env override cannot do this:
+    // path_provider's documents dir comes from XDG_DOCUMENTS_DIR, which is
+    // an absolute path in user-dirs.dirs.
+    const dbPath = String.fromEnvironment('LYRIC_DB_PATH');
     return driftDatabase(
       name: 'lyric3',
+      native: DriftNativeOptions(
+        databasePath: dbPath.isEmpty ? null : () async => dbPath,
+      ),
       web: DriftWebOptions(
         sqlite3Wasm: Uri.parse('sqlite3.wasm'),
         driftWorker: Uri.parse('drift_worker.js'),

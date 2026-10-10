@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../data/bank/bank.dart';
 import '../../../../data/cue/slide.dart';
-import '../../../../data/database.dart';
 import '../../../../data/log/logger.dart';
 import '../../../../data/song/extensions.dart';
 import '../../../../data/song/song.dart';
@@ -28,7 +27,7 @@ class LSongResultTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final Song song = songResult.song;
-    final SongFulltextSearchResult? result = songResult.result;
+    final SongMatch? result = songResult.match;
     final List<String> downloadedAssets = songResult.downloadedAssets;
     final connection = ref.watch(connectionProvider);
     final showActiveCueQuickAdd = ref.watch(

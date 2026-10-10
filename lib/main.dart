@@ -35,6 +35,9 @@ void main() async {
     await FullScreen.ensureInitialized();
   }
   db = LyricDatabase();
+  // The search index is app-managed and not part of drift's schema; bring it
+  // in line with the field registry before the UI can query it.
+  await db.ensureSearchIndex();
   final initialAppUri = kIsWeb
       ? captureInitialWebAppUri(config: appConfig)
       : await captureInitialAppUri();

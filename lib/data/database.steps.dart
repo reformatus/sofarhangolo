@@ -1542,6 +1542,131 @@ final class Schema8 extends i0.VersionedSchema {
   );
 }
 
+final class Schema9 extends i0.VersionedSchema {
+  Schema9({required super.database}) : super(version: 9);
+  @override
+  late final List<i1.DatabaseSchemaEntity> entities = [
+    banks,
+    songs,
+    assets,
+    cues,
+    preferenceStorage,
+    songsUuid,
+    songsVariationOf,
+    assetSourceUrl,
+    cuesUuid,
+  ];
+  late final Shape6 banks = Shape6(
+    source: i0.VersionedTable(
+      entityName: 'banks',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_1,
+        _column_2,
+        _column_3,
+        _column_4,
+        _column_5,
+        _column_6,
+        _column_7,
+        _column_8,
+        _column_9,
+        _column_10,
+        _column_11,
+        _column_12,
+        _column_13,
+        _column_14,
+        _column_15,
+        _column_16,
+        _column_34,
+        _column_35,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape8 songs = Shape8(
+    source: i0.VersionedTable(
+      entityName: 'songs',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_1,
+        _column_17,
+        _column_18,
+        _column_19,
+        _column_36,
+        _column_21,
+        _column_37,
+        _column_22,
+        _column_38,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape4 assets = Shape4(
+    source: i0.VersionedTable(
+      entityName: 'assets',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [_column_0, _column_28, _column_29, _column_30, _column_31],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape3 cues = Shape3(
+    source: i0.VersionedTable(
+      entityName: 'cues',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_1,
+        _column_19,
+        _column_25,
+        _column_26,
+        _column_27,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape2 preferenceStorage = Shape2(
+    source: i0.VersionedTable(
+      entityName: 'preference_storage',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: ['PRIMARY KEY("key")'],
+      columns: [_column_23, _column_24],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  final i1.Index songsUuid = i1.Index(
+    'songs_uuid',
+    'CREATE UNIQUE INDEX songs_uuid ON songs (uuid)',
+  );
+  final i1.Index songsVariationOf = i1.Index(
+    'songs_variation_of',
+    'CREATE INDEX songs_variation_of ON songs (variation_of)',
+  );
+  final i1.Index assetSourceUrl = i1.Index(
+    'asset_source_url',
+    'CREATE UNIQUE INDEX asset_source_url ON assets (source_url)',
+  );
+  final i1.Index cuesUuid = i1.Index(
+    'cues_uuid',
+    'CREATE UNIQUE INDEX cues_uuid ON cues (uuid)',
+  );
+}
+
 i0.MigrationStepWithVersion migrationSteps({
   required Future<void> Function(i1.Migrator m, Schema2 schema) from1To2,
   required Future<void> Function(i1.Migrator m, Schema3 schema) from2To3,
@@ -1550,6 +1675,7 @@ i0.MigrationStepWithVersion migrationSteps({
   required Future<void> Function(i1.Migrator m, Schema6 schema) from5To6,
   required Future<void> Function(i1.Migrator m, Schema7 schema) from6To7,
   required Future<void> Function(i1.Migrator m, Schema8 schema) from7To8,
+  required Future<void> Function(i1.Migrator m, Schema9 schema) from8To9,
 }) {
   return (currentVersion, database) async {
     switch (currentVersion) {
@@ -1588,6 +1714,11 @@ i0.MigrationStepWithVersion migrationSteps({
         final migrator = i1.Migrator(database, schema);
         await from7To8(migrator, schema);
         return 8;
+      case 8:
+        final schema = Schema9(database: database);
+        final migrator = i1.Migrator(database, schema);
+        await from8To9(migrator, schema);
+        return 9;
       default:
         throw ArgumentError.value('Unknown migration from $currentVersion');
     }
@@ -1602,6 +1733,7 @@ i1.OnUpgrade stepByStep({
   required Future<void> Function(i1.Migrator m, Schema6 schema) from5To6,
   required Future<void> Function(i1.Migrator m, Schema7 schema) from6To7,
   required Future<void> Function(i1.Migrator m, Schema8 schema) from7To8,
+  required Future<void> Function(i1.Migrator m, Schema9 schema) from8To9,
 }) => i0.VersionedSchema.stepByStepHelper(
   step: migrationSteps(
     from1To2: from1To2,
@@ -1611,5 +1743,6 @@ i1.OnUpgrade stepByStep({
     from5To6: from5To6,
     from6To7: from6To7,
     from7To8: from7To8,
+    from8To9: from8To9,
   ),
 );
