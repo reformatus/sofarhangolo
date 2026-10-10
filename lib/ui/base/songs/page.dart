@@ -524,7 +524,7 @@ class FiltersTitle extends ConsumerWidget {
                         : Theme.of(context).textTheme.bodyMedium!.fontSize,
                   ),
                   softWrap: true,
-                  maxLines: 3,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                 ),
                 if (subtitle != null)
