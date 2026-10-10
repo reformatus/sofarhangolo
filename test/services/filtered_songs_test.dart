@@ -4,6 +4,7 @@ import 'package:sofarhangolo/data/database.dart';
 import 'package:sofarhangolo/data/song/song.dart';
 import 'package:sofarhangolo/services/songs/filter.dart';
 import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/multiselect-tags/state.dart';
+import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/search/state.dart';
 
 import '../harness/test_database.dart';
 import '../harness/test_harness.dart' show waitForProviderValue;
@@ -28,6 +29,23 @@ Song _song(String uuid, String title, [Map<String, Object> extra = const {}]) {
 }
 
 void main() {
+  group('SongResultsLimit', () {
+    test('pages forward and resets when the search changes', () async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+
+      expect(container.read(songResultsLimitProvider), songSearchPageSize);
+
+      container.read(songResultsLimitProvider.notifier).loadMore();
+      expect(container.read(songResultsLimitProvider), songSearchPageSize * 2);
+
+      container.read(searchStringStateProvider.notifier).set('alma');
+      await Future<void>.microtask(() {});
+
+      expect(container.read(songResultsLimitProvider), songSearchPageSize);
+    });
+  });
+
   group('filteredSongs content-map filters', () {
     // Shared database for the group: downloadedAssetsSubquery is a global
     // initialized against the first `db` it sees, so per-test databases
@@ -74,7 +92,7 @@ void main() {
       addTearDown(container.dispose);
       final results = await waitForProviderValue(
         container,
-        filteredSongsProvider(songSearchPageSize),
+        filteredSongsProvider,
       );
       return results.map((result) => result.song.uuid).toSet();
     }

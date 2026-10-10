@@ -118,14 +118,36 @@ bool matchesKeyFilters(Song song, KeyFilters keyFilters) {
   return matchesCompleteKey || matchesPartialKeyGroup;
 }
 
-/// Number of results fetched per page; the songs list grows [filteredSongs]'
-/// limit as it scrolls (see the page's scroll listener).
+/// Number of results fetched per page; [SongResultsLimit] grows it as the
+/// results list is scrolled to the end.
 const songSearchPageSize = 50;
 
+/// How many search results are currently requested. Kept as its own notifier
+/// (rather than a provider family keyed by the limit) so that growing it
+/// recomputes [filteredSongs] in place: the list keeps showing the already
+/// loaded results while the next page is fetched, and the page can render a
+/// footer spinner instead of swapping the whole view for one.
+@riverpod
+class SongResultsLimit extends _$SongResultsLimit {
+  @override
+  int build() {
+    // A new query starts from the first page.
+    ref.listen(searchStringStateProvider, (previous, next) {
+      if (previous != next) reset();
+    });
+    return songSearchPageSize;
+  }
+
+  void loadMore() => state += songSearchPageSize;
+
+  void reset() => state = songSearchPageSize;
+}
+
 @Riverpod(keepAlive: true)
-Stream<List<SongResult>> filteredSongs(Ref ref, int limit) {
+Stream<List<SongResult>> filteredSongs(Ref ref) {
   final String searchString = sanitize(ref.watch(searchStringStateProvider));
   final List<String> searchFields = ref.watch(searchFieldsStateProvider);
+  final int limit = ref.watch(songResultsLimitProvider);
   final Map<String, List<String>> filters = ref.watch(
     multiselectTagsFilterStateProvider,
   );

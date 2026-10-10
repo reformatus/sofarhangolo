@@ -62,16 +62,67 @@ class _SongsPageState extends ConsumerState<SongsPage> {
 
   bool filtersScrolled = false;
 
-  /// How many search results are loaded; the results list grows this as it
-  /// scrolls (["automatic" pagination via a SQL LIMIT]).
-  int searchLimit = songSearchPageSize;
+  /// Loads the next page once the list has been scrolled to its end: building
+  /// the last item means the viewport reached the end of what is loaded, which
+  /// is when the next page should be fetched. Deferred to after the frame
+  /// because it updates providers while the list is being built.
+  void _loadMoreIfNeeded(int index, int loadedCount, bool isLoading) {
+    if (index < loadedCount - 1) return;
+    if (isLoading) return;
+    // Only the search path paginates - the plain filtered list is unbounded.
+    if (ref.read(searchStringStateProvider).trim().isEmpty) return;
+    // The last page was not full, so there is nothing left to load.
+    if (loadedCount < ref.read(songResultsLimitProvider)) return;
 
-  /// Loads the next page when the list has scrolled near its end. Only the
-  /// search path paginates - the filtered list is unbounded.
-  void _maybeLoadMore(int loadedCount, String searchString) {
-    if (searchString.trim().isEmpty) return;
-    if (loadedCount < searchLimit) return;
-    setState(() => searchLimit += songSearchPageSize);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(songResultsLimitProvider.notifier).loadMore();
+    });
+  }
+
+  /// The results list. While the next page is being fetched it keeps showing
+  /// the loaded results and appends a footer spinner (rather than swapping the
+  /// whole list for a spinner). The next page is requested once the last
+  /// loaded item is built - that is, when the list has been scrolled to its
+  /// end - see [_loadMoreIfNeeded].
+  Widget _buildResultsList(
+    BuildContext context, {
+    required List<SongResult> results,
+    required List<Bank> banks,
+    required Set<String> banksFilterState,
+    required bool isLoading,
+  }) {
+    // A running fetch that asks for more than is currently displayed.
+    final showFooter = isLoading && results.length < ref.watch(songResultsLimitProvider);
+
+    return ListView.builder(
+      itemCount: results.length + (showFooter ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index >= results.length) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        }
+
+        _loadMoreIfNeeded(index, results.length, isLoading);
+
+        final result = results[index];
+        return LSongResultTile(
+          result,
+          banksFilterState.length == 1
+              ? null
+              : banks.firstWhere((b) => b.uuid == result.song.sourceBank),
+          onTap: () => _searchFieldFocusNode.unfocus(),
+        );
+      },
+    );
   }
 
   late OverlayPortalController _overlayPortalController;
@@ -94,17 +145,11 @@ class _SongsPageState extends ConsumerState<SongsPage> {
   @override
   Widget build(BuildContext context) {
     final banks = ref.watch(watchAllBanksProvider);
-    final songResults = ref.watch(filteredSongsProvider(searchLimit));
+    final songResults = ref.watch(filteredSongsProvider);
     final filterState = ref.watch(multiselectTagsFilterStateProvider);
     final keyFilterState = ref.watch(keyFilterStateProvider);
     final banksFilterState = ref.watch(banksFilterStateProvider);
     final searchString = ref.watch(searchStringStateProvider);
-    // A new query starts from the first page.
-    ref.listen(searchStringStateProvider, (previous, next) {
-      if (previous != next && searchLimit != songSearchPageSize) {
-        setState(() => searchLimit = songSearchPageSize);
-      }
-    });
     final shellCueInset = CueShellInset.bottomInsetOf(context);
     final insetAnimationDuration =
         MediaQuery.maybeOf(context)?.accessibleNavigation ?? false
@@ -315,44 +360,18 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                                         )
                                       : value.isEmpty
                                       ? CenteredHint(
-                                          'Nincs találat :(',
+                                          searchString.trim().isEmpty
+                                              ? 'Nincs dal'
+                                              : 'Nincs találat :(',
                                           iconData: Icons.search_off,
                                           alignment: Alignment.topCenter,
                                         )
-                                      : NotificationListener<ScrollNotification>(
-                                          onNotification: (notification) {
-                                            _maybeLoadMore(
-                                              value.length,
-                                              searchString,
-                                            );
-                                            return false;
-                                          },
-                                          child: ListView.builder(
-                                            itemBuilder:
-                                                (
-                                                  BuildContext context,
-                                                  int i,
-                                                ) {
-                                                  return LSongResultTile(
-                                                    value.elementAt(i),
-                                                    banksFilterState.length == 1
-                                                        ? null
-                                                        : banks.firstWhere(
-                                                            (b) =>
-                                                                b.uuid ==
-                                                                value
-                                                                    .elementAt(
-                                                                      i,
-                                                                    )
-                                                                    .song
-                                                                    .sourceBank,
-                                                          ),
-                                                    onTap: () => _searchFieldFocusNode
-                                                        .unfocus(),
-                                                  );
-                                                },
-                                            itemCount: value.length,
-                                          ),
+                                      : _buildResultsList(
+                                          context,
+                                          results: value,
+                                          banks: banks,
+                                          banksFilterState: banksFilterState,
+                                          isLoading: songResults.isLoading,
                                         ),
                               },
                             ),
