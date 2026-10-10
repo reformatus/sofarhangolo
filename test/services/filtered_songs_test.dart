@@ -117,7 +117,7 @@ void main() {
         container,
         filteredSongsProvider,
       );
-      return results.map((result) => result.song.uuid).toSet();
+      return results.results.map((result) => result.song.uuid).toSet();
     }
 
     test('list fields match whole elements only', () async {
@@ -167,7 +167,7 @@ void main() {
       keys: <KeyField>{},
     );
 
-    Future<List<SongResult>> page({
+    Future<SongResultPage> pageResult({
       int limit = 100,
       KeyFilters keyFilters = noKeyFilters,
     }) => filteredSongsPage(
@@ -176,6 +176,14 @@ void main() {
       keyFilters: keyFilters,
       limit: limit,
     ).first;
+
+    Future<List<SongResult>> page({
+      int limit = 100,
+      KeyFilters keyFilters = noKeyFilters,
+    }) => pageResult(
+      limit: limit,
+      keyFilters: keyFilters,
+    ).then((result) => result.results);
 
     test('is paginated and ordered by folded title', () async {
       final all = await page();
@@ -188,6 +196,8 @@ void main() {
         firstPage.map((r) => r.song.uuid),
         all.take(2).map((r) => r.song.uuid),
       );
+      // The window count still reports the whole match set, not the page.
+      expect((await pageResult(limit: 2)).total, 6);
     });
 
     test('SQL key filter mirrors matchesKeyFilters', () async {
@@ -209,6 +219,11 @@ void main() {
             .map((r) => r.song.uuid)
             .toSet();
         expect(actual, expected, reason: 'key filter $keyFilters');
+        expect(
+          (await pageResult(keyFilters: keyFilters)).total,
+          expected.length,
+          reason: 'total for key filter $keyFilters',
+        );
       }
     });
   });

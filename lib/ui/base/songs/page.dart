@@ -357,7 +357,7 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                                       ? const Center(
                                           child: CircularProgressIndicator(),
                                         )
-                                      : value.isEmpty
+                                      : value.results.isEmpty
                                       ? CenteredHint(
                                           searchString.trim().isEmpty
                                               ? 'Nincs dal'
@@ -367,7 +367,7 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                                         )
                                       : _buildResultsList(
                                           context,
-                                          results: value,
+                                          results: value.results,
                                           banks: banks,
                                           banksFilterState: banksFilterState,
                                           isLoading: songResults.isLoading,
@@ -468,7 +468,7 @@ class FiltersTitle extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final total = ref.watch(songTotalCountProvider).value;
-    final matches = ref.watch(songMatchCountProvider).value;
+    final matches = ref.watch(songMatchCountProvider);
     final filtering =
         ref.watch(searchStringStateProvider).trim().isNotEmpty ||
         filterState.isNotEmpty ||

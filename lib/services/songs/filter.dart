@@ -193,16 +193,13 @@ Stream<int> songTotalCount(Ref ref) {
 }
 
 /// Number of songs matching the current search and filters - the "filtered"
-/// count in the filters subtitle (see [countSongs]).
+/// count in the filters subtitle.
+///
+/// Taken from the list query's own window count ([SongResultPage.total]), so
+/// the subtitle costs no second query.
 @Riverpod(keepAlive: true)
-Stream<int> songMatchCount(Ref ref) {
-  return countSongs(
-    searchString: sanitize(ref.watch(searchStringStateProvider)),
-    searchFields: ref.watch(searchFieldsStateProvider),
-    filters: ref.watch(multiselectTagsFilterStateProvider),
-    bankFilters: ref.watch(banksFilterStateProvider),
-    keyFilters: ref.watch(keyFilterStateProvider),
-  );
+int? songMatchCount(Ref ref) {
+  return ref.watch(filteredSongsProvider).value?.total;
 }
 
 const snippetTags = (
@@ -264,7 +261,7 @@ class SongResultsLimit extends _$SongResultsLimit {
 }
 
 @Riverpod(keepAlive: true)
-Stream<List<SongResult>> filteredSongs(Ref ref) {
+Stream<SongResultPage> filteredSongs(Ref ref) {
   return songResults(
     searchString: sanitize(ref.watch(searchStringStateProvider)),
     searchFields: ref.watch(searchFieldsStateProvider),
@@ -280,8 +277,9 @@ Stream<List<SongResult>> filteredSongs(Ref ref) {
 /// [limit] always applies - with or without a search term - so the page grows
 /// its window by the same rule in both cases (see [SongResultsLimit]). Without
 /// a term the songs are ordered by folded title; with one, by the relevance
-/// order of [searchSongs]. Both apply the same tag, bank and key filters.
-Stream<List<SongResult>> songResults({
+/// order of [searchSongs]. Both apply the same tag, bank and key filters, and
+/// both report the full match count alongside the page.
+Stream<SongResultPage> songResults({
   required String searchString,
   required List<String> searchFields,
   required Map<String, List<String>> filters,
@@ -314,7 +312,10 @@ final String foldedTitle = SongFtsIndex.foldExpression('songs.title');
 
 /// The plain listing: songs matching the filters only, ordered by folded title
 /// and paged with [limit].
-Stream<List<SongResult>> filteredSongsPage({
+/// The plain listing: songs matching the filters only, ordered by folded title
+/// and paged with [limit]. The window count rides along, so the total comes
+/// from the same query.
+Stream<SongResultPage> filteredSongsPage({
   required Map<String, List<String>> filters,
   required Set<String> bankFilters,
   required KeyFilters keyFilters,
@@ -322,6 +323,9 @@ Stream<List<SongResult>> filteredSongsPage({
 }) {
   return (db.select(db.songs).addColumns([
           subqueryExpression(downloadedAssetsSubquery),
+          // `COUNT(*) OVER ()` counts the rows matching the WHERE, before the
+          // LIMIT; drift aliases added expressions `c0`, `c1`, ...
+          CustomExpression<int>('COUNT(*) OVER ()'),
         ])
         ..where(filterExpression(db.songs, filters, bankFilters, keyFilters))
         ..orderBy([
@@ -331,7 +335,7 @@ Stream<List<SongResult>> filteredSongsPage({
         ..limit(limit))
       .watch()
       .map(
-        (rows) => [
+        (rows) => SongResultPage([
           for (final row in rows)
             SongResult(
               row.readTable(db.songs),
@@ -341,8 +345,13 @@ Stream<List<SongResult>> filteredSongsPage({
                       ?.split(',') ??
                   const <String>[],
             ),
-        ],
+        ], _windowTotal(rows)),
       );
+}
+
+int _windowTotal(List<TypedResult> rows) {
+  if (rows.isEmpty) return 0;
+  return rows.first.rawData.readNullableWithType(DriftSqlType.int, 'c1') ?? 0;
 }
 
 /// Drift expression for the tag and bank filters plus the key filter, used by
@@ -491,43 +500,15 @@ List<String> searchableFields(List<String> searchFields) {
   return (where: clauses.join(' AND '), variables: variables);
 }
 
-/// Total number of songs matching the current search and filters.
-///
-/// Uses the same [filterWhere] predicates as the page query, so the count
-/// agrees with the results even though those are paginated.
-Stream<int> countSongs({
-  required String searchString,
-  required List<String> searchFields,
-  required Map<String, List<String>> filters,
-  required Set<String> bankFilters,
-  required KeyFilters keyFilters,
-}) {
-  final extra = filterWhere(filters, bankFilters, keyFilters);
-  final query = SongFtsIndex.countQuery(
-    term: searchString.isEmpty ? null : searchString,
-    fields: searchableFields(searchFields),
-    extraWhere: extra.where,
-    extraVariables: extra.variables,
-  );
-
-  return db
-      .customSelect(
-        query.sql,
-        variables: query.variables,
-        readsFrom: {db.songs},
-      )
-      .watch()
-      .map((rows) => rows.first.read<int>('count'));
-}
-
 /// Searches the drift-owned FTS index (see [SongFtsIndex]): `title` and
 /// `lyrics` are matched by FTS5, every other searchable field by a folded LIKE
 /// or exact equality over `songs`, so the index layout stays static.
 ///
 /// Two phases: a custom select reads the hit columns (uuid, rank, tier and
-/// snippets), then a normal typed select resolves those songs. A single query
-/// cannot be typed: the FTS columns drift cannot join into `readTable`.
-Stream<List<SongResult>> searchSongs({
+/// snippets) plus the window total, then a normal typed select resolves those
+/// songs. A single query cannot be typed: the FTS columns drift cannot join
+/// into `readTable`.
+Stream<SongResultPage> searchSongs({
   required String searchString,
   required List<String> searchFields,
   required Map<String, List<String>> filters,
@@ -556,8 +537,9 @@ Stream<List<SongResult>> searchSongs({
       )
       .watch()
       .asyncMap((hits) async {
-        if (hits.isEmpty) return const <SongResult>[];
+        if (hits.isEmpty) return const SongResultPage([], 0);
 
+        final total = hits.first.read<int>('total');
         final uuids = [for (final hit in hits) hit.read<String>('uuid')];
         final rows = await (db.select(db.songs).addColumns([
           subqueryExpression(downloadedAssetsSubquery),
@@ -566,7 +548,7 @@ Stream<List<SongResult>> searchSongs({
           for (final row in rows) row.readTable(db.songs).uuid: row,
         };
 
-        return [
+        return SongResultPage([
           for (final hit in hits)
             if (songsByUuid[hit.read<String>('uuid')] case final row?)
               SongResult(
@@ -587,7 +569,7 @@ Stream<List<SongResult>> searchSongs({
                   ),
                 ),
               ),
-        ];
+        ], total);
       });
 }
 
@@ -669,4 +651,14 @@ class SongMatch {
 
   String? get matchTitle => matches['title'];
   String? get matchLyrics => matches['lyrics'];
+}
+
+/// One page of the songs list plus [total], the number of rows the query
+/// matched before its limit. The count is a window count in the same statement,
+/// so the page and the subtitle never disagree and never need a second query.
+class SongResultPage {
+  final List<SongResult> results;
+  final int total;
+
+  const SongResultPage(this.results, this.total);
 }

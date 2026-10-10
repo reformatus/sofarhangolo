@@ -47,14 +47,14 @@ void main() {
     List<String> fields = const [],
     int limit = 50,
   }) {
-    return searchSongs(
+    return songResults(
       searchString: term,
       searchFields: fields,
       filters: const {},
       bankFilters: const {},
       keyFilters: noKeyFilters,
       limit: limit,
-    ).first;
+    ).first.then((page) => page.results);
   }
 
   test('whole-value matches rank above substring matches', () async {
@@ -181,13 +181,14 @@ void main() {
     Map<String, List<String>> filters = const {},
     KeyFilters keyFilters = noKeyFilters,
   }) {
-    return countSongs(
+    return songResults(
       searchString: term,
       searchFields: const [],
       filters: filters,
       bankFilters: const {},
       keyFilters: keyFilters,
-    ).first;
+      limit: songSearchPageSize,
+    ).first.then((page) => page.total);
   }
 
   test('counts every match, independently of the pagination limit', () async {
@@ -236,14 +237,14 @@ void main() {
       ]),
     );
 
-    Future<Set<String>> uuids(KeyFilters keyFilters) => searchSongs(
+    Future<Set<String>> uuids(KeyFilters keyFilters) => songResults(
       searchString: 'talalj',
       searchFields: const [],
       filters: const {},
       bankFilters: const {},
       keyFilters: keyFilters,
       limit: 50,
-    ).first.then((results) => results.map((r) => r.song.uuid).toSet());
+    ).first.then((page) => page.results.map((r) => r.song.uuid).toSet());
 
     expect(await uuids(noKeyFilters), {'c-major', 'a-minor', 'no-key'});
     expect(

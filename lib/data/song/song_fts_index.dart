@@ -26,7 +26,9 @@ class SongFtsColumn {
 /// the folded title and finally the rowid, so LIMIT/OFFSET pages stay stable.
 /// The FTS set is a `MATERIALIZED` CTE (FTS5 also rejects `MATCH` inside an OR
 /// over a left join) so `bm25` and the snippets are computed once per query
-/// instead of per scanned song.
+/// instead of per scanned song. The statement also reports the total number of
+/// matches with `COUNT(*) OVER ()`, evaluated before `LIMIT`, so the UI needs
+/// no separate counting query.
 class SongFtsIndex {
   static const tableName = 'songs_fts';
   static const snippetStart = '<?';
@@ -123,6 +125,9 @@ class SongFtsIndex {
   /// the searchable field names taking part; [extraWhere] and [extraVariables]
   /// append caller filters (tags, banks, key).
   ///
+  /// Also returns `total`, the full match count - a window count evaluated
+  /// before the limit, so no second counting query is needed.
+  ///
   /// The FTS set is a `MATERIALIZED` CTE: the OR below stops FTS from driving
   /// the scan, and ordering by the rank would otherwise re-evaluate `bm25` and
   /// the snippets for every scanned song (a correlated blow-up that dominated
@@ -203,6 +208,7 @@ class SongFtsIndex {
 
     final sql =
         '${cte}SELECT songs.uuid AS uuid, '
+        'COUNT(*) OVER () AS total, '
         '$rankColumn, '
         'CASE WHEN ${exact.join(' OR ')} THEN 0 '
         'WHEN ${like.join(' OR ')} THEN 1 ELSE 2 END AS tier, '
@@ -215,60 +221,5 @@ class SongFtsIndex {
         'LIMIT ? OFFSET ?';
 
     return (sql: sql, variables: variables);
-  }
-
-  /// A `SELECT COUNT(*)` query over every row matching the current search (when
-  /// [term] is non-empty) and [extraWhere] filters - no ordering, snippets or
-  /// limit. Used for the result count in the filters subtitle.
-  static ({String sql, List<Variable> variables}) countQuery({
-    String? term,
-    List<String> fields = const [],
-    String extraWhere = '',
-    List<Variable> extraVariables = const [],
-  }) {
-    final searching = term != null && term.isNotEmpty;
-    final variables = <Variable>[];
-    final conditions = <String>[];
-
-    if (searching) {
-      assert(fields.isNotEmpty, 'at least one searchable field must take part');
-      // Textual order: the MATCH of the candidate subquery first, then the
-      // LIKE conditions, then the caller's filters.
-      final ftsFields = _ftsFieldsOf(fields);
-      final hasFts = ftsFields.isNotEmpty;
-      String? matchCondition;
-      if (hasFts) {
-        variables.add(Variable<String>(_matchString(term, ftsFields)));
-        // An uncorrelated IN subquery lets FTS answer membership once instead
-        // of a left join re-evaluated for every scanned song.
-        matchCondition =
-            'songs.id IN (SELECT rowid FROM $tableName WHERE $tableName MATCH ?)';
-      }
-
-      final like = <String>[];
-      final likePattern = '%${_escapeLike(foldTerm(term))}%';
-      for (final field in fields) {
-        like.add("${_foldedValue(field)} LIKE ? ESCAPE '\\'");
-        variables.add(Variable<String>(likePattern));
-      }
-      conditions.add(
-        matchCondition == null
-            ? '(${like.join(' OR ')})'
-            : '($matchCondition OR ${like.join(' OR ')})',
-      );
-    }
-
-    if (extraWhere.isNotEmpty) {
-      conditions.add('($extraWhere)');
-      variables.addAll(extraVariables);
-    }
-
-    final where = conditions.isEmpty
-        ? ''
-        : ' WHERE ${conditions.join(' AND ')}';
-    return (
-      sql: 'SELECT COUNT(*) AS count FROM songs$where',
-      variables: variables,
-    );
   }
 }
