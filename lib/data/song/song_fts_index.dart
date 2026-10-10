@@ -24,8 +24,9 @@ class SongFtsColumn {
 ///
 /// Hits are tiered - 0 exact, 1 substring, 2 FTS-only - then ordered by bm25,
 /// the folded title and finally the rowid, so LIMIT/OFFSET pages stay stable.
-/// The FTS part lives in a subquery because FTS5 rejects `MATCH` inside an OR
-/// over a left join; that subquery also computes `bm25` and the snippets.
+/// The FTS set is a `MATERIALIZED` CTE (FTS5 also rejects `MATCH` inside an OR
+/// over a left join) so `bm25` and the snippets are computed once per query
+/// instead of per scanned song.
 class SongFtsIndex {
   static const tableName = 'songs_fts';
   static const snippetStart = '<?';
@@ -122,10 +123,16 @@ class SongFtsIndex {
   /// the searchable field names taking part; [extraWhere] and [extraVariables]
   /// append caller filters (tags, banks, key).
   ///
+  /// The FTS set is a `MATERIALIZED` CTE: the OR below stops FTS from driving
+  /// the scan, and ordering by the rank would otherwise re-evaluate `bm25` and
+  /// the snippets for every scanned song (a correlated blow-up that dominated
+  /// the cost - on a common word the whole query took ~12 s instead of ~0.7 s).
+  /// Materialising computes them once for the match set.
+  ///
   /// Prepared-statement variables are bound positionally, so their order must
-  /// follow the placeholders in the SQL text: exact conditions, LIKE
-  /// conditions, the FTS match, the WHERE LIKE conditions, extras, then the
-  /// limit and offset.
+  /// follow the placeholders in the SQL text: the CTE's MATCH comes first
+  /// (the CTE precedes the outer SELECT), then the exact conditions, the LIKE
+  /// conditions, the WHERE LIKE conditions, extras, then the limit and offset.
   static ({String sql, List<Variable> variables}) buildSearchQuery({
     required String term,
     required List<String> fields,
@@ -143,6 +150,32 @@ class SongFtsIndex {
 
     final variables = <Variable>[];
 
+    var cte = '';
+    var from = 'FROM songs';
+    var rankColumn = 'NULL AS rank';
+    var matches = [
+      for (final column in columns) 'NULL AS ${matchAlias(column.name)}',
+    ].join(', ');
+    // A bare integer in ORDER BY is a column ordinal, so use NULL as the
+    // neutral constant when there is no FTS rank.
+    var rankOrder = 'NULL';
+    if (hasFts) {
+      variables.add(Variable<String>(_matchString(term, ftsFields)));
+      cte =
+          'WITH hit AS MATERIALIZED ('
+          'SELECT rowid AS id, '
+          'bm25($tableName, ${columns.map((c) => c.weight).join(', ')}) AS rank, '
+          '$_snippetSelects '
+          'FROM $tableName WHERE $tableName MATCH ?) ';
+      from = 'FROM songs LEFT JOIN hit ON hit.id = songs.id';
+      rankColumn = 'hit.rank AS rank';
+      matches = [
+        for (final column in columns)
+          'hit.${matchAlias(column.name)} AS ${matchAlias(column.name)}',
+      ].join(', ');
+      rankOrder = 'COALESCE(hit.rank, 0)';
+    }
+
     final exact = <String>[];
     final like = <String>[];
     for (final field in fields) {
@@ -152,18 +185,6 @@ class SongFtsIndex {
     for (final field in fields) {
       like.add("${_foldedValue(field)} LIKE ? ESCAPE '\\'");
       variables.add(Variable<String>(likePattern));
-    }
-
-    var from = 'FROM songs';
-    if (hasFts) {
-      variables.add(Variable<String>(_matchString(term, ftsFields)));
-      from =
-          'FROM songs LEFT JOIN ('
-          'SELECT rowid AS id, '
-          'bm25($tableName, ${columns.map((c) => c.weight).join(', ')}) AS rank, '
-          '$_snippetSelects '
-          'FROM $tableName WHERE $tableName MATCH ?'
-          ') AS hit ON hit.id = songs.id';
     }
 
     final whereLike = <String>[];
@@ -179,19 +200,9 @@ class SongFtsIndex {
     final matchCondition = hasFts
         ? '(hit.id IS NOT NULL OR ${whereLike.join(' OR ')})'
         : '(${whereLike.join(' OR ')})';
-    final rankColumn = hasFts ? 'hit.rank AS rank' : 'NULL AS rank';
-    final matches = [
-      for (final column in columns)
-        hasFts
-            ? 'hit.${matchAlias(column.name)} AS ${matchAlias(column.name)}'
-            : 'NULL AS ${matchAlias(column.name)}',
-    ].join(', ');
-    // A bare integer in ORDER BY is a column ordinal, so use NULL as the
-    // neutral constant when there is no FTS rank.
-    final rankOrder = hasFts ? 'COALESCE(hit.rank, 0)' : 'NULL';
 
     final sql =
-        'SELECT songs.uuid AS uuid, '
+        '${cte}SELECT songs.uuid AS uuid, '
         '$rankColumn, '
         'CASE WHEN ${exact.join(' OR ')} THEN 0 '
         'WHEN ${like.join(' OR ')} THEN 1 ELSE 2 END AS tier, '
@@ -219,18 +230,19 @@ class SongFtsIndex {
     final variables = <Variable>[];
     final conditions = <String>[];
 
-    var from = 'FROM songs';
     if (searching) {
       assert(fields.isNotEmpty, 'at least one searchable field must take part');
-      // Textual order: the MATCH inside the join subquery first, then the
+      // Textual order: the MATCH of the candidate subquery first, then the
       // LIKE conditions, then the caller's filters.
       final ftsFields = _ftsFieldsOf(fields);
       final hasFts = ftsFields.isNotEmpty;
+      String? matchCondition;
       if (hasFts) {
         variables.add(Variable<String>(_matchString(term, ftsFields)));
-        from =
-            'FROM songs LEFT JOIN (SELECT rowid AS id FROM $tableName '
-            'WHERE $tableName MATCH ?) AS hit ON hit.id = songs.id';
+        // An uncorrelated IN subquery lets FTS answer membership once instead
+        // of a left join re-evaluated for every scanned song.
+        matchCondition =
+            'songs.id IN (SELECT rowid FROM $tableName WHERE $tableName MATCH ?)';
       }
 
       final like = <String>[];
@@ -240,9 +252,9 @@ class SongFtsIndex {
         variables.add(Variable<String>(likePattern));
       }
       conditions.add(
-        hasFts
-            ? '(hit.id IS NOT NULL OR ${like.join(' OR ')})'
-            : '(${like.join(' OR ')})',
+        matchCondition == null
+            ? '(${like.join(' OR ')})'
+            : '($matchCondition OR ${like.join(' OR ')})',
       );
     }
 
@@ -254,6 +266,9 @@ class SongFtsIndex {
     final where = conditions.isEmpty
         ? ''
         : ' WHERE ${conditions.join(' AND ')}';
-    return (sql: 'SELECT COUNT(*) AS count $from$where', variables: variables);
+    return (
+      sql: 'SELECT COUNT(*) AS count FROM songs$where',
+      variables: variables,
+    );
   }
 }
