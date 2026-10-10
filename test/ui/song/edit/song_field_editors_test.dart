@@ -142,6 +142,77 @@ void main() {
     expect(changes.last, isNull);
   });
 
+  testWidgets('suggestion field commits the highlighted option on Enter', (
+    tester,
+  ) async {
+    final field = _field('language');
+    final changes = <Object?>[];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          selectableValuesForFilterableFieldProvider(
+            field.apiName,
+          ).overrideWith((ref) async => const ['magyar', 'angol']),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: SongContentFieldEditor(
+              field: field,
+              value: null,
+              onChanged: changes.add,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'mag');
+    await tester.pumpAndSettle();
+
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(changes.last, 'magyar');
+  });
+
+  testWidgets('chips field commits the highlighted suggestion on Enter', (
+    tester,
+  ) async {
+    final field = _field('content_tags');
+    final changes = <Object?>[];
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          selectableValuesForFilterableFieldProvider(
+            field.apiName,
+          ).overrideWith((ref) async => const ['dicsőítés', 'karácsony']),
+        ],
+        child: MaterialApp(
+          home: Scaffold(
+            body: SongContentFieldEditor(
+              field: field,
+              value: null,
+              onChanged: changes.add,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField), 'dics');
+    await tester.pumpAndSettle();
+
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pumpAndSettle();
+
+    expect(changes.last, const ['dicsőítés']);
+    expect(find.widgetWithText(InputChip, 'dicsőítés'), findsOneWidget);
+  });
+
   testWidgets('key field adds the chosen key to the song', (tester) async {
     final changes = <List<KeyField>>[];
 

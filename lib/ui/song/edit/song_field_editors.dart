@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_typeahead/flutter_typeahead.dart';
 import 'package:textfield_tags/textfield_tags.dart';
 
 import '../../../data/song/song.dart';
@@ -74,13 +73,17 @@ class SongContentFieldEditor extends ConsumerWidget {
         suggestions: suggestions,
         onChanged: (tags) => onChanged(tags.isEmpty ? null : tags),
       ),
-      SongFieldEditorKind.text || SongFieldEditorKind.suggestionText =>
-        _TextField(
-          field: field,
-          initialValue: value is String ? value as String : null,
-          suggestions: suggestions,
-          onChanged: onChanged,
-        ),
+      SongFieldEditorKind.text => _PlainTextField(
+        field: field,
+        initialValue: value is String ? value as String : null,
+        onChanged: onChanged,
+      ),
+      SongFieldEditorKind.suggestionText => _SuggestionField(
+        field: field,
+        initialValue: value is String ? value as String : null,
+        suggestions: suggestions,
+        onChanged: onChanged,
+      ),
       SongFieldEditorKind.key => throw StateError(
         'key fields are rendered by SongKeyField',
       ),
@@ -94,10 +97,55 @@ List<String> _asStringList(Object? value) {
   return const [];
 }
 
-/// A labelled text field; when [suggestions] is non-empty it becomes a
-/// typeahead field that still accepts custom values.
-class _TextField extends StatefulWidget {
-  const _TextField({
+InputDecoration _fieldDecoration(SongField field) => InputDecoration(
+  labelText: field.title,
+  prefixIcon: field.icon == null ? null : Icon(field.icon),
+  isDense: true,
+);
+
+/// A plain text field (no value vocabulary).
+class _PlainTextField extends StatefulWidget {
+  const _PlainTextField({
+    required this.field,
+    required this.initialValue,
+    required this.onChanged,
+  });
+
+  final SongField field;
+  final String? initialValue;
+  final ValueChanged<Object?> onChanged;
+
+  @override
+  State<_PlainTextField> createState() => _PlainTextFieldState();
+}
+
+class _PlainTextFieldState extends State<_PlainTextField> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.initialValue ?? '',
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _controller,
+      decoration: _fieldDecoration(widget.field),
+      onChanged: widget.onChanged,
+    );
+  }
+}
+
+/// A single-value text field with a value vocabulary. Uses the same
+/// [Autocomplete] as the chip editor, so the suggestion dropdown and its
+/// keyboard behaviour (first result highlighted, arrows move, Enter selects)
+/// are identical; custom values are still accepted.
+class _SuggestionField extends StatelessWidget {
+  const _SuggestionField({
     required this.field,
     required this.initialValue,
     required this.suggestions,
@@ -110,68 +158,34 @@ class _TextField extends StatefulWidget {
   final ValueChanged<Object?> onChanged;
 
   @override
-  State<_TextField> createState() => _TextFieldState();
-}
-
-class _TextFieldState extends State<_TextField> {
-  late final TextEditingController _controller = TextEditingController(
-    text: widget.initialValue ?? '',
-  );
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  InputDecoration get _decoration => InputDecoration(
-    labelText: widget.field.title,
-    prefixIcon: widget.field.icon == null ? null : Icon(widget.field.icon),
-    isDense: true,
-  );
-
-  @override
   Widget build(BuildContext context) {
-    if (widget.suggestions.isEmpty) {
-      return TextField(
-        controller: _controller,
-        decoration: _decoration,
-        onChanged: widget.onChanged,
-      );
-    }
-
-    return TypeAheadField<String>(
-      controller: _controller,
-      hideOnEmpty: true,
-      hideOnUnfocus: true,
-      suggestionsCallback: (pattern) {
-        final query = pattern.trim().toLowerCase();
-        final current = _controller.text.trim().toLowerCase();
-        return [
-          for (final suggestion in widget.suggestions)
-            if (suggestion.toLowerCase() != current &&
-                (query.isEmpty || suggestion.toLowerCase().contains(query)))
-              suggestion,
-        ];
-      },
-      itemBuilder: (context, suggestion) =>
-          ListTile(dense: true, title: Text(suggestion)),
-      onSelected: (suggestion) {
-        _controller.text = suggestion;
-        widget.onChanged(suggestion);
-      },
-      builder: (context, controller, focusNode) => TextField(
-        controller: controller,
-        focusNode: focusNode,
-        decoration: _decoration,
-        onChanged: widget.onChanged,
-      ),
+    return Autocomplete<String>(
+      initialValue: TextEditingValue(text: initialValue ?? ''),
+      optionsBuilder: (value) => _matchingSuggestions(value.text, suggestions),
+      onSelected: onChanged,
+      fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) =>
+          TextField(
+            controller: controller,
+            focusNode: focusNode,
+            decoration: _fieldDecoration(field),
+            onChanged: onChanged,
+            onSubmitted: (_) => onFieldSubmitted(),
+          ),
     );
   }
 }
 
-/// A tag input: values become removable chips; typing a separator or picking a
-/// suggestion adds one, and the cursor keeps writing in the field below.
+Iterable<String> _matchingSuggestions(String text, List<String> suggestions) {
+  final query = text.trim().toLowerCase();
+  return [
+    for (final suggestion in suggestions)
+      if (query.isEmpty || suggestion.toLowerCase().contains(query)) suggestion,
+  ];
+}
+
+/// A tag input: values are chips inside the field; typing a separator or
+/// picking a suggested result adds one, and the cursor keeps writing after
+/// them. Enter selects the highlighted suggestion, comma commits free text.
 class _ChipsField extends StatefulWidget {
   const _ChipsField({
     required this.field,
@@ -218,13 +232,13 @@ class _ChipsFieldState extends State<_ChipsField> {
   Widget build(BuildContext context) {
     return Autocomplete<String>(
       optionsBuilder: (value) {
-        final query = value.text.trim().toLowerCase();
         final chosen = _tagsController.getTags ?? const <String>[];
         return [
-          for (final suggestion in widget.suggestions)
-            if (!chosen.contains(suggestion) &&
-                (query.isEmpty || suggestion.toLowerCase().contains(query)))
-              suggestion,
+          for (final suggestion in _matchingSuggestions(
+            value.text,
+            widget.suggestions,
+          ))
+            if (!chosen.contains(suggestion)) suggestion,
         ];
       },
       onSelected: _tagsController.onTagSubmitted,
@@ -235,42 +249,44 @@ class _ChipsFieldState extends State<_ChipsField> {
             textEditingController: textController,
             focusNode: focusNode,
             textSeparators: const [','],
-            inputFieldBuilder: (context, values) => Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (values.tags.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        for (final tag in values.tags)
-                          InputChip(
-                            label: Text(tag),
-                            visualDensity: VisualDensity.compact,
-                            materialTapTargetSize:
-                                MaterialTapTargetSize.shrinkWrap,
-                            onDeleted: () => values.onTagRemoved(tag),
+            inputFieldBuilder: (context, values) => LayoutBuilder(
+              builder: (context, constraints) => TextField(
+                controller: values.textEditingController,
+                focusNode: values.focusNode,
+                decoration: _fieldDecoration(widget.field).copyWith(
+                  errorText: values.error,
+                  // Chips live inside the field, to the left of the cursor.
+                  prefixIconConstraints: BoxConstraints(
+                    maxWidth: constraints.maxWidth * 0.6,
+                  ),
+                  prefixIcon: values.tags.isEmpty
+                      ? null
+                      : SingleChildScrollView(
+                          controller: values.tagScrollController,
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (final tag in values.tags)
+                                Padding(
+                                  padding: const EdgeInsets.only(left: 4),
+                                  child: InputChip(
+                                    label: Text(tag),
+                                    visualDensity: VisualDensity.compact,
+                                    materialTapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    onDeleted: () => values.onTagRemoved(tag),
+                                  ),
+                                ),
+                            ],
                           ),
-                      ],
-                    ),
-                  ),
-                TextField(
-                  controller: values.textEditingController,
-                  focusNode: values.focusNode,
-                  decoration: InputDecoration(
-                    labelText: widget.field.title,
-                    prefixIcon: widget.field.icon == null
-                        ? null
-                        : Icon(widget.field.icon),
-                    isDense: true,
-                    errorText: values.error,
-                  ),
-                  onChanged: values.onTagChanged,
-                  onSubmitted: values.onTagSubmitted,
+                        ),
                 ),
-              ],
+                onChanged: values.onTagChanged,
+                // Enter selects the highlighted suggestion (no-op when none
+                // is showing); comma commits free text.
+                onSubmitted: (_) => onFieldSubmitted(),
+              ),
             ),
           ),
     );
@@ -280,7 +296,11 @@ class _ChipsFieldState extends State<_ChipsField> {
 /// The core `key` field: a multi-value picker over the fixed pitch/mode
 /// vocabulary.
 class SongKeyField extends StatefulWidget {
-  const SongKeyField({required this.initialKeys, required this.onChanged, super.key});
+  const SongKeyField({
+    required this.initialKeys,
+    required this.onChanged,
+    super.key,
+  });
 
   final List<KeyField> initialKeys;
   final ValueChanged<List<KeyField>> onChanged;
