@@ -7,6 +7,16 @@ import '../../data/song/song.dart';
 import '../cue/session/session_provider.dart';
 import 'state.dart';
 
+/// The icon used for [viewType] wherever the view is presented: the segmented
+/// chooser and the editor's attachment empty state. One source keeps them in
+/// sync.
+IconData viewTypeIcon(SongViewType viewType) => switch (viewType) {
+  SongViewType.svg => Icons.music_note_outlined,
+  SongViewType.pdf => Icons.audio_file_outlined,
+  SongViewType.lyrics => Icons.text_snippet_outlined,
+  SongViewType.chords => Icons.tag_outlined,
+};
+
 class ViewChooser extends ConsumerWidget {
   const ViewChooser({
     super.key,
@@ -27,27 +37,19 @@ class ViewChooser extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final Map<SongViewType, ({IconData icon, String label, bool enabled})>
-    viewTypeEntries = {
+    final Map<SongViewType, ({String label, bool enabled})> viewTypeEntries = {
       SongViewType.svg: (
-        icon: Icons.music_note_outlined,
         label: 'Kotta',
         enabled: song.hasSvg || allowUnavailableViews,
       ),
       SongViewType.pdf: (
-        icon: Icons.audio_file_outlined,
         label: 'PDF',
         enabled: song.hasPdf || allowUnavailableViews,
       ),
       if (song.hasChords)
-        SongViewType.chords: (
-          icon: Icons.tag_outlined,
-          label: 'Akkordok',
-          enabled: true,
-        )
+        SongViewType.chords: (label: 'Akkordok', enabled: true)
       else
         SongViewType.lyrics: (
-          icon: Icons.text_snippet_outlined,
           label: 'Dalszöveg',
           enabled: song.hasLyrics || allowUnavailableViews,
         ),
@@ -89,7 +91,7 @@ class ViewChooser extends ConsumerWidget {
                     (entry) => ButtonSegment(
                       value: entry.key,
                       label: Text(entry.value.label),
-                      icon: Icon(entry.value.icon),
+                      icon: Icon(viewTypeIcon(entry.key)),
                       enabled: entry.value.enabled,
                       tooltip: !entry.value.enabled ? 'Nem elérhető' : null,
                     ),
@@ -138,7 +140,7 @@ class ViewChooser extends ConsumerWidget {
                           Padding(
                             padding: EdgeInsets.only(right: 10),
                             child: Icon(
-                              entry.value.icon,
+                              viewTypeIcon(entry.key),
                               color: Theme.of(
                                 context,
                               ).colorScheme.inverseSurface,
@@ -193,7 +195,7 @@ class ViewChooser extends ConsumerWidget {
                   (entry) => ButtonSegment(
                     value: entry.key,
                     label: Text(entry.value.label),
-                    icon: Icon(entry.value.icon),
+                    icon: Icon(viewTypeIcon(entry.key)),
                     enabled: entry.value.enabled,
                     tooltip: !entry.value.enabled ? 'Nem elérhető' : null,
                   ),
@@ -239,7 +241,7 @@ class ViewChooser extends ConsumerWidget {
                           Padding(
                             padding: EdgeInsets.only(right: 10),
                             child: Icon(
-                              entry.value.icon,
+                              viewTypeIcon(entry.key),
                               color: Theme.of(
                                 context,
                               ).colorScheme.inverseSurface,

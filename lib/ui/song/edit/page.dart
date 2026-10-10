@@ -275,9 +275,9 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
     );
   }
 
-  /// Actions belonging to the currently selected view, mirroring the song
-  /// page's action bar. The sheet views get attach/replace/remove instead of
-  /// a view switch.
+  /// Actions belonging to the currently selected, *attached* sheet view. When
+  /// nothing is attached the attach button lives in the centered empty state
+  /// instead, so the action bar stays empty.
   List<Widget> _contextualActions(SongViewType viewType) {
     final field = switch (viewType) {
       SongViewType.svg => 'svg',
@@ -287,34 +287,28 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
     if (field == null) return const [];
 
     final attached = field == 'svg' ? _song.hasSvg : _song.hasPdf;
+    if (!attached) return const [];
 
     return [
       Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
-        child: attached
-            ? FilledButton.tonalIcon(
-                onPressed: () => _replaceAttachment(field),
-                icon: const Icon(Icons.sync),
-                label: const Text('Csere'),
-              )
-            : FilledButton.icon(
-                onPressed: () => _replaceAttachment(field),
-                icon: const Icon(Icons.upload_file),
-                label: const Text('Fájl csatolása'),
-              ),
-      ),
-      if (attached)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: OutlinedButton.icon(
-            style: OutlinedButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-            onPressed: () => _removeAttachment(field),
-            icon: const Icon(Icons.delete_outline),
-            label: const Text('Eltávolítás'),
-          ),
+        child: FilledButton.tonalIcon(
+          onPressed: () => _replaceAttachment(field),
+          icon: const Icon(Icons.sync),
+          label: const Text('Csere'),
         ),
+      ),
+      Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8),
+        child: OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.error,
+          ),
+          onPressed: () => _removeAttachment(field),
+          icon: const Icon(Icons.delete_outline),
+          label: const Text('Eltávolítás'),
+        ),
+      ),
     ];
   }
 
@@ -351,8 +345,16 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
 
   Widget _buildBody(SongViewType viewType, double previewWidth) {
     return switch (viewType) {
-      SongViewType.svg => AttachmentEditor(song: _song, isSvg: true),
-      SongViewType.pdf => AttachmentEditor(song: _song, isSvg: false),
+      SongViewType.svg => AttachmentEditor(
+        song: _song,
+        isSvg: true,
+        onAttach: () => _replaceAttachment('svg'),
+      ),
+      SongViewType.pdf => AttachmentEditor(
+        song: _song,
+        isSvg: false,
+        onAttach: () => _replaceAttachment('pdf'),
+      ),
       SongViewType.lyrics || SongViewType.chords => _buildLyricsArea(
         previewWidth,
       ),
