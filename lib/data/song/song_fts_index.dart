@@ -197,26 +197,34 @@ class SongFtsIndex {
           "'...', 30) AS snippet_${column.name}",
   ].join(', ');
 
+  /// Folds a search term the same way [foldExpression] folds database values:
+  /// diacritics removed, lowercased.
+  static String foldTerm(String term) => removeDiacritics(term).toLowerCase();
+
   /// Builds the integrated search statement: FTS ∪ LIKE ∪ exact, tiered
   /// (0 exact, 1 LIKE, 2 FTS-only) and ordered by tier, relevance, folded
-  /// title. [fields] are the searchable columns taking part; [extraWhere] and
-  /// [extraVariables] append caller filters (tags, banks).
+  /// title (then rowid, so [limit]/[offset] pages are stable). [fields] are
+  /// the searchable columns taking part; [extraWhere] and [extraVariables]
+  /// append caller filters (tags, banks).
   ///
   /// The FTS part lives in a subquery because FTS5 rejects `MATCH` in an OR
   /// over a left join; that subquery also computes `bm25` and the snippets.
   ///
   /// Prepared-statement variables are bound positionally, so their order must
   /// follow the placeholders in the SQL text: exact conditions, LIKE
-  /// conditions, the FTS match, the WHERE LIKE conditions, then extras.
+  /// conditions, the FTS match, the WHERE LIKE conditions, extras, then the
+  /// limit and offset.
   ({String sql, List<Variable> variables}) buildSearchQuery({
     required String term,
     required List<SongFtsColumn> fields,
+    required int limit,
+    int offset = 0,
     String extraWhere = '',
     List<Variable> extraVariables = const [],
   }) {
     assert(fields.isNotEmpty, 'at least one searchable field must take part');
 
-    final foldedTerm = removeDiacritics(term).toLowerCase();
+    final foldedTerm = foldTerm(term);
     final likePattern = '%${_escapeLike(foldedTerm)}%';
     final variables = <Variable>[];
 
@@ -242,6 +250,9 @@ class SongFtsIndex {
       variables.add(Variable<String>(likePattern));
     }
     variables.addAll(extraVariables);
+    variables
+      ..add(Variable<int>(limit))
+      ..add(Variable<int>(offset));
 
     final sql =
         'SELECT songs.uuid AS uuid, '
@@ -262,7 +273,8 @@ class SongFtsIndex {
         'WHERE hit.id IS NOT NULL OR ${whereLike.join(' OR ')}'
         '${extraWhere.isEmpty ? '' : ' AND ($extraWhere)'} '
         'ORDER BY tier, COALESCE(hit.rank, 0), '
-        '${foldExpression('songs.title')}';
+        '${foldExpression('songs.title')}, songs.id '
+        'LIMIT ? OFFSET ?';
 
     return (sql: sql, variables: variables);
   }

@@ -74,7 +74,7 @@ void main() {
       addTearDown(container.dispose);
       final results = await waitForProviderValue(
         container,
-        filteredSongsProvider,
+        filteredSongsProvider(songSearchPageSize),
       );
       return results.map((result) => result.song.uuid).toSet();
     }

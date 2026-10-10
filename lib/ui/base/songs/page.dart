@@ -62,6 +62,18 @@ class _SongsPageState extends ConsumerState<SongsPage> {
 
   bool filtersScrolled = false;
 
+  /// How many search results are loaded; the results list grows this as it
+  /// scrolls (["automatic" pagination via a SQL LIMIT]).
+  int searchLimit = songSearchPageSize;
+
+  /// Loads the next page when the list has scrolled near its end. Only the
+  /// search path paginates - the filtered list is unbounded.
+  void _maybeLoadMore(int loadedCount, String searchString) {
+    if (searchString.trim().isEmpty) return;
+    if (loadedCount < searchLimit) return;
+    setState(() => searchLimit += songSearchPageSize);
+  }
+
   late OverlayPortalController _overlayPortalController;
   late ScrollController _filterExpansionScrollController;
   late ScrollController _filterSidebarScrollController;
@@ -82,11 +94,17 @@ class _SongsPageState extends ConsumerState<SongsPage> {
   @override
   Widget build(BuildContext context) {
     final banks = ref.watch(watchAllBanksProvider);
-    final songResults = ref.watch(filteredSongsProvider);
+    final songResults = ref.watch(filteredSongsProvider(searchLimit));
     final filterState = ref.watch(multiselectTagsFilterStateProvider);
     final keyFilterState = ref.watch(keyFilterStateProvider);
     final banksFilterState = ref.watch(banksFilterStateProvider);
     final searchString = ref.watch(searchStringStateProvider);
+    // A new query starts from the first page.
+    ref.listen(searchStringStateProvider, (previous, next) {
+      if (previous != next && searchLimit != songSearchPageSize) {
+        setState(() => searchLimit = songSearchPageSize);
+      }
+    });
     final shellCueInset = CueShellInset.bottomInsetOf(context);
     final insetAnimationDuration =
         MediaQuery.maybeOf(context)?.accessibleNavigation ?? false
@@ -295,40 +313,46 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                                       ? const Center(
                                           child: CircularProgressIndicator(),
                                         )
-                                      : searchString.trim().isNotEmpty &&
-                                            searchString.trim().length < 3
-                                      ? CenteredHint(
-                                          'Írj be legalább három betűt a kereséshez.',
-                                          iconData: Icons.search,
-                                          alignment: Alignment.topCenter,
-                                        )
                                       : value.isEmpty
                                       ? CenteredHint(
                                           'Nincs találat :(',
                                           iconData: Icons.search_off,
                                           alignment: Alignment.topCenter,
                                         )
-                                      : ListView.builder(
-                                          itemBuilder:
-                                              (BuildContext context, int i) {
-                                                return LSongResultTile(
-                                                  value.elementAt(i),
-                                                  banksFilterState.length == 1
-                                                      ? null
-                                                      : banks.firstWhere(
-                                                          (b) =>
-                                                              b.uuid ==
-                                                              value
-                                                                  .elementAt(i)
-                                                                  .song
-                                                                  .sourceBank,
-                                                        ),
-                                                  onTap: () =>
-                                                      _searchFieldFocusNode
-                                                          .unfocus(),
-                                                );
-                                              },
-                                          itemCount: value.length,
+                                      : NotificationListener<ScrollNotification>(
+                                          onNotification: (notification) {
+                                            _maybeLoadMore(
+                                              value.length,
+                                              searchString,
+                                            );
+                                            return false;
+                                          },
+                                          child: ListView.builder(
+                                            itemBuilder:
+                                                (
+                                                  BuildContext context,
+                                                  int i,
+                                                ) {
+                                                  return LSongResultTile(
+                                                    value.elementAt(i),
+                                                    banksFilterState.length == 1
+                                                        ? null
+                                                        : banks.firstWhere(
+                                                            (b) =>
+                                                                b.uuid ==
+                                                                value
+                                                                    .elementAt(
+                                                                      i,
+                                                                    )
+                                                                    .song
+                                                                    .sourceBank,
+                                                          ),
+                                                    onTap: () => _searchFieldFocusNode
+                                                        .unfocus(),
+                                                  );
+                                                },
+                                            itemCount: value.length,
+                                          ),
                                         ),
                               },
                             ),

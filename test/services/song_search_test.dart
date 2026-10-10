@@ -44,6 +44,7 @@ void main() {
   Future<List<SongResult>> search(
     String term, {
     List<String> fields = const [],
+    int limit = 50,
   }) {
     return searchSongs(
       searchString: term,
@@ -51,6 +52,7 @@ void main() {
       filters: const {},
       bankFilters: const {},
       keyFilters: noKeyFilters,
+      limit: limit,
     ).first;
   }
 
@@ -113,6 +115,8 @@ void main() {
     // Substring tier, and no FTS hit to rank by.
     expect(results.single.match?.tier, 1);
     expect(results.single.match?.rank, 0);
+    // LIKE hits highlight the match too, not just FTS ones.
+    expect(results.single.match?.matchTitle, 'Az <?Úr?>');
   });
 
   test('reports per-field snippets with the highlight tags', () async {
@@ -125,8 +129,8 @@ void main() {
     final byUuid = {for (final r in results) r.song.uuid: r.match};
 
     expect(byUuid['title-hit']?.matchTitle, contains('<?'));
-    expect(byUuid['title-hit']?.snippets['composer'], isNull);
-    expect(byUuid['people-hit']?.snippets['composer'], contains('<?'));
+    expect(byUuid['title-hit']?.matches['composer'], isNull);
+    expect(byUuid['people-hit']?.matches['composer'], contains('<?'));
   });
 
   test('restricts the match to the selected fields', () async {
@@ -138,6 +142,27 @@ void main() {
     final results = await search('talalj', fields: ['composer']);
 
     expect(results.map((r) => r.song.uuid).toList(), ['people-hit']);
+  });
+
+  test('limits results and pages stably', () async {
+    await db.batch(
+      (batch) => batch.insertAll(db.songs, [
+        songWith('first', 'Találj meg'),
+        songWith('second', 'Találj velem'),
+        songWith('third', 'Találj értem'),
+      ]),
+    );
+
+    final firstPage = await search('talalj', limit: 2);
+    expect(firstPage, hasLength(2));
+
+    final all = await search('talalj', limit: 10);
+    expect(all, hasLength(3));
+    // The page is a prefix of the full, deterministically ordered result.
+    expect(
+      firstPage.map((r) => r.song.uuid),
+      all.take(2).map((r) => r.song.uuid),
+    );
   });
 
   test('returns typed songs with their assets', () async {

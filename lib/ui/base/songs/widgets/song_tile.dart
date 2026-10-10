@@ -7,6 +7,7 @@ import '../../../../data/cue/slide.dart';
 import '../../../../data/log/logger.dart';
 import '../../../../data/song/extensions.dart';
 import '../../../../data/song/song.dart';
+import '../../../../data/song/song_fields.dart';
 import '../../../../services/app_links/navigation.dart';
 import '../../../../services/connectivity/provider.dart';
 import '../../../../services/songs/filter.dart';
@@ -36,6 +37,13 @@ class LSongResultTile extends ConsumerWidget {
       ),
     );
     final firstLine = song.firstLine;
+    // The fields the search matched besides the title, shown with the
+    // field's registry icon.
+    final matchRows = <Widget>[
+      for (final entry in result?.matches.entries ?? const <MapEntry<String, String>>[])
+        if (entry.key != 'title')
+          contentResultRow(context, _fieldIcon(entry.key), entry.value),
+    ];
     return LayoutBuilder(
       builder: (context, constraints) {
         final hideSongFeatures =
@@ -98,31 +106,24 @@ class LSongResultTile extends ConsumerWidget {
               ),
             ),
           ),
-          subtitle: result == null
-              ? firstLine == null ||
-                        firstLine.isEmpty ||
-                        firstLine
-                            .replaceAll(RegExp(r'[^a-zA-Z]'), '')
-                            .startsWith(
-                              song.title.replaceAll(RegExp(r'[^a-zA-Z]'), ''),
-                            )
-                    ? null
-                    : Text(
-                        firstLine,
-                        maxLines: 1,
-                        softWrap: false,
-                        overflow: TextOverflow.fade,
-                      )
-              : Column(
+          subtitle: matchRows.isNotEmpty
+              ? Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (hasMatch(result.matchLyrics))
-                      contentResultRow(
-                        context,
-                        Icons.text_snippet,
-                        result.matchLyrics,
-                      ),
-                  ],
+                  children: matchRows,
+                )
+              : firstLine == null ||
+                    firstLine.isEmpty ||
+                    firstLine
+                        .replaceAll(RegExp(r'[^a-zA-Z]'), '')
+                        .startsWith(
+                          song.title.replaceAll(RegExp(r'[^a-zA-Z]'), ''),
+                        )
+              ? null
+              : Text(
+                  firstLine,
+                  maxLines: 1,
+                  softWrap: false,
+                  overflow: TextOverflow.fade,
                 ),
           minLeadingWidth: leadingChildren.isEmpty ? 40 : 0,
           leading: leadingChildren.isEmpty
@@ -391,11 +392,10 @@ class SongFeatures extends StatelessWidget {
   }
 }
 
-bool hasMatch(String? snippet) {
-  if (snippet == null) return false;
-  return snippet.contains(snippetTags.start) &&
-      snippet.contains(snippetTags.end);
-}
+/// The registry icon for a matched field, with a neutral fallback for fields
+/// the vocabulary does not know.
+IconData _fieldIcon(String field) =>
+    defaultSongFieldRegistry[field]?.icon ?? Icons.label_outline;
 
 List<TextSpan> spansFromSnippet(
   String? snippet, {

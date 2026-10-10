@@ -90,7 +90,10 @@ Stream<List<Song>> allSongs(Ref ref) {
   return db.select(db.songs).watch();
 }
 
-const snippetTags = (start: '<?', end: '?>');
+const snippetTags = (
+  start: SongFtsIndex.snippetStart,
+  end: SongFtsIndex.snippetEnd,
+);
 
 bool matchesKeyFilters(Song song, KeyFilters keyFilters) {
   if (keyFilters.isEmpty) return true;
@@ -115,8 +118,12 @@ bool matchesKeyFilters(Song song, KeyFilters keyFilters) {
   return matchesCompleteKey || matchesPartialKeyGroup;
 }
 
+/// Number of results fetched per page; the songs list grows [filteredSongs]'
+/// limit as it scrolls (see the page's scroll listener).
+const songSearchPageSize = 50;
+
 @Riverpod(keepAlive: true)
-Stream<List<SongResult>> filteredSongs(Ref ref) {
+Stream<List<SongResult>> filteredSongs(Ref ref, int limit) {
   final String searchString = sanitize(ref.watch(searchStringStateProvider));
   final List<String> searchFields = ref.watch(searchFieldsStateProvider);
   final Map<String, List<String>> filters = ref.watch(
@@ -190,6 +197,7 @@ Stream<List<SongResult>> filteredSongs(Ref ref) {
     filters: filters,
     bankFilters: bankFilters,
     keyFilters: keyFilters,
+    limit: limit,
   );
 }
 
@@ -207,6 +215,7 @@ Stream<List<SongResult>> searchSongs({
   required Map<String, List<String>> filters,
   required Set<String> bankFilters,
   required KeyFilters keyFilters,
+  required int limit,
 }) {
   final index = SongFtsIndex.registry;
   final allColumns = [for (final column in index.columns) column.name];
@@ -245,9 +254,12 @@ Stream<List<SongResult>> searchSongs({
   final query = index.buildSearchQuery(
     term: searchString,
     fields: fields,
+    limit: limit,
     extraWhere: clauses.join(' AND '),
     extraVariables: variables,
   );
+
+  final foldedTerm = SongFtsIndex.foldTerm(searchString);
 
   return db
       .customSelect(query.sql, variables: query.variables, readsFrom: {db.songs})
@@ -278,16 +290,68 @@ Stream<List<SongResult>> searchSongs({
                 match: SongMatch(
                   tier: hit.read<int>('tier'),
                   rank: hit.readNullable<double>('rank') ?? 0,
-                  snippets: {
-                    for (final column in index.columns)
-                      column.name: hit.readNullable<String>(
-                        index.matchAlias(column),
-                      ),
-                  },
+                  matches: _matchedFields(
+                    row.readTable(db.songs),
+                    hit,
+                    index,
+                    foldedTerm,
+                  ),
                 ),
               ),
         ].where((result) => matchesKeyFilters(result.song, keyFilters)).toList();
       });
+}
+
+/// Highlighted snippets for the fields a song matched in, keyed by field name.
+///
+/// The FTS snippet is preferred (it is index-driven, token-based); for hits
+/// the trigram index cannot cover — short terms, and exact/substring matches
+/// outside the FTS' reach — a snippet is built in Dart around the folded
+/// match, so LIKE and exact hits highlight just like FTS ones.
+Map<String, String> _matchedFields(
+  Song song,
+  QueryRow hit,
+  SongFtsIndex index,
+  String foldedTerm,
+) {
+  final matched = <String, String>{};
+  for (final column in index.columns) {
+    final ftsSnippet = hit.readNullable<String>(index.matchAlias(column));
+    if (ftsSnippet != null && ftsSnippet.contains(SongFtsIndex.snippetStart)) {
+      matched[column.name] = ftsSnippet;
+      continue;
+    }
+    final value = _fieldValue(song, column.name);
+    if (value == null) continue;
+    final snippet = _snippetFor(value, foldedTerm);
+    if (snippet != null) matched[column.name] = snippet;
+  }
+  return matched;
+}
+
+String? _fieldValue(Song song, String field) => switch (field) {
+  'title' => song.title,
+  'lyrics' => song.lyrics,
+  _ => song.contentDisplay(field),
+};
+
+/// Slices [value] around its folded match of [foldedTerm] and wraps the match
+/// in the snippet highlight tags. The fold maps characters one-to-one, so
+/// indices in the folded string line up with the original.
+String? _snippetFor(String value, String foldedTerm) {
+  if (foldedTerm.isEmpty) return null;
+  final index = SongFtsIndex.foldTerm(value).indexOf(foldedTerm);
+  if (index < 0) return null;
+
+  const context = 20;
+  final start = index - context < 0 ? 0 : index - context;
+  final matchEnd = index + foldedTerm.length;
+  final end = matchEnd + context > value.length ? value.length : matchEnd + context;
+
+  return '${start > 0 ? '...' : ''}${value.substring(start, index)}'
+      '${SongFtsIndex.snippetStart}${value.substring(index, matchEnd)}'
+      '${SongFtsIndex.snippetEnd}${value.substring(matchEnd, end)}'
+      '${end < value.length ? '...' : ''}';
 }
 
 class SongResult {
@@ -299,15 +363,15 @@ class SongResult {
 }
 
 /// Relevance metadata for a song matched through the search index: the match
-/// tier (0 exact, 1 substring, 2 FTS-only), the bm25 rank, and one snippet per
-/// searchable field, keyed by field name.
+/// tier (0 exact, 1 substring, 2 FTS-only), the bm25 rank, and highlighted
+/// snippets for the fields that matched, keyed by field name.
 class SongMatch {
   final int tier;
   final double rank;
-  final Map<String, String?> snippets;
+  final Map<String, String> matches;
 
-  SongMatch({required this.tier, required this.rank, required this.snippets});
+  SongMatch({required this.tier, required this.rank, required this.matches});
 
-  String? get matchTitle => snippets['title'];
-  String? get matchLyrics => snippets['lyrics'];
+  String? get matchTitle => matches['title'];
+  String? get matchLyrics => matches['lyrics'];
 }
