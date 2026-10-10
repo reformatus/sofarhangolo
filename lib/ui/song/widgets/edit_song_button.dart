@@ -1,6 +1,3 @@
-import 'dart:async';
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,8 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../data/bank/bank.dart';
 import '../../../data/log/logger.dart';
 import '../../../data/song/song.dart';
-import '../../../services/assets/get_song_asset.dart';
 import '../../../services/songs/write_song.dart';
+import '../../common/asset_bytes.dart';
 import '../../common/confirm_dialog.dart';
 
 /// Opens the song in the editor.
@@ -57,7 +54,7 @@ class EditSongButton extends ConsumerWidget {
           try {
             copy = await copySongToLocal(
               song,
-              fetchAsset: (song, field) => _fetchAssetBytes(ref, song, field),
+              fetchAsset: (song, field) => fetchAssetBytes(ref, song, field),
             );
           } catch (error, stackTrace) {
             log.warning(
@@ -73,35 +70,5 @@ class EditSongButton extends ConsumerWidget {
     final created = copy;
     if (created == null || !context.mounted) return;
     context.push('/song/local/${created.uuid}');
-  }
-
-  /// Reads an attachment's bytes through the app's asset pipeline, downloading
-  /// and caching it on demand.
-  Future<Uint8List?> _fetchAssetBytes(
-    WidgetRef ref,
-    Song song,
-    String field,
-  ) {
-    final completer = Completer<Uint8List?>();
-    final subscription = ref.listenManual<AsyncValue<AssetResult>>(
-      getSongAssetProvider(song, field),
-      (previous, next) {
-        if (completer.isCompleted) return;
-        next.when(
-          data: (result) {
-            if (result.data != null) completer.complete(result.data);
-          },
-          error: completer.completeError,
-          loading: () {},
-        );
-      },
-      fireImmediately: true,
-    );
-
-    // `getSongAsset` emits a "loading" event first and then the bytes; guard
-    // against a stream that never settles.
-    return completer.future
-        .timeout(const Duration(seconds: 30), onTimeout: () => null)
-        .whenComplete(subscription.close);
   }
 }

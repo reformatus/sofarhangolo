@@ -72,6 +72,7 @@ class ShareDialog extends ConsumerStatefulWidget {
 
 class _ShareDialogState extends ConsumerState<ShareDialog> {
   bool _copySuccess = false;
+  bool _pdfSharing = false;
   // TODO: expose the original/raw OpenSong lyrics format here (e.g. a
   // "Eredeti formátum másolása" action for power users). Decided 2026-09-18:
   // lyrics copy actions use the user-friendly format instead.
@@ -315,8 +316,14 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
           SizedBox(
             width: double.infinity,
             child: TextButton(
-              onPressed: () => getPDF(song, ref),
-              child: const Text('PDF'),
+              onPressed: _pdfSharing ? null : () => _sharePdf(song),
+              child: _pdfSharing
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('PDF'),
             ),
           ),
         );
@@ -402,6 +409,16 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
         ),
       ),
     );
+  }
+
+  Future<void> _sharePdf(Song song) async {
+    if (_pdfSharing) return;
+    setState(() => _pdfSharing = true);
+    try {
+      await sharePdf(song, ref);
+    } finally {
+      if (mounted) setState(() => _pdfSharing = false);
+    }
   }
 
   Future<void> _copyToClipboard(BuildContext context) async {
