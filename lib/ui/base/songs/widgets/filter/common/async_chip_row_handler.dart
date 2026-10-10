@@ -6,7 +6,11 @@ import '../../../../../common/error/card.dart';
 import 'filter_chip.dart';
 import 'skeleton_chip_row.dart';
 
-/// A reusable widget that displays an async list of values as horizontal filter chips
+/// A reusable widget that displays an async list of values as horizontal filter chips.
+///
+/// While the values refresh it keeps the chips it already has and fades them,
+/// rather than replacing them with the loading placeholder - the list is being
+/// recomputed for a new search/filter, not starting from nothing.
 class AsyncChipRowHandlerOf<T> extends StatefulWidget {
   const AsyncChipRowHandlerOf({
     required this.asyncValue,
@@ -44,6 +48,9 @@ class AsyncChipRowHandlerOf<T> extends StatefulWidget {
 class _AsyncChipRowHandlerOfState<T> extends State<AsyncChipRowHandlerOf<T>> {
   late final ScrollController _scrollController;
 
+  /// The last values we had, kept while a refresh is in flight.
+  List<T>? _lastValues;
+
   @override
   void initState() {
     super.initState();
@@ -58,43 +65,51 @@ class _AsyncChipRowHandlerOfState<T> extends State<AsyncChipRowHandlerOf<T>> {
 
   @override
   Widget build(BuildContext context) {
-    return switch (widget.asyncValue) {
-      AsyncError(:final error, :final stackTrace) => LErrorCard.fromError(
-        error: error,
-        stackTrace: stackTrace,
-        title: 'Hiba a szűrőértékek lekérdezése közben',
-        icon: Icons.warning,
-        showReportButton: true,
-      ),
-      AsyncValue(:final value) =>
-        value == null
-            ? SkeletonChipRow(height: widget.height)
-            : SizedBox(
-                height: widget.height,
-                child: FadingEdgeScrollView.fromScrollView(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    controller: _scrollController,
-                    scrollDirection: Axis.horizontal,
-                    itemCount: value.length,
-                    itemBuilder: (context, i) {
-                      final item = value[i];
-                      final isSelected =
-                          widget.selectedValues?.contains(item) ?? false;
+    if (widget.asyncValue.hasValue) {
+      _lastValues = widget.asyncValue.requireValue;
+    }
+    final values = widget.asyncValue.value ?? _lastValues;
 
-                      return LFilterChip(
-                        label: widget.chipLabelBuilder(item),
-                        leading: (widget.chipLeadingBuilder != null)
-                            ? widget.chipLeadingBuilder!(item)
-                            : null,
-                        onSelected: (newValue) =>
-                            widget.onChipToggle(item, newValue),
-                        selected: isSelected,
-                      );
-                    },
-                  ),
-                ),
-              ),
-    };
+    if (values == null) {
+      return switch (widget.asyncValue) {
+        AsyncError(:final error, :final stackTrace) => LErrorCard.fromError(
+          error: error,
+          stackTrace: stackTrace,
+          title: 'Hiba a szűrőértékek lekérdezése közben',
+          icon: Icons.warning,
+          showReportButton: true,
+        ),
+        _ => SkeletonChipRow(height: widget.height),
+      };
+    }
+
+    return AnimatedOpacity(
+      duration: Durations.short4,
+      opacity: widget.asyncValue.isLoading ? 0.45 : 1,
+      child: SizedBox(
+        height: widget.height,
+        child: FadingEdgeScrollView.fromScrollView(
+          child: ListView.builder(
+            shrinkWrap: true,
+            controller: _scrollController,
+            scrollDirection: Axis.horizontal,
+            itemCount: values.length,
+            itemBuilder: (context, i) {
+              final item = values[i];
+              final isSelected = widget.selectedValues?.contains(item) ?? false;
+
+              return LFilterChip(
+                label: widget.chipLabelBuilder(item),
+                leading: (widget.chipLeadingBuilder != null)
+                    ? widget.chipLeadingBuilder!(item)
+                    : null,
+                onSelected: (newValue) => widget.onChipToggle(item, newValue),
+                selected: isSelected,
+              );
+            },
+          ),
+        ),
+      ),
+    );
   }
 }

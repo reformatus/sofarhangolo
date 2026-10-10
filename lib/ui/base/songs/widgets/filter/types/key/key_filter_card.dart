@@ -143,47 +143,63 @@ class _KeyFilterCardState extends ConsumerState<KeyFilterCard> {
     );
   }
 
+  /// The last values each row had, kept while a refresh is in flight so the row
+  /// fades its chips instead of flashing a placeholder.
+  List<KeyFilterSelectable>? _lastPitches;
+  List<KeyFilterSelectable>? _lastModes;
+
   Widget chipsRow(
     AsyncValue<List<KeyFilterSelectable>> selectables, {
     bool modes = false,
   }) {
-    return switch (selectables) {
-      AsyncError(:final error, :final stackTrace) => LErrorCard.fromError(
-        error: error,
-        stackTrace: stackTrace,
-        title: 'Hiba a hangsoradatok lekérdezésekor',
-        icon: Icons.error,
-        showReportButton: false,
+    if (selectables.hasValue) {
+      if (modes) {
+        _lastModes = selectables.requireValue;
+      } else {
+        _lastPitches = selectables.requireValue;
+      }
+    }
+    final values = selectables.value ?? (modes ? _lastModes : _lastPitches);
+
+    if (values == null) {
+      return switch (selectables) {
+        AsyncError(:final error, :final stackTrace) => LErrorCard.fromError(
+          error: error,
+          stackTrace: stackTrace,
+          title: 'Hiba a hangsoradatok lekérdezésekor',
+          icon: Icons.error,
+          showReportButton: false,
+        ),
+        _ => const SkeletonChipRow(),
+      };
+    }
+
+    return SizedBox(
+      height: 42,
+      child: AnimatedOpacity(
+        duration: Durations.short4,
+        opacity: selectables.isLoading ? 0.45 : 1,
+        child: FadingEdgeScrollView.fromScrollView(
+          child: ListView.builder(
+            // hack, but still better than code repetition...
+            controller: modes ? modesScrollController : pitchesScrollController,
+            shrinkWrap: true,
+            scrollDirection: Axis.horizontal,
+            itemBuilder: (context, i) => LFilterChip(
+              label: values[i].addingKey
+                  ? displayKeyString(values[i].label)
+                  : (modes
+                        ? displayKeyMode(values[i].label)
+                        : displayKeyPitch(values[i].label)),
+              selected: values[i].selected,
+              onSelected: values[i].onSelected,
+              special: values[i].addingKey,
+              leading: values[i].addingKey ? Icon(Icons.add, size: 20) : null,
+            ),
+            itemCount: values.length,
+          ),
+        ),
       ),
-      AsyncValue(:final value) => SizedBox(
-        height: 42,
-        child: value == null
-            ? const SkeletonChipRow()
-            : FadingEdgeScrollView.fromScrollView(
-                child: ListView.builder(
-                  // hack, but still better than code repetition...
-                  controller: modes
-                      ? modesScrollController
-                      : pitchesScrollController,
-                  shrinkWrap: true,
-                  scrollDirection: Axis.horizontal,
-                  itemBuilder: (context, i) => LFilterChip(
-                    label: value[i].addingKey
-                        ? displayKeyString(value[i].label)
-                        : (modes
-                              ? displayKeyMode(value[i].label)
-                              : displayKeyPitch(value[i].label)),
-                    selected: value[i].selected,
-                    onSelected: value[i].onSelected,
-                    special: value[i].addingKey,
-                    leading: value[i].addingKey
-                        ? Icon(Icons.add, size: 20)
-                        : null,
-                  ),
-                  itemCount: value.length,
-                ),
-              ),
-      ),
-    };
+    );
   }
 }
