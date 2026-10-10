@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../../../services/key/filter.dart';
+import '../../../../../../../services/songs/facet.dart';
 import '../../../../../../common/error/card.dart';
 import '../../../../../../common/key_text.dart';
 import '../../common/filter_chip.dart';
+import '../../common/skeleton_chip_row.dart';
 import 'state.dart';
 
 class KeyFilterCard extends ConsumerStatefulWidget {
@@ -39,6 +41,15 @@ class _KeyFilterCardState extends ConsumerState<KeyFilterCard> {
 
     final selectablePitches = ref.watch(selectablePitchesProvider);
     final selectableModes = ref.watch(selectableModesProvider);
+
+    // No key in the collection matches the current query and none is selected:
+    // the card has no purpose.
+    final available = ref.watch(keyFacetProvider);
+    if (!isActive &&
+        available.hasValue &&
+        available.requireValue.keys.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Card(
       elevation: isActive ? 3 : 0,
@@ -83,12 +94,13 @@ class _KeyFilterCardState extends ConsumerState<KeyFilterCard> {
                         overflow: TextOverflow.fade,
                         style: TextStyle(
                           fontStyle: FontStyle.italic,
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSecondaryContainer,
-                          fontSize: Theme.of(
-                            context,
-                          ).textTheme.bodySmall!.fontSize,
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSecondaryContainer,
+                          fontSize: Theme.of(context)
+                              .textTheme
+                              .bodySmall!
+                              .fontSize,
                         ),
                       ),
                     ),
@@ -146,10 +158,7 @@ class _KeyFilterCardState extends ConsumerState<KeyFilterCard> {
       AsyncValue(:final value) => SizedBox(
         height: 42,
         child: value == null
-            ? Align(
-                alignment: Alignment.center,
-                child: LinearProgressIndicator(),
-              )
+            ? const SkeletonChipRow()
             : FadingEdgeScrollView.fromScrollView(
                 child: ListView.builder(
                   // hack, but still better than code repetition...

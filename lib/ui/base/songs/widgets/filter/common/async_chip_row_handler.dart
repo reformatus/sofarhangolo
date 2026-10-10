@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../common/error/card.dart';
 import 'filter_chip.dart';
+import 'skeleton_chip_row.dart';
 
 /// A reusable widget that displays an async list of values as horizontal filter chips
 class AsyncChipRowHandlerOf<T> extends StatefulWidget {
@@ -67,7 +68,7 @@ class _AsyncChipRowHandlerOfState<T> extends State<AsyncChipRowHandlerOf<T>> {
       ),
       AsyncValue(:final value) =>
         value == null
-            ? const LinearProgressIndicator()
+            ? SkeletonChipRow(height: widget.height)
             : SizedBox(
                 height: widget.height,
                 child: FadingEdgeScrollView.fromScrollView(

@@ -52,15 +52,6 @@ void main() {
   Future<FilterFields> existingFields([Map<String, SongField>? registry]) =>
       buildExistingFilterableFields(registry).first;
 
-  Future<List<String>> selectableValues(String field) async {
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-    return waitForProviderValue(
-      container,
-      selectableValuesForFilterableFieldProvider(field),
-    );
-  }
-
   group('buildExistingFilterableFields', () {
     test('counts text and list fields with a filter use', () async {
       await insertAll([
@@ -207,51 +198,6 @@ void main() {
       expect((await existingFields(registry))['genre'], isNull);
       // The base registry is untouched: overlay merge returns a new map.
       expect((await existingFields())['genre']?.count, equals(1));
-    });
-  });
-
-  group('selectableValuesForFilterableField', () {
-    test('returns sorted distinct values, splitting list elements', () async {
-      await insertAll([
-        buildSong(
-          uuid: 'song-1',
-          extra: {
-            'genre': ['Rock', 'Pop'],
-            'language': 'magyar',
-          },
-        ),
-        buildSong(
-          uuid: 'song-2',
-          extra: {
-            'genre': ['Rock', 'Jazz'],
-            'language': 'angol',
-          },
-        ),
-      ]);
-
-      expect(await selectableValues('genre'), ['Jazz', 'Pop', 'Rock']);
-      expect(await selectableValues('language'), ['angol', 'magyar']);
-    });
-
-    test('drops blanks and trims surrounding whitespace', () async {
-      await insertAll([
-        buildSong(
-          uuid: 'song-1',
-          extra: {
-            'genre': [' Rock ', '', '  '],
-            'language': ' magyar ',
-          },
-        ),
-      ]);
-
-      expect(await selectableValues('genre'), ['Rock']);
-      expect(await selectableValues('language'), ['magyar']);
-    });
-
-    test('is empty for a field no song stores', () async {
-      await insertAll([buildSong(uuid: 'song-1')]);
-
-      expect(await selectableValues('genre'), isEmpty);
     });
   });
 

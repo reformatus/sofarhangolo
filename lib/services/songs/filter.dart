@@ -140,49 +140,6 @@ Map<String, ({SongField field, int count})> _readExistingFilterableFields(
   return fields;
 }
 
-/// Sorted distinct non-blank values of a filter field across every song.
-///
-/// List fields contribute each element; both scalar and element values are
-/// trimmed, so the chip values line up with what the filters match.
-@Riverpod(keepAlive: true)
-Future<List<String>> selectableValuesForFilterableField(Ref ref, String field) {
-  return ref.watch(_selectableValuesStream(field).future);
-}
-
-final _selectableValuesStream = StreamProvider.family<List<String>, String>(
-  (ref, field) => _watchSelectableValues(field),
-);
-
-Stream<List<String>> _watchSelectableValues(String field) {
-  // Two branches because scalar values are plain text (not valid JSON, so
-  // `json_each` would reject them) while list values are JSON arrays.
-  const sql = '''
-    SELECT DISTINCT value FROM (
-      SELECT TRIM(CAST(element.value AS TEXT)) AS value
-      FROM songs, json_each(songs.content_map) AS entry,
-           json_each(
-             CASE WHEN entry.type = 'array' THEN entry.value ELSE json('[]') END
-           ) AS element
-      WHERE entry.key = ?
-      UNION
-      SELECT TRIM(CAST(entry.value AS TEXT)) AS value
-      FROM songs, json_each(songs.content_map) AS entry
-      WHERE entry.key = ? AND entry.type <> 'array'
-    )
-    WHERE value <> ''
-    ORDER BY value
-  ''';
-
-  return db
-      .customSelect(
-        sql,
-        variables: [Variable<String>(field), Variable<String>(field)],
-        readsFrom: {db.songs},
-      )
-      .watch()
-      .map((rows) => [for (final row in rows) row.read<String>('value')]);
-}
-
 /// Number of songs in the collection - the "total" in the filters subtitle.
 @Riverpod(keepAlive: true)
 Stream<int> songTotalCount(Ref ref) {
@@ -205,6 +162,14 @@ int? songMatchCount(Ref ref) {
 const snippetTags = (
   start: SongFtsIndex.snippetStart,
   end: SongFtsIndex.snippetEnd,
+);
+
+/// The empty key filter, for callers that must not apply one (a facet drops the
+/// selection of the field it is computing).
+const noKeyFilters = (
+  pitches: <String>{},
+  modes: <String>{},
+  keys: <KeyField>{},
 );
 
 bool matchesKeyFilters(Song song, KeyFilters keyFilters) =>

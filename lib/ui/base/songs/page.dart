@@ -62,6 +62,10 @@ class _SongsPageState extends ConsumerState<SongsPage> {
 
   bool filtersScrolled = false;
 
+  /// Whether the mobile filter expansion is open. The cards are only built (and
+  /// their facet queries only run) while it is.
+  bool _filtersExpanded = false;
+
   /// Loads the next page once the list has been scrolled to its end: building
   /// the last item means the viewport reached the end of what is loaded, which
   /// is when the next page should be fetched. Deferred to after the frame
@@ -304,6 +308,11 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                                                         .onSecondaryContainer,
                                               controller:
                                                   _filterExpansionTileController,
+                                              onExpansionChanged: (expanded) =>
+                                                  setState(
+                                                    () => _filtersExpanded =
+                                                        expanded,
+                                                  ),
                                               leading: Transform.translate(
                                                 offset: const Offset(-3, 0),
                                                 child: const Icon(
@@ -317,7 +326,14 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                                                 banksFilterState:
                                                     banksFilterState,
                                               ),
-                                              children: [FiltersColumn()],
+                                              children: [
+                                                if (_filtersExpanded)
+                                                  FiltersColumn(
+                                                    shrinkWrap: true,
+                                                    physics:
+                                                        const NeverScrollableScrollPhysics(),
+                                                  ),
+                                              ],
                                             ),
                                           ),
                                         ),
@@ -405,14 +421,11 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                                           .secondaryContainer,
                               ),
                               Expanded(
-                                child:
-                                    FadingEdgeScrollView.fromSingleChildScrollView(
-                                      child: SingleChildScrollView(
-                                        controller:
-                                            _filterSidebarScrollController,
-                                        child: FiltersColumn(),
-                                      ),
-                                    ),
+                                child: FiltersColumn(
+                                  scrollController:
+                                      _filterSidebarScrollController,
+                                  fadeEdges: true,
+                                ),
                               ),
                             ],
                           ),

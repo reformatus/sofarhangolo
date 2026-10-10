@@ -119,6 +119,55 @@ class SongFtsIndex {
       ? term
       : '{${ftsFields.join(' ')}} : $term';
 
+  /// The candidate test every query shares: the FTS set as a `MATERIALIZED` CTE
+  /// (FTS5 rejects `MATCH` in an OR over a left join, and materialising keeps
+  /// `bm25`/snippets from being recomputed per scanned row) OR a folded LIKE per
+  /// searchable field.
+  ///
+  /// Returned as fragments because callers place the condition differently - the
+  /// list puts its exact/LIKE CASE between the CTE and the WHERE, a facet puts
+  /// nothing between. Binds are split to match: [SearchCandidate.variables] bind
+  /// first (the CTE precedes the SELECT), [SearchCandidate.likeVariables] bind
+  /// where [SearchCandidate.condition] appears.
+  ///
+  /// [cteSelect] is the CTE's projection (`rowid AS id`; the list adds rank and
+  /// the snippets).
+  static SearchCandidate searchCandidate({
+    required String term,
+    required List<String> fields,
+    String cteSelect = 'rowid AS id',
+  }) {
+    if (term.isEmpty) return const SearchCandidate.empty();
+    assert(fields.isNotEmpty, 'at least one searchable field must take part');
+
+    final likePattern = '%${_escapeLike(foldTerm(term))}%';
+    final likeConditions = [
+      for (final field in fields) "${_foldedValue(field)} LIKE ? ESCAPE '\\'",
+    ];
+    final likeVariables = [
+      for (var i = 0; i < fields.length; i++) Variable<String>(likePattern),
+    ];
+    final ftsFields = _ftsFieldsOf(fields);
+    if (ftsFields.isEmpty) {
+      return SearchCandidate(
+        cte: '',
+        join: '',
+        condition: '(${likeConditions.join(' OR ')})',
+        variables: const [],
+        likeVariables: likeVariables,
+      );
+    }
+    return SearchCandidate(
+      cte:
+          'WITH hit AS MATERIALIZED (SELECT $cteSelect FROM $tableName '
+          'WHERE $tableName MATCH ?) ',
+      join: ' LEFT JOIN hit ON hit.id = songs.id',
+      condition: '(hit.id IS NOT NULL OR ${likeConditions.join(' OR ')})',
+      variables: [Variable<String>(_matchString(term, ftsFields))],
+      likeVariables: likeVariables,
+    );
+  }
+
   /// Builds the integrated search statement: FTS ∪ LIKE ∪ exact, tiered
   /// (0 exact, 1 LIKE, 2 FTS-only) and ordered by tier, relevance, folded
   /// title (then rowid, so [limit]/[offset] pages are stable). [fields] are
@@ -127,12 +176,6 @@ class SongFtsIndex {
   ///
   /// Also returns `total`, the full match count - a window count evaluated
   /// before the limit, so no second counting query is needed.
-  ///
-  /// The FTS set is a `MATERIALIZED` CTE: the OR below stops FTS from driving
-  /// the scan, and ordering by the rank would otherwise re-evaluate `bm25` and
-  /// the snippets for every scanned song (a correlated blow-up that dominated
-  /// the cost - on a common word the whole query took ~12 s instead of ~0.7 s).
-  /// Materialising computes them once for the match set.
   ///
   /// Prepared-statement variables are bound positionally, so their order must
   /// follow the placeholders in the SQL text: the CTE's MATCH comes first
@@ -146,40 +189,21 @@ class SongFtsIndex {
     String extraWhere = '',
     List<Variable> extraVariables = const [],
   }) {
-    assert(fields.isNotEmpty, 'at least one searchable field must take part');
+    assert(term.isNotEmpty, 'the search query is only used with a term');
 
     final foldedTerm = foldTerm(term);
     final likePattern = '%${_escapeLike(foldedTerm)}%';
-    final ftsFields = _ftsFieldsOf(fields);
-    final hasFts = ftsFields.isNotEmpty;
-
-    final variables = <Variable>[];
-
-    var cte = '';
-    var from = 'FROM songs';
-    var rankColumn = 'NULL AS rank';
-    var matches = [
-      for (final column in columns) 'NULL AS ${matchAlias(column.name)}',
-    ].join(', ');
-    // A bare integer in ORDER BY is a column ordinal, so use NULL as the
-    // neutral constant when there is no FTS rank.
-    var rankOrder = 'NULL';
-    if (hasFts) {
-      variables.add(Variable<String>(_matchString(term, ftsFields)));
-      cte =
-          'WITH hit AS MATERIALIZED ('
-          'SELECT rowid AS id, '
+    final candidate = searchCandidate(
+      term: term,
+      fields: fields,
+      cteSelect:
+          'rowid AS id, '
           'bm25($tableName, ${columns.map((c) => c.weight).join(', ')}) AS rank, '
-          '$_snippetSelects '
-          'FROM $tableName WHERE $tableName MATCH ?) ';
-      from = 'FROM songs LEFT JOIN hit ON hit.id = songs.id';
-      rankColumn = 'hit.rank AS rank';
-      matches = [
-        for (final column in columns)
-          'hit.${matchAlias(column.name)} AS ${matchAlias(column.name)}',
-      ].join(', ');
-      rankOrder = 'COALESCE(hit.rank, 0)';
-    }
+          '$_snippetSelects',
+    );
+    final hasFts = candidate.cte.isNotEmpty;
+
+    final variables = <Variable>[...candidate.variables];
 
     final exact = <String>[];
     final like = <String>[];
@@ -192,29 +216,32 @@ class SongFtsIndex {
       variables.add(Variable<String>(likePattern));
     }
 
-    final whereLike = <String>[];
-    for (final field in fields) {
-      whereLike.add("${_foldedValue(field)} LIKE ? ESCAPE '\\'");
-      variables.add(Variable<String>(likePattern));
-    }
+    variables.addAll(candidate.likeVariables);
     variables.addAll(extraVariables);
     variables
       ..add(Variable<int>(limit))
       ..add(Variable<int>(offset));
 
-    final matchCondition = hasFts
-        ? '(hit.id IS NOT NULL OR ${whereLike.join(' OR ')})'
-        : '(${whereLike.join(' OR ')})';
+    // A bare integer in ORDER BY is a column ordinal, so use NULL as the
+    // neutral constant when there is no FTS rank.
+    final rankColumn = hasFts ? 'hit.rank AS rank' : 'NULL AS rank';
+    final matches = [
+      for (final column in columns)
+        hasFts
+            ? 'hit.${matchAlias(column.name)} AS ${matchAlias(column.name)}'
+            : 'NULL AS ${matchAlias(column.name)}',
+    ].join(', ');
+    final rankOrder = hasFts ? 'COALESCE(hit.rank, 0)' : 'NULL';
 
     final sql =
-        '${cte}SELECT songs.uuid AS uuid, '
+        '${candidate.cte}SELECT songs.uuid AS uuid, '
         'COUNT(*) OVER () AS total, '
         '$rankColumn, '
         'CASE WHEN ${exact.join(' OR ')} THEN 0 '
         'WHEN ${like.join(' OR ')} THEN 1 ELSE 2 END AS tier, '
         '$matches '
-        '$from '
-        'WHERE $matchCondition'
+        'FROM songs${candidate.join} '
+        'WHERE ${candidate.condition}'
         '${extraWhere.isEmpty ? '' : ' AND ($extraWhere)'} '
         'ORDER BY tier, $rankOrder, '
         '${foldExpression('songs.title')}, songs.id '
@@ -222,4 +249,39 @@ class SongFtsIndex {
 
     return (sql: sql, variables: variables);
   }
+}
+
+/// Fragments of the shared search candidate test, see
+/// [SongFtsIndex.searchCandidate].
+class SearchCandidate {
+  /// `''` or the `WITH hit AS MATERIALIZED (...)` prefix, which must precede the
+  /// statement's SELECT.
+  final String cte;
+
+  /// `''` or the `LEFT JOIN hit ...` to append after the caller's own joins.
+  final String join;
+
+  /// `''` (no term) or the condition to AND into the WHERE.
+  final String condition;
+
+  /// Binds for [cte]'s `MATCH`, bound before everything else.
+  final List<Variable> variables;
+
+  /// Binds for [condition]'s LIKE placeholders, bound where it appears.
+  final List<Variable> likeVariables;
+
+  const SearchCandidate({
+    required this.cte,
+    required this.join,
+    required this.condition,
+    required this.variables,
+    required this.likeVariables,
+  });
+
+  const SearchCandidate.empty()
+    : cte = '',
+      join = '',
+      condition = '',
+      variables = const [],
+      likeVariables = const [];
 }
