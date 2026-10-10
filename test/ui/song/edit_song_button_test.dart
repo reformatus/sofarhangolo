@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:sofarhangolo/data/bank/bank.dart';
 import 'package:sofarhangolo/data/database.dart';
 import 'package:sofarhangolo/data/song/song.dart';
+import 'package:sofarhangolo/services/songs/write_song.dart';
 import 'package:sofarhangolo/ui/song/widgets/edit_song_button.dart';
 
 import '../../harness/test_database.dart';
@@ -142,5 +143,34 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('songpage:$copiedUuid'), findsOneWidget);
+  });
+
+  testWidgets('bank song with an existing copy offers to edit it', (
+    tester,
+  ) async {
+    await insertBankSong();
+    final copy = await copySongToLocal(
+      _song(uuid: 'bank-1', sourceBank: 'bank-1'),
+    );
+
+    final router = _router(_song(uuid: 'bank-1', sourceBank: 'bank-1'));
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+
+    await tester.tap(find.text('Másolat szerkesztése'));
+    await tester.pumpAndSettle();
+
+    // The dialog mentions the copy and offers the primary "edit existing".
+    expect(find.textContaining('már készült helyi másolat'), findsOneWidget);
+    expect(find.text('Meglévő másolat szerkesztése'), findsOneWidget);
+
+    await tester.tap(find.text('Meglévő másolat szerkesztése'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('editor:${copy.uuid}'), findsOneWidget);
+
+    router.pop();
+    await tester.pumpAndSettle();
+
+    expect(find.text('songpage:${copy.uuid}'), findsOneWidget);
   });
 }

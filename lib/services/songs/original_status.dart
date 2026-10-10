@@ -74,3 +74,22 @@ Stream<Song?> originalSong(Ref ref, Song song) {
     return rows.first.readTableOrNull(original);
   });
 }
+
+/// The local copy made from [song] (a bank song), or null when none exists.
+///
+/// The inverse of [originalSong]: it finds the [SongLinkType.localCopyOf] link
+/// whose target is [song] and loads that (first) copy.
+Future<Song?> localCopyOf(Song song) async {
+  final links = await (db.songLinks.select()
+        ..where(
+          (l) =>
+              l.targetUuid.equals(song.uuid) &
+              l.type.equals(SongLinkType.localCopyOf.index),
+        ))
+      .get();
+  if (links.isEmpty) return null;
+
+  return (db.songs.select()
+        ..where((s) => s.uuid.equals(links.first.sourceUuid)))
+      .getSingleOrNull();
+}
