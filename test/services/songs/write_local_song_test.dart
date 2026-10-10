@@ -100,6 +100,21 @@ void main() {
       expect((await storedSong(song.uuid)).title, 'Második cím');
     });
 
+    test('persists contentMap and keyField', () async {
+      final song = await writeLocalSong(
+        Song.local(
+          title: 'Meta dal',
+          contentMap: {'composer': 'Bach', 'genre': ['klasszikus']},
+          keyField: [KeyField('C', 'dur')],
+        ),
+      );
+
+      final stored = await storedSong(song.uuid);
+      expect(stored.contentMap['composer'], 'Bach');
+      expect(stored.contentMap['genre'], ['klasszikus']);
+      expect(stored.keyField, [KeyField('C', 'dur')]);
+    });
+
     test('rejects songs that belong to another bank', () {
       expect(
         () => writeLocalSong(bankSong('foreign')),

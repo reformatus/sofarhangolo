@@ -558,6 +558,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_typeahead:
+    dependency: "direct main"
+    description:
+      name: flutter_typeahead
+      sha256: "7b3f84e0bff51c544f4d1382c00413c36c1714328a6a89600865e497437d29d2"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.0.0"
   flutter_web_plugins:
     dependency: "direct main"
     description: flutter
@@ -1426,6 +1434,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.12"
+  textfield_tags:
+    dependency: "direct main"
+    description:
+      name: textfield_tags
+      sha256: d1f2204114157a1296bb97c20d7f8c8c7fd036212812afb2e19de7bb34acc55b
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.1"
   typed_data:
     dependency: transitive
     description:

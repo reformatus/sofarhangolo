@@ -4,14 +4,32 @@ import 'package:go_router/go_router.dart';
 
 import '../../../data/song/song.dart';
 import '../../../services/songs/original_status.dart';
-import '../../common/key_text.dart';
+import 'song_field_editors.dart';
 
 /// Right-pane song details: the original bank song (for copies) and the
-/// song's keys.
+/// editable metadata fields.
 class DetailsPane extends StatelessWidget {
-  const DetailsPane({super.key, required this.song});
+  const DetailsPane({
+    super.key,
+    required this.song,
+    required this.contentMap,
+    required this.keyField,
+    required this.onFieldChanged,
+    required this.onKeysChanged,
+  });
 
+  /// The (last saved) song, used by the original-song card.
   final Song song;
+
+  /// The live draft metadata, so edits reflect immediately.
+  final Map<String, Object> contentMap;
+  final List<KeyField> keyField;
+
+  /// Called with the new raw value for a `contentMap` field (null clears it).
+  final void Function(String apiName, Object? value) onFieldChanged;
+
+  /// Called when the song's keys change.
+  final ValueChanged<List<KeyField>> onKeysChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -22,7 +40,20 @@ class DetailsPane extends StatelessWidget {
         spacing: 20,
         children: [
           _OriginalSongCard(song),
-          _KeySection(song),
+          for (final field in editableSongFields())
+            if (songFieldEditorKind(field) == SongFieldEditorKind.key)
+              SongKeyField(
+                key: const ValueKey('song-field-key'),
+                initialKeys: keyField,
+                onChanged: onKeysChanged,
+              )
+            else
+              SongContentFieldEditor(
+                key: ValueKey('song-field-${field.apiName}'),
+                field: field,
+                value: contentMap[field.apiName],
+                onChanged: (value) => onFieldChanged(field.apiName, value),
+              ),
         ],
       ),
     );
@@ -111,38 +142,6 @@ class _OriginalSongCard extends ConsumerWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _KeySection extends StatelessWidget {
-  const _KeySection(this.song);
-
-  final Song song;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      spacing: 8,
-      children: [
-        Text('Hangnem', style: Theme.of(context).textTheme.titleMedium),
-        if (song.keyField.isEmpty)
-          Text(
-            'Nincs hangnem megadva.',
-            style: Theme.of(context).textTheme.bodySmall,
-          )
-        else
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final key in song.keyField)
-                Chip(label: Text(displayKeyField(key))),
-            ],
-          ),
-        // TODO(editor): make the song's keys editable (needs a key picker).
-      ],
     );
   }
 }

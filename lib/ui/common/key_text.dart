@@ -38,6 +38,13 @@ String displayKeyMode(String mode) {
   return _modeDisplayMap[mode] ?? mode;
 }
 
+/// The fixed pitch vocabulary (canonical strings, display order) that a
+/// [KeyField] can use. Single source with the display map above.
+List<String> get keyPitchValues => _pitchDisplayMap.keys.toList();
+
+/// The fixed mode vocabulary (canonical strings, display order).
+List<String> get keyModeValues => _modeDisplayMap.keys.toList();
+
 String displayKeyString(String key) {
   final parts = key.split('-');
   if (parts.length != 2) return key;

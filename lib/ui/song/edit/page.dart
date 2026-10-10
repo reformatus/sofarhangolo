@@ -76,6 +76,8 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
   static const double _viewChooserDropdownBelow = 620;
 
   late Song _song = widget.song;
+  late final Map<String, Object> _contentMap = Map.of(widget.song.contentMap);
+  late List<KeyField> _keyField = List.of(widget.song.keyField);
   late final TextEditingController _titleController = TextEditingController(
     text: _song.title,
   );
@@ -102,8 +104,8 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
   @override
   void initState() {
     super.initState();
-    _titleController.addListener(_onContentChanged);
-    _lyricsController.addListener(_onContentChanged);
+    _titleController.addListener(_markChanged);
+    _lyricsController.addListener(_markChanged);
   }
 
   @override
@@ -113,8 +115,8 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
     if (_dirty) {
       unawaited(writeLocalSong(_draft()));
     }
-    _titleController.removeListener(_onContentChanged);
-    _lyricsController.removeListener(_onContentChanged);
+    _titleController.removeListener(_markChanged);
+    _lyricsController.removeListener(_markChanged);
     _titleController.dispose();
     _lyricsController.dispose();
     _titleFocus.dispose();
@@ -125,13 +127,36 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
   Song _draft() => _song.copyWith(
     title: _titleController.text,
     lyrics: _lyricsController.text,
+    contentMap: Map.of(_contentMap),
+    keyField: List.of(_keyField),
   );
 
-  void _onContentChanged() {
+  void _markChanged() {
     _dirty = true;
     _autosaveTimer?.cancel();
     setState(() => _autosaveStatus = AutosaveStatus.saving);
     _autosaveTimer = Timer(_saveDebounce, _save);
+  }
+
+  /// Updates one metadata field; blank values clear the key entirely.
+  void _setMetadataField(String apiName, Object? value) {
+    final cleared =
+        value == null ||
+        (value is String && value.trim().isEmpty) ||
+        (value is List && value.isEmpty);
+    setState(() {
+      if (cleared) {
+        _contentMap.remove(apiName);
+      } else {
+        _contentMap[apiName] = value;
+      }
+    });
+    _markChanged();
+  }
+
+  void _setKeys(List<KeyField> keys) {
+    setState(() => _keyField = List.of(keys));
+    _markChanged();
   }
 
   Future<void> _save() async {
@@ -223,7 +248,13 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
             ),
           ),
           body: _buildBody(viewType, previewWidth),
-          rightDrawer: DetailsPane(song: _song),
+          rightDrawer: DetailsPane(
+            song: _song,
+            contentMap: _contentMap,
+            keyField: _keyField,
+            onFieldChanged: _setMetadataField,
+            onKeysChanged: _setKeys,
+          ),
           rightDrawerIcon: Icons.info_outline,
           rightDrawerTooltip: 'Részletek',
           actionBarChildren: [

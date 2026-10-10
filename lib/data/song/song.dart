@@ -147,7 +147,7 @@ class Song extends Insertable<Song> {
     LyricsFormat? lyricsFormat,
     String? variationOf,
     List<KeyField>? keyField,
-    Map<String, String>? contentMap,
+    Map<String, Object>? contentMap,
     SongFieldOwnership? ownership,
   }) {
     return Song(
