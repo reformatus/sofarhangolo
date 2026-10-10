@@ -115,7 +115,20 @@ class BankSongUpdateTask extends BackgroundTask {
 
   Future<void> _upsertSong(Song song) async {
     try {
-      await db.into(db.songs).insert(song, mode: InsertMode.insertOrReplace);
+      // Upsert by the unique uuid index — deliberately NOT
+      // `InsertMode.insertOrReplace`: REPLACE's implicit delete skips
+      // DELETE triggers (recursive triggers are off by default), so the
+      // FTS delete trigger would not fire and the old rowid's index entry
+      // would be orphaned, corrupting search. A plain upsert must target
+      // uuid explicitly: drift's default target is the primary key, but
+      // Song has no id column, so the conflict is always on uuid (the
+      // variation merge rewrites the same song within a run).
+      // ON CONFLICT DO UPDATE fires the UPDATE trigger and keeps the
+      // rowid stable.
+      await db.into(db.songs).insert(
+        song,
+        onConflict: DoUpdate((_) => song, target: [db.songs.uuid]),
+      );
 
       await deleteAssetsForSong(song);
 
