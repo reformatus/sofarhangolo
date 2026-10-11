@@ -1,4 +1,3 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:sofarhangolo/data/log/logger.dart';
 import 'package:sofarhangolo/data/song/extensions.dart';
@@ -23,29 +22,27 @@ Future<void> shareRawLyrics(Song song) async {
   await SharePlus.instance.share(ShareParams(text: lyrics));
 }
 
-Future<void> getPDF(Song song, WidgetRef ref) async {
-  final assetProvider = getSongAssetProvider(song, 'pdf');
-  final asset = ref.watch(assetProvider);
-  // TODO show loading
-  switch (asset) {
-    case AsyncError(:final error, :final stackTrace):
-      log.warning('Letöltés közben hiba lépett fel', error, stackTrace);
-    case AsyncData(value: final assetResult):
-      if (assetResult.data != null) {
-        try {
-          // TODO not supported on linux, download it to a selectable location
-          await SharePlus.instance.share(
-            ShareParams(
-              files: [XFile.fromData(assetResult.data!)],
-              fileNameOverrides: ['${song.title}.pdf'],
-            ),
-          );
-        } catch (error, stackTrace) {
-          log.warning('Letöltés közben hiba lépett fel', error, stackTrace);
-        }
-      } else {
-        log.warning('Üres file');
-      }
-    case AsyncLoading():
+/// Shares the song's PDF sheet music via the system share sheet.
+///
+/// Fetches the bytes through the asset pipeline, so sharing works for PDFs
+/// that have not been downloaded yet. Does nothing when the song has no PDF
+/// or the download fails.
+Future<void> sharePdf(Song song) async {
+  try {
+    final bytes = await fetchSongAsset(song, 'pdf');
+    if (bytes == null) {
+      log.warning('Nem sikerült betölteni a PDF-et a megosztáshoz.');
+      return;
+    }
+
+    // TODO not supported on linux, download it to a selectable location
+    await SharePlus.instance.share(
+      ShareParams(
+        files: [XFile.fromData(bytes)],
+        fileNameOverrides: ['${song.title}.pdf'],
+      ),
+    );
+  } catch (error, stackTrace) {
+    log.warning('Letöltés közben hiba lépett fel', error, stackTrace);
   }
 }

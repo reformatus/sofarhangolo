@@ -5,7 +5,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/cue/slide.dart';
+import '../../../data/database.dart';
 import '../../../data/log/logger.dart';
+import '../../../data/song/song.dart';
 import '../../../services/cue/source/cue_source.dart';
 import '../../../services/cue/source/local_source.dart';
 import '../../../services/error/app_error.dart';
@@ -22,6 +24,10 @@ class ActiveCueSession extends AsyncNotifier<CueSession?> {
   Timer? _writeDebounce;
   StreamSubscription<CueSourceEvent>? _externalChangesSubscription;
 
+  /// Watches the songs referenced by the cue so their cached snapshots on the
+  /// slides stay current (content edits, bank updates, deletion/recovery).
+  StreamSubscription<List<Song>>? _songSubscription;
+
   static const _writeDebounceDuration = Duration(milliseconds: 300);
 
   @override
@@ -36,6 +42,7 @@ class ActiveCueSession extends AsyncNotifier<CueSession?> {
   void _cleanup() {
     _writeDebounce?.cancel();
     _externalChangesSubscription?.cancel();
+    _songSubscription?.cancel();
     _source?.dispose();
   }
 
@@ -50,6 +57,8 @@ class ActiveCueSession extends AsyncNotifier<CueSession?> {
 
     _externalChangesSubscription?.cancel();
     _externalChangesSubscription = null;
+    _songSubscription?.cancel();
+    _songSubscription = null;
     _source?.dispose();
     _source = null;
   }
@@ -103,6 +112,9 @@ class ActiveCueSession extends AsyncNotifier<CueSession?> {
       _externalChangesSubscription = _source!.externalChanges.listen(
         _handleExternalChange,
       );
+
+      // Keep the cached song snapshots on the slides current.
+      _refreshSongSubscription();
     } catch (e, s) {
       // Carry the context on the error so the loader renders the same
       // wording as the log.
@@ -134,11 +146,64 @@ class ActiveCueSession extends AsyncNotifier<CueSession?> {
             ? session.currentSlideUuid
             : slides.firstOrNull?.uuid;
         state = AsyncValue.data(session.withCurrentSlide(currentSlideUuid));
+        _refreshSongSubscription();
       case CurrentSlideChangedEvent(:final slideUuid):
         state = AsyncValue.data(session.withCurrentSlide(slideUuid));
       case CueMetadataChangedEvent(:final cue):
         session.cue.replaceMetadata(cue);
         state = AsyncValue.data(session.refreshed());
+    }
+  }
+
+  /// (Re)subscribes to the songs referenced by the cue. Cancels any previous
+  /// subscription first; safe to call whenever the slide set changes.
+  void _refreshSongSubscription() {
+    _songSubscription?.cancel();
+    _songSubscription = null;
+
+    final uuids =
+        state.value?.slides
+            .whereType<SongSlide>()
+            .map((slide) => slide.songUuid)
+            .where((uuid) => uuid.isNotEmpty)
+            .toSet() ??
+        const <String>{};
+    if (uuids.isEmpty) return;
+
+    _songSubscription =
+        (db.select(db.songs)..where((s) => s.uuid.isIn(uuids))).watch().listen(
+          _applyLiveSongs,
+        );
+  }
+
+  /// Refreshes the slides' cached song snapshots from the database. This must
+  /// not schedule a cue write: the cached content is a render-time cache, and
+  /// persisting would rewrite the stored "shared-at" content hash.
+  void _applyLiveSongs(List<Song> songs) {
+    final session = state.value;
+    if (session == null) return;
+
+    final byUuid = {for (final song in songs) song.uuid: song};
+    var changed = false;
+
+    for (final slide in session.slides) {
+      if (slide is! SongSlide) continue;
+
+      final fresh = byUuid[slide.songUuid];
+      final current = slide.song;
+      if (fresh == null && current == null) continue;
+      if (fresh != null &&
+          current != null &&
+          fresh.contentHash == current.contentHash) {
+        continue;
+      }
+
+      session.cue.updateSlide(slide.withSong(fresh));
+      changed = true;
+    }
+
+    if (changed) {
+      state = AsyncValue.data(session.refreshed());
     }
   }
 
@@ -221,6 +286,7 @@ class ActiveCueSession extends AsyncNotifier<CueSession?> {
 
     state = AsyncValue.data(finalSession);
     _scheduleWrite();
+    _refreshSongSubscription();
   }
 
   /// Remove a slide from the cue
@@ -250,6 +316,7 @@ class ActiveCueSession extends AsyncNotifier<CueSession?> {
     }
 
     _scheduleWrite();
+    _refreshSongSubscription();
   }
 
   /// Reorder slides (for drag-and-drop)

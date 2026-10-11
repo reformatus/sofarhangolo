@@ -79,6 +79,8 @@ dependencies:
   html_unescape: ^2.0.0
   diacritic: ^0.1.6
   flutter_markdown_plus: ^1.0.12
+  file_picker: ^13.1.0
+  textfield_tags: ^3.0.1
 
 dev_dependencies:
   msix: ^3.16.9

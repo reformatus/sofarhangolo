@@ -3,9 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:wtf_sliding_sheet/wtf_sliding_sheet.dart';
 
-import '../../data/song/song.dart';
 import '../../services/app_links/navigation.dart';
-import '../../services/song/from_uuid.dart';
+import '../../services/song/song_content.dart';
 import '../common/browser_title.dart';
 import '../common/error/card.dart';
 import 'widgets/content.dart';
@@ -62,26 +61,34 @@ class _SongPageState extends ConsumerState<SongPage> {
 
   @override
   Widget build(BuildContext context) {
-    final song = ref.watch(songFromUuidProvider(widget.songId));
+    final songAsync = ref.watch(songContentProvider(widget.songId));
 
-    return switch (song) {
-      AsyncLoading() => const Center(child: CircularProgressIndicator()),
-      AsyncError(:final error, :final stackTrace) => _buildErrorCard(
-        error: error,
-        stackTrace: stackTrace,
+    if (songAsync.hasError && !songAsync.hasValue) {
+      return _buildErrorCard(
+        error: songAsync.error!,
+        stackTrace: songAsync.stackTrace ?? StackTrace.empty,
+      );
+    }
+
+    final snapshot = songAsync.value;
+    if (!songAsync.hasValue) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (snapshot == null) {
+      return _buildNotFoundCard();
+    }
+
+    final song = snapshot.song;
+    return BrowserTitle(
+      contextTitle: song.title,
+      child: SongPageContent(
+        song: song,
+        detailsSheetScrollController: detailsSheetScrollController,
+        actionButtonsScrollController: actionButtonsScrollController,
+        transposeOverlayVisible: transposeOverlayVisible,
+        onShowDetailsSheet: showDetailsBottomSheet,
       ),
-      AsyncValue(value: null) => _buildNotFoundCard(),
-      AsyncValue(value: final Song song) => BrowserTitle(
-        contextTitle: song.title,
-        child: SongPageContent(
-          song: song,
-          detailsSheetScrollController: detailsSheetScrollController,
-          actionButtonsScrollController: actionButtonsScrollController,
-          transposeOverlayVisible: transposeOverlayVisible,
-          onShowDetailsSheet: showDetailsBottomSheet,
-        ),
-      ),
-    };
+    );
   }
 
   Widget _buildErrorCard({

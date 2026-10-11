@@ -6,6 +6,7 @@ import '../song_cue_actions.dart';
 import '../state.dart';
 import '../transpose/state.dart';
 import '../transpose/widget.dart';
+import 'edit_song_button.dart';
 import 'report_song_button.dart';
 import 'song_details_helpers.dart';
 
@@ -50,6 +51,7 @@ class DesktopSidebar extends ConsumerWidget {
                 transpose: transpose,
               ),
               SizedBox(height: 10),
+              EditSongButton(song),
               ReportSongButton(song),
               const Divider(),
               SelectableDetailsList(children: detailsContent),

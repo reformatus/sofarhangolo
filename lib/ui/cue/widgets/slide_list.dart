@@ -93,7 +93,7 @@ class _SlideListState extends ConsumerState<SlideList> {
             selectCallback: () => _handleSlideSelection(ref, slide),
             removeCallback: () => showConfirmDialog(
               context,
-              title: '${songSlide.song.title} - biztos eltávolítod a listából?',
+              title: '${songSlide.title} - biztos eltávolítod a listából?',
               actionIcon: Icons.delete_outline,
               actionLabel: 'Eltávolítás',
               actionOnPressed: () async {

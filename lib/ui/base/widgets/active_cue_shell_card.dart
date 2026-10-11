@@ -8,7 +8,7 @@ import '../../../data/cue/slide.dart';
 import '../../../data/song/song.dart';
 import '../../../data/song/transpose.dart';
 import '../../../services/app_links/navigation.dart';
-import '../../../services/song/from_uuid.dart';
+import '../../../services/song/song_content.dart';
 import '../../cue/cue_page_type.dart';
 import '../../cue/session/cue_session.dart';
 import '../../cue/session/session_provider.dart';
@@ -112,6 +112,22 @@ class ActiveCueShellCard extends StatelessWidget {
         final maxWidth = mediaQuery.size.width >= 700 ? 620.0 : double.infinity;
         final targetHeight = math.min(mediaQuery.size.height * 0.78, 640.0);
 
+        // Close the sheet first, then open the cue editor at the chosen slide
+        // (pushing while the sheet is open would strand it underneath).
+        void openEditorAt(String? slideUuid) {
+          Navigator.of(sheetContext).pop();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!context.mounted) return;
+            context.push(
+              cueRoutePath(
+                session.cue.uuid,
+                CuePageType.edit,
+                slideUuid: slideUuid,
+              ),
+            );
+          });
+        }
+
         return Align(
           alignment: Alignment.bottomCenter,
           child: ConstrainedBox(
@@ -128,19 +144,8 @@ class ActiveCueShellCard extends StatelessWidget {
               ),
               child: CueShellPanel(
                 session: session,
-                onOpenCueEditor: () {
-                  Navigator.of(sheetContext).pop();
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (!context.mounted) return;
-                    context.push(
-                      cueRoutePath(
-                        session.cue.uuid,
-                        CuePageType.edit,
-                        slideUuid: session.currentSlideUuid,
-                      ),
-                    );
-                  });
-                },
+                onOpenCueEditor: () => openEditorAt(session.currentSlideUuid),
+                onSlideSelected: (slide) => openEditorAt(slide.uuid),
                 onClose: () => Navigator.of(sheetContext).pop(),
                 showDragHandle: true,
               ),
@@ -168,13 +173,16 @@ class _ActiveCueCardSongAction extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    final currentSong = ref.watch(songFromUuidProvider(currentSongUuid)).value;
+    final currentSong = ref
+        .watch(songContentProvider(currentSongUuid))
+        .value
+        ?.song;
     if (currentSong == null) {
       return const SizedBox.shrink();
     }
 
     final songAlreadyInCue = session.slides.whereType<SongSlide>().any(
-      (slide) => slide.song.uuid == currentSong.uuid,
+      (slide) => slide.songUuid == currentSong.uuid,
     );
 
     if (songAlreadyInCue) {
@@ -455,16 +463,30 @@ class CueShellPanel extends StatelessWidget {
     required this.session,
     this.listVisible = true,
     this.onOpenCueEditor,
+    this.onSlideSelected,
     this.onClose,
     this.showDragHandle = false,
+    this.openEditorOnSlideSelect = false,
     super.key,
   });
 
   final CueSession session;
   final bool listVisible;
   final VoidCallback? onOpenCueEditor;
+
+  /// Overrides the default slide-selection behaviour entirely. The panel
+  /// always jumps the cue to the tapped slide first; this then decides what
+  /// else happens. The mobile sheet uses it to dismiss itself before
+  /// navigating.
+  final ValueChanged<Slide>? onSlideSelected;
+
   final VoidCallback? onClose;
   final bool showDragHandle;
+
+  /// Whether selecting a slide should navigate to the cue editor at that
+  /// slide, so a tap takes the user to that slide in the cue. Used by the
+  /// persistent cue sidebar and the tablet drawer.
+  final bool openEditorOnSlideSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -513,6 +535,12 @@ class CueShellPanel extends StatelessWidget {
                         ref
                             .read(activeCueSessionProvider.notifier)
                             .goToSlide(slide.uuid);
+                        final handler = onSlideSelected;
+                        if (handler != null) {
+                          handler(slide);
+                        } else if (openEditorOnSlideSelect) {
+                          _openCueEditor(context, slideUuid: slide.uuid);
+                        }
                       },
                     ),
                   ),

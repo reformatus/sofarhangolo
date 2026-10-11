@@ -506,6 +506,7 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
                                       child: CueShellPanel(
                                         session: sidebarCueSession!,
                                         listVisible: _desktopCueListVisible,
+                                        openEditorOnSlideSelect: true,
                                       ),
                                     ),
                                   ),
@@ -540,6 +541,7 @@ class _BaseScaffoldState extends ConsumerState<BaseScaffold> {
                                               session: sidebarCueSession!,
                                               listVisible:
                                                   _tabletCueDrawerVisible,
+                                              openEditorOnSlideSelect: true,
                                             ),
                                           ),
                                         )

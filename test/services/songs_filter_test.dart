@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sofarhangolo/data/database.dart';
@@ -173,7 +174,7 @@ void main() {
             BanksCompanion.insert(
               uuid: 'bank-1',
               name: 'Test Bank',
-              baseUrl: Uri.parse('https://example.com/api'),
+              baseUrl: Value(Uri.parse('https://example.com/api')),
               parallelUpdateJobs: 1,
               amountOfSongsInRequest: 1,
               noCms: false,

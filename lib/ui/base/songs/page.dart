@@ -1,11 +1,14 @@
 import 'package:fading_edge_scrollview/fading_edge_scrollview.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../config/config.dart';
 import '../../../data/bank/bank.dart';
+import '../../../data/song/song.dart';
 import '../../../services/bank/banks.dart';
 import '../../../services/songs/filter.dart';
+import '../../../services/songs/write_song.dart';
 import '../../common/centered_hint.dart';
 import '../../common/error/card.dart';
 import '../../common/key_text.dart';
@@ -118,6 +121,19 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                     Expanded(
                       child: Scaffold(
                         resizeToAvoidBottomInset: false,
+                        floatingActionButton: FloatingActionButton.extended(
+                          onPressed: () async {
+                            // `/new` carries no meaning: create the song
+                            // first and edit it by its uuid.
+                            final song = await writeLocalSong(
+                              Song.local(title: 'Új dal'),
+                            );
+                            if (!context.mounted) return;
+                            context.push('/song/local/${song.uuid}');
+                          },
+                          icon: const Icon(Icons.add),
+                          label: const Text('Új dal'),
+                        ),
                         appBar: AppBar(
                           toolbarHeight: 51,
                           title: // Search bar

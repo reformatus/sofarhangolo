@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 
 import '../database.dart';
+import '../log/logger.dart';
 import 'slide.dart';
 
 /*
@@ -60,13 +61,33 @@ class Cue extends Insertable<Cue> {
       return slides;
     }
 
+    // Revive each entry in isolation: a slide whose song is missing or whose
+    // JSON is malformed must not abort loading the whole cue. `reviveFromJson`
+    // is expected to be total, but this is a defensive net.
     final revived = await Future.wait(
       _serializedContent.map(
-        (entry) => Slide.reviveFromJson(Map<String, dynamic>.from(entry), this),
+        (entry) => _reviveSafely(Map<String, dynamic>.from(entry)),
       ),
     );
     _revivedSlides = revived;
     return slides;
+  }
+
+  Future<Slide> _reviveSafely(Map<String, dynamic> entry) async {
+    try {
+      return await Slide.reviveFromJson(entry, this);
+    } catch (error, stackTrace) {
+      log.warning(
+        'Nem sikerült feloldani egy dia tartalmát; hibás diaként jelenik meg.',
+        error,
+        stackTrace,
+      );
+      return UnknownTypeSlide(
+        entry,
+        entry['uuid'] as String? ?? '',
+        entry['comment'] as String?,
+      );
+    }
   }
 
   static List<Map> getContentMapFromSlides(Iterable<Slide> slides) {
