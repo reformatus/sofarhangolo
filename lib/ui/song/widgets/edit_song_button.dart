@@ -17,9 +17,23 @@ import '../../common/confirm_dialog.dart';
 /// that one instead. The copy also gets its own copies of the original's
 /// attachments (see [copySongToLocal]).
 class EditSongButton extends StatelessWidget {
-  const EditSongButton(this.song, {super.key});
+  const EditSongButton(
+    this.song, {
+    super.key,
+    this.onCopyCreated,
+    this.pushCopyPage = true,
+  });
 
   final Song song;
+
+  /// Called with the freshly created copy, before its editor opens. Cue
+  /// editing uses this to switch its slide over to the copy.
+  final ValueChanged<Song>? onCopyCreated;
+
+  /// Whether to push the copy's own page below its editor, so backing out of
+  /// the editor lands on the copy. Set false when the page opening the editor
+  /// (e.g. a cue) should be returned to instead.
+  final bool pushCopyPage;
 
   bool get _isLocal => song.sourceBank == localBankUuid;
 
@@ -86,13 +100,18 @@ class EditSongButton extends StatelessWidget {
     if (!context.mounted) return;
     final copy = editExisting ? existingCopy : created;
     if (copy == null) return;
+    if (!editExisting) onCopyCreated?.call(copy);
     _openCopy(context, copy);
   }
 
-  /// Opens [copy]'s own page with the editor on top, so going back from the
-  /// editor lands on the edited copy.
+  /// Opens [copy]'s own page and/or the editor for it.
+  ///
+  /// With [pushCopyPage], the copy's page goes under the editor so going back
+  /// from the editor lands on the edited copy.
   void _openCopy(BuildContext context, Song copy) {
-    context.push('/song/${copy.uuid}');
+    if (pushCopyPage) {
+      context.push('/song/${copy.uuid}');
+    }
     context.push('/song/local/${copy.uuid}');
   }
 

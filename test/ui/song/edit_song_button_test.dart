@@ -1,4 +1,4 @@
-import 'package:drift/drift.dart' hide isNull;
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -18,12 +18,22 @@ Song _song({required String uuid, required String? sourceBank}) => Song(
   sourceBank: sourceBank,
 );
 
-GoRouter _router(Song song) => GoRouter(
+GoRouter _router(
+  Song song, {
+  ValueChanged<Song>? onCopyCreated,
+  bool pushCopyPage = true,
+}) => GoRouter(
   initialLocation: '/origin',
   routes: [
     GoRoute(
       path: '/origin',
-      builder: (context, state) => Scaffold(body: EditSongButton(song)),
+      builder: (context, state) => Scaffold(
+        body: EditSongButton(
+          song,
+          onCopyCreated: onCopyCreated,
+          pushCopyPage: pushCopyPage,
+        ),
+      ),
     ),
     GoRoute(
       path: '/song/local/:uuid',
@@ -174,5 +184,85 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('songpage:${copy.uuid}'), findsOneWidget);
+  });
+
+  testWidgets('bank song: reports the created copy before opening its editor', (
+    tester,
+  ) async {
+    await insertBankSong();
+    Song? reported;
+
+    await tester.pumpWidget(
+      MaterialApp.router(
+        routerConfig: _router(
+          _song(uuid: 'bank-1', sourceBank: 'bank-1'),
+          onCopyCreated: (copy) => reported = copy,
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Másolat szerkesztése'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.widgetWithText(FilledButton, 'Másolat szerkesztése'),
+    );
+    await tester.pumpAndSettle();
+
+    expect(reported, isNotNull);
+    expect(find.text('editor:${reported!.uuid}'), findsOneWidget);
+  });
+
+  testWidgets('bank song: pushCopyPage false keeps the origin under the editor', (
+    tester,
+  ) async {
+    await insertBankSong();
+    final router = _router(
+      _song(uuid: 'bank-1', sourceBank: 'bank-1'),
+      pushCopyPage: false,
+    );
+    await tester.pumpWidget(MaterialApp.router(routerConfig: router));
+
+    await tester.tap(find.text('Másolat szerkesztése'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.widgetWithText(FilledButton, 'Másolat szerkesztése'),
+    );
+    await tester.pumpAndSettle();
+
+    // No copy page is pushed under the editor.
+    expect(find.textContaining('songpage:'), findsNothing);
+
+    router.pop();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Másolat szerkesztése'), findsOneWidget);
+    expect(find.textContaining('songpage:'), findsNothing);
+  });
+
+  testWidgets('bank song: editing an existing copy reports nothing', (
+    tester,
+  ) async {
+    await insertBankSong();
+    final copy = await copySongToLocal(
+      _song(uuid: 'bank-1', sourceBank: 'bank-1'),
+    );
+    Song? reported;
+
+    await tester.pumpWidget(
+      MaterialApp.router(
+        routerConfig: _router(
+          _song(uuid: 'bank-1', sourceBank: 'bank-1'),
+          onCopyCreated: (created) => reported = created,
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Másolat szerkesztése'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Meglévő másolat szerkesztése'));
+    await tester.pumpAndSettle();
+
+    expect(reported, isNull);
+    expect(find.text('editor:${copy.uuid}'), findsOneWidget);
   });
 }

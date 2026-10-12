@@ -11,6 +11,7 @@ import '../../common/error/card.dart';
 import '../session/session_provider.dart';
 import '../../song/transpose/widget.dart';
 import '../../song/view_chooser.dart';
+import '../../song/widgets/edit_song_button.dart';
 import '../slide_views/song.dart';
 
 class ActionsDrawer extends ConsumerStatefulWidget {
@@ -109,6 +110,14 @@ class _ActionsDrawerState extends ConsumerState<ActionsDrawer> {
         onPressed: () => context.push(songRoutePath(liveSong.uuid)),
         label: const Text('Ugrás a dalhoz'),
         icon: const Icon(Icons.redo),
+      ),
+      const SizedBox(height: 8),
+      // Editing a bank song makes a local copy; switch this slide over to it
+      // right away, and keep the cue (not the copy's page) under the editor.
+      EditSongButton(
+        liveSong,
+        onCopyCreated: (copy) => _useLocalCopy(songSlide, copy),
+        pushCopyPage: false,
       ),
       const SizedBox(height: 8),
       TransposeCard(song: liveSong, songSlide: songSlide),
