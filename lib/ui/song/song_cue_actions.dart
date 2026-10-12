@@ -55,39 +55,21 @@ class SongCueActions extends StatelessWidget {
       );
     }
 
+    // The search box sits first so the "already added" hint (or the
+    // add-to-open-cue button) reads as its outcome, separated by the
+    // sidebar's usual small gap.
     return SidebarColumn(
       gap: 10,
       children: [
-        OpenCueActionControl(song: song, transpose: transpose),
-        _DesktopCueSearchSpacer(song: song),
         AddToCueSearch(
           song: song,
           isDesktop: true,
           viewType: viewType,
           transpose: transpose ?? SongTranspose(),
         ),
+        OpenCueActionControl(song: song, transpose: transpose),
       ],
     );
-  }
-}
-
-class _DesktopCueSearchSpacer extends ConsumerWidget {
-  const _DesktopCueSearchSpacer({required this.song});
-
-  final Song song;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final session = ref.watch(
-      activeCueSessionProvider.select((sessionAsync) => sessionAsync.value),
-    );
-    final cueActionState = SongCueActionState.fromSession(session, song);
-
-    if (!cueActionState.hasActiveCue) {
-      return const SizedBox.shrink();
-    }
-
-    return const SizedBox(height: 10);
   }
 }
 

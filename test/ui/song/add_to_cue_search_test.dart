@@ -15,6 +15,7 @@ import 'package:sofarhangolo/services/ui/messenger_service.dart';
 import 'package:sofarhangolo/ui/base/cue_shell_inset.dart';
 import 'package:sofarhangolo/ui/cue/session/cue_session.dart';
 import 'package:sofarhangolo/ui/cue/session/session_provider.dart';
+import 'package:sofarhangolo/ui/song/add_to_cue_search.dart';
 import 'package:sofarhangolo/ui/song/state.dart';
 import 'package:sofarhangolo/ui/song/song_cue_actions.dart';
 import 'package:sofarhangolo/ui/song/widgets/content.dart';
@@ -543,6 +544,43 @@ void main() {
       expect(find.text('Megnyitott listához adva'), findsOneWidget);
       expect(find.text('Hozzáadás listához...'), findsOneWidget);
       expect(find.text('Hozzáadás megnyitott listához'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'desktop keeps the search box above the added-state row with a gap',
+    (tester) async {
+      final song = _createSong('song-1', 'Song');
+      final cue = Cue(1, 'cue-1', 'Cue', '', currentCueVersion, const []);
+      final session = _createSession(
+        cue: cue,
+        slides: [SongSlide.from(song, viewType: SongViewType.lyrics)],
+      );
+
+      await _pumpSubject(
+        tester,
+        song: song,
+        session: session,
+        isDesktop: true,
+        cues: const [],
+      );
+
+      final searchRect = tester.getRect(find.byType(AddToCueSearch));
+      final addedRowRect = tester.getRect(
+        find.text('Megnyitott listához adva'),
+      );
+
+      expect(
+        searchRect.bottom,
+        lessThan(addedRowRect.top),
+        reason: 'a keresőmezőnek a "Megnyitott listához adva" sor fölött kell lennie',
+      );
+      expect(
+        addedRowRect.top - searchRect.bottom,
+        greaterThan(0),
+        reason:
+            'a keresőmező és a hozzáadva-sor között pozitív résnek kell lennie',
+      );
     },
   );
 
