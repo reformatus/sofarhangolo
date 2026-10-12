@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../common/error/card.dart';
+import 'delayed_dim.dart';
 import 'empty_chip_row.dart';
 import 'filter_chip.dart';
 import 'skeleton_chip_row.dart';
@@ -81,9 +82,8 @@ class _AsyncChipRowHandlerOfState<T> extends State<AsyncChipRowHandlerOf<T>> {
       };
     }
 
-    return AnimatedOpacity(
-      duration: Durations.short4,
-      opacity: widget.asyncValue.isLoading ? 0.45 : 1,
+    return DelayedDim(
+      loading: widget.asyncValue.isLoading,
       child: values.isEmpty
           ? EmptyChipRow(height: widget.height)
           : SizedBox(

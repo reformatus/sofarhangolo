@@ -6,6 +6,7 @@ import '../../../../../../../services/key/filter.dart';
 import '../../../../../../../services/songs/facet.dart';
 import '../../../../../../common/error/card.dart';
 import '../../../../../../common/key_text.dart';
+import '../../common/delayed_dim.dart';
 import '../../common/empty_chip_row.dart';
 import '../../common/filter_chip.dart';
 import '../../common/skeleton_chip_row.dart';
@@ -180,9 +181,8 @@ class _KeyFilterCardState extends ConsumerState<KeyFilterCard> {
 
     return SizedBox(
       height: _chipRowHeight,
-      child: AnimatedOpacity(
-        duration: Durations.short4,
-        opacity: selectables.isLoading ? 0.45 : 1,
+      child: DelayedDim(
+        loading: selectables.isLoading,
         child: FadingEdgeScrollView.fromScrollView(
           child: ListView.builder(
             // hack, but still better than code repetition...
