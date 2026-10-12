@@ -9,6 +9,41 @@ void main() {
       expect(SongFieldUse.details.isFilterUse, isFalse);
       expect(SongFieldUse.summary.isFilterUse, isFalse);
     });
+
+    test('marks exactly the search uses', () {
+      expect(SongFieldUse.searchText.isSearchUse, isTrue);
+      expect(SongFieldUse.searchBible.isSearchUse, isTrue);
+      expect(SongFieldUse.searchSongbook.isSearchUse, isTrue);
+      for (final use in [
+        SongFieldUse.filterMultiselect,
+        SongFieldUse.filterKey,
+        SongFieldUse.details,
+        SongFieldUse.summary,
+      ]) {
+        expect(use.isSearchUse, isFalse, reason: use.name);
+      }
+    });
+  });
+
+  group('SongSearchGroup', () {
+    test('weights follow the agreed relevance ladder', () {
+      expect(SongSearchGroup.title.weight, 10.0);
+      expect(SongSearchGroup.people.weight, 5.0);
+      expect(SongSearchGroup.metadata.weight, 2.0);
+      expect(SongSearchGroup.lyrics.weight, 1.0);
+      expect(
+        SongSearchGroup.title.weight,
+        greaterThan(SongSearchGroup.people.weight),
+      );
+      expect(
+        SongSearchGroup.people.weight,
+        greaterThan(SongSearchGroup.metadata.weight),
+      );
+      expect(
+        SongSearchGroup.metadata.weight,
+        greaterThan(SongSearchGroup.lyrics.weight),
+      );
+    });
   });
 
   group('SongField', () {
@@ -24,6 +59,13 @@ void main() {
       expect(defaultSongFieldRegistry['composer']!.filterUse, isNull);
       expect(defaultSongFieldRegistry['composer']!.hasFilterUse, isFalse);
       expect(defaultSongFieldRegistry['key']!.hasFilterUse, isTrue);
+    });
+
+    test('hasSearchUse resolves search participation', () {
+      expect(defaultSongFieldRegistry['title']!.hasSearchUse, isTrue);
+      expect(defaultSongFieldRegistry['composer']!.hasSearchUse, isTrue);
+      expect(defaultSongFieldRegistry['genre']!.hasSearchUse, isFalse);
+      expect(defaultSongFieldRegistry['key']!.hasSearchUse, isFalse);
     });
   });
 
@@ -64,6 +106,23 @@ void main() {
 
     test('ignores a non-list uses value', () {
       expect(SongField.fromJson('f', {'uses': 'details'}).uses, isEmpty);
+    });
+
+    test('parses search_group and degrades unknown values', () {
+      expect(
+        SongField.fromJson('f', {'search_group': 'people'}).searchGroup,
+        SongSearchGroup.people,
+      );
+      expect(
+        SongField.fromJson('f', {'search_group': 'METADATA'}).searchGroup,
+        SongSearchGroup.metadata,
+      );
+      expect(
+        SongField.fromJson('f', {'search_group': 'nonsense'}).searchGroup,
+        isNull,
+      );
+      expect(SongField.fromJson('f', {}).searchGroup, isNull);
+      expect(SongField.fromJson('f', {'search_group': 7}).searchGroup, isNull);
     });
 
     test('falls back to the api name as title', () {
@@ -109,6 +168,30 @@ void main() {
         'svg',
       ]) {
         expect(defaultSongFieldRegistry[name]!.core, isTrue, reason: name);
+      }
+    });
+
+    test('search fields carry ranking groups', () {
+      const groups = {
+        'title': SongSearchGroup.title,
+        'lyrics': SongSearchGroup.lyrics,
+        'composer': SongSearchGroup.people,
+        'lyricist': SongSearchGroup.people,
+        'translator': SongSearchGroup.people,
+        'title_original': SongSearchGroup.metadata,
+        'bible_ref': SongSearchGroup.metadata,
+        'songbook': SongSearchGroup.metadata,
+      };
+      for (final entry in groups.entries) {
+        final field = defaultSongFieldRegistry[entry.key]!;
+        expect(field.hasSearchUse, isTrue, reason: entry.key);
+        expect(field.searchGroup, entry.value, reason: entry.key);
+      }
+      // Every search-use field needs a group: the FTS weight vector uses them.
+      for (final field in defaultSongFields) {
+        if (field.hasSearchUse) {
+          expect(field.searchGroup, isNotNull, reason: field.apiName);
+        }
       }
     });
   });
@@ -213,6 +296,35 @@ void main() {
       });
 
       expect(merged['genre']!.uses, {SongFieldUse.details});
+    });
+
+    test('keeps base search uses and group when an overlay customizes a field', () {
+      final merged = mergeSongFields(defaultSongFieldRegistry, {
+        'composer': {
+          'title': 'Szerző',
+          'uses': ['details'],
+          'search_group': 'lyrics',
+        },
+      });
+
+      final composer = merged['composer']!;
+      expect(composer.hasSearchUse, isTrue);
+      expect(composer.uses.contains(SongFieldUse.searchText), isTrue);
+      expect(composer.searchGroup, SongSearchGroup.people);
+    });
+
+    test('keeps a declared search group on overlay-introduced fields', () {
+      final merged = mergeSongFields(defaultSongFieldRegistry, {
+        'orchestra': {
+          'search_group': 'people',
+          'uses': ['details'],
+        },
+      });
+
+      final orchestra = merged['orchestra']!;
+      expect(orchestra.searchGroup, SongSearchGroup.people);
+      // Inert: overlay fields are not searchable, but the group carries over.
+      expect(orchestra.hasSearchUse, isFalse);
     });
 
     test('skips malformed overlay entries', () {

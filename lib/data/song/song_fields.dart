@@ -3,12 +3,30 @@ import 'package:flutter/material.dart';
 /// How a field's values are shaped in the bank API and in contentMap.
 enum SongFieldType { text, list }
 
+/// Ranking weight of a search-use field's matches: title > people > metadata >
+/// lyrics. [weight] is the bm25 multiplier for this group; only ratios matter.
+enum SongSearchGroup {
+  /// A title hit is the strongest relevance signal.
+  title(10.0),
+
+  /// Composer, lyricist, translator: finding a song by its people.
+  people(5.0),
+
+  /// Original titles, scripture references, songbook entries.
+  metadata(2.0),
+
+  /// Lyrics matches are plentiful but rarely the best answer.
+  lyrics(1.0);
+
+  const SongSearchGroup(this.weight);
+
+  /// bm25 multiplier for this group; tiers dominate, this orders within one.
+  final double weight;
+}
+
 /// What the app does with a field. Storage itself is open-world: unknown
 /// fields still land in [Song.contentMap] untouched; uses only decide
 /// whether (and where) a known field gets UI.
-///
-/// Search uses (text, bible, songbook) will be added here later, each
-/// declared with an `isSearchUse` flag like [SongFieldUse.isFilterUse].
 enum SongFieldUse {
   /// Generic chip-row filter card over the field's own values.
   filterMultiselect(isFilterUse: true),
@@ -17,16 +35,32 @@ enum SongFieldUse {
   /// bank overlays cannot introduce dedicated filter UI.
   filterKey(isFilterUse: true),
 
+  /// Unified text search: FTS ∪ LIKE ∪ exact, tiered in SQL. Title and lyrics
+  /// declare it too (they read from dedicated columns). App-side: overlays
+  /// cannot add or drop search uses ([mergeSongFields]).
+  searchText(isSearchUse: true),
+
+  /// Placeholder for scripture-reference search (e.g. "Jn 3,16"); no field
+  /// declares it yet.
+  searchBible(isSearchUse: true),
+
+  /// Placeholder for songbook-number search (e.g. "234"); no field declares it
+  /// yet.
+  searchSongbook(isSearchUse: true),
+
   /// Row in the song details list.
   details,
 
   /// Compact chip in the details summary.
   summary;
 
-  const SongFieldUse({this.isFilterUse = false});
+  const SongFieldUse({this.isFilterUse = false, this.isSearchUse = false});
 
   /// Whether this use is one of the filter-card uses.
   final bool isFilterUse;
+
+  /// Whether this use is one of the search uses.
+  final bool isSearchUse;
 }
 
 /// Definition of one song field in the shared bank vocabulary.
@@ -46,6 +80,9 @@ class SongField {
   final IconData? icon;
   final Set<SongFieldUse> uses;
 
+  /// Ranking group for the unified text search; null on fields it never ranks.
+  final SongSearchGroup? searchGroup;
+
   /// Mechanistic field with a dedicated column/feature. Immune to overlays.
   final bool core;
 
@@ -55,12 +92,15 @@ class SongField {
     this.type, {
     this.icon,
     this.uses = const {},
+    this.searchGroup,
     this.core = false,
   });
 
   bool hasUse(SongFieldUse use) => uses.contains(use);
 
   bool get hasFilterUse => uses.any((use) => use.isFilterUse);
+
+  bool get hasSearchUse => uses.any((use) => use.isSearchUse);
 
   /// The one filter-card use this field has, or null when it has none.
   /// Used to dispatch the filter card UI.
@@ -94,11 +134,21 @@ class SongField {
           else if (use == 'summary')
             SongFieldUse.summary,
     };
+    final rawGroup = json['search_group'];
+    final group = rawGroup is String ? rawGroup : '';
+    final searchGroup = switch (group.toLowerCase()) {
+      'title' => SongSearchGroup.title,
+      'people' => SongSearchGroup.people,
+      'metadata' => SongSearchGroup.metadata,
+      'lyrics' => SongSearchGroup.lyrics,
+      _ => null,
+    };
     final rawTitle = json['title'];
     return SongField(
       apiName,
       rawTitle is String ? rawTitle : apiName,
       type,
+      searchGroup: searchGroup,
       uses: uses,
     );
   }
@@ -114,6 +164,8 @@ const List<SongField> defaultSongFields = [
     'Cím',
     SongFieldType.text,
     icon: Icons.text_fields,
+    uses: {SongFieldUse.searchText},
+    searchGroup: SongSearchGroup.title,
     core: true,
   ),
   SongField(
@@ -121,6 +173,8 @@ const List<SongField> defaultSongFields = [
     'Dalszöveg',
     SongFieldType.text,
     icon: Icons.text_snippet,
+    uses: {SongFieldUse.searchText},
+    searchGroup: SongSearchGroup.lyrics,
     core: true,
   ),
   SongField(
@@ -141,42 +195,48 @@ const List<SongField> defaultSongFields = [
     'Dalszerző',
     SongFieldType.text,
     icon: Icons.music_note,
-    uses: {SongFieldUse.details, SongFieldUse.summary},
+    uses: {SongFieldUse.details, SongFieldUse.summary, SongFieldUse.searchText},
+    searchGroup: SongSearchGroup.people,
   ),
   SongField(
     'lyricist',
     'Szövegíró',
     SongFieldType.text,
     icon: Icons.edit,
-    uses: {SongFieldUse.details, SongFieldUse.summary},
+    uses: {SongFieldUse.details, SongFieldUse.summary, SongFieldUse.searchText},
+    searchGroup: SongSearchGroup.people,
   ),
   SongField(
     'translator',
     'Fordító',
     SongFieldType.text,
     icon: Icons.translate,
-    uses: {SongFieldUse.details, SongFieldUse.summary},
+    uses: {SongFieldUse.details, SongFieldUse.summary, SongFieldUse.searchText},
+    searchGroup: SongSearchGroup.people,
   ),
   SongField(
     'title_original',
     'Cím (eredeti)',
     SongFieldType.text,
     icon: Icons.wrap_text,
-    uses: {SongFieldUse.details},
+    uses: {SongFieldUse.details, SongFieldUse.searchText},
+    searchGroup: SongSearchGroup.metadata,
   ),
   SongField(
     'bible_ref',
     'Igeszakasz',
     SongFieldType.text,
     icon: Icons.book,
-    uses: {SongFieldUse.details},
+    uses: {SongFieldUse.details, SongFieldUse.searchText},
+    searchGroup: SongSearchGroup.metadata,
   ),
   SongField(
     'songbook',
     'Énekeskönyv',
     SongFieldType.text,
     icon: Icons.menu_book,
-    uses: {SongFieldUse.details},
+    uses: {SongFieldUse.details, SongFieldUse.searchText},
+    searchGroup: SongSearchGroup.metadata,
   ),
 
   // Tag filters that also show as details rows.
@@ -297,10 +357,17 @@ Map<String, SongField> mergeSongFields(
       rawTitle is String ? rawTitle : (baseDef?.title ?? field.title),
       rawType is String ? field.type : (baseDef?.type ?? field.type),
       icon: baseDef?.icon,
+      // Base definitions win, so overlays cannot re-weight the fixed FTS
+      // columns.
+      searchGroup: baseDef?.searchGroup ?? field.searchGroup,
       // Dedicated filter cards are app-side decisions, like icons: only
       // the core `key` field may use the key picker, and it is immune to
       // overlays anyway, so a bank's filter_key never passes through.
-      uses: field.uses.where((use) => use != SongFieldUse.filterKey).toSet(),
+      // Search uses are app-side too: overlays keep the base definition's.
+      uses: {
+        ...field.uses.where((use) => use != SongFieldUse.filterKey),
+        ...?baseDef?.uses.where((use) => use.isSearchUse),
+      },
     );
   }
   return merged;

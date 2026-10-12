@@ -1,8 +1,8 @@
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../../data/database.dart';
 import '../../data/song/song.dart';
 import '../../ui/base/songs/widgets/filter/types/key/state.dart';
+import '../songs/facet.dart';
 
 part 'filter.g.dart';
 
@@ -13,82 +13,79 @@ typedef KeyFilterSelectable = ({
   bool addingKey,
 });
 
-@Riverpod(keepAlive: true)
-Stream<List<KeyFilterSelectable>> selectablePitches(Ref ref) {
+/// Pitch/complete-key chips the key card offers, limited to the keys the query
+/// can reach ([keyFacet]); one selected mode narrows it to that mode's keys.
+@riverpod
+Future<List<KeyFilterSelectable>> selectablePitches(Ref ref) async {
+  // Captured once: a chip built from a previous value must not reach through a
+  // stale provider Ref when tapped.
+  final keyFilterState = ref.read(keyFilterStateProvider.notifier);
   final state = ref.watch(keyFilterStateProvider);
-  return db.select(db.songs).watch().map((songs) {
-    final selectables = <KeyFilterSelectable>[];
-    final seenPitches = <String>{};
+  final available = await ref.watch(keyFacetProvider.future);
 
-    for (final song in songs) {
-      for (final key in song.keyField) {
-        if (state.modes.length == 1 && state.pitches.isEmpty) {
-          if (key.mode != state.modes.first) continue;
-          if (!seenPitches.add(key.pitch)) continue;
-          final selectableKey = KeyField(key.pitch, key.mode);
-          if (state.keys.contains(selectableKey)) continue;
-          selectables.add((
-            label: selectableKey.toString(),
-            onSelected: (v) => ref
-                .read(keyFilterStateProvider.notifier)
-                .setKeyTo(selectableKey, v),
-            selected: state.keys.contains(selectableKey),
+  if (state.modes.length == 1 && state.pitches.isEmpty) {
+    return [
+      for (final key in _sortedKeys(available.keys))
+        if (key.mode == state.modes.first && !state.keys.contains(key))
+          (
+            label: key.toString(),
+            onSelected: (bool v) => keyFilterState.setKeyTo(key, v),
+            selected: false,
             addingKey: true,
-          ));
-        } else {
-          if (!seenPitches.add(key.pitch)) continue;
-          selectables.add((
-            label: key.pitch,
-            onSelected: (v) => ref
-                .read(keyFilterStateProvider.notifier)
-                .setPitchTo(key.pitch, v),
-            selected: state.pitches.contains(key.pitch),
-            addingKey: false,
-          ));
-        }
-      }
-    }
+          ),
+    ];
+  }
 
-    return selectables;
-  });
+  return [
+    for (final pitch in _sorted({...available.pitches, ...state.pitches}))
+      (
+        label: pitch,
+        onSelected: (bool v) => keyFilterState.setPitchTo(pitch, v),
+        selected: state.pitches.contains(pitch),
+        addingKey: false,
+      ),
+  ];
 }
 
-@Riverpod(keepAlive: true)
-Stream<List<KeyFilterSelectable>> selectableModes(Ref ref) {
+/// Mode/complete-key chips the key card offers, limited to the keys the query
+/// can reach ([keyFacet]); one selected pitch narrows it to that pitch's keys.
+@riverpod
+Future<List<KeyFilterSelectable>> selectableModes(Ref ref) async {
+  final keyFilterState = ref.read(keyFilterStateProvider.notifier);
   final state = ref.watch(keyFilterStateProvider);
-  return db.select(db.songs).watch().map((songs) {
-    final selectables = <KeyFilterSelectable>[];
-    final seenModes = <String>{};
+  final available = await ref.watch(keyFacetProvider.future);
 
-    for (final song in songs) {
-      for (final key in song.keyField) {
-        if (state.pitches.length == 1 && state.modes.isEmpty) {
-          if (key.pitch != state.pitches.first) continue;
-          if (!seenModes.add(key.mode)) continue;
-          final selectableKey = KeyField(key.pitch, key.mode);
-          if (state.keys.contains(selectableKey)) continue;
-          selectables.add((
-            label: selectableKey.toString(),
-            onSelected: (v) => ref
-                .read(keyFilterStateProvider.notifier)
-                .setKeyTo(selectableKey, v),
-            selected: state.keys.contains(selectableKey),
+  if (state.pitches.length == 1 && state.modes.isEmpty) {
+    return [
+      for (final key in _sortedKeys(available.keys))
+        if (key.pitch == state.pitches.first && !state.keys.contains(key))
+          (
+            label: key.toString(),
+            onSelected: (bool v) => keyFilterState.setKeyTo(key, v),
+            selected: false,
             addingKey: true,
-          ));
-        } else {
-          if (!seenModes.add(key.mode)) continue;
-          selectables.add((
-            label: key.mode,
-            onSelected: (v) => ref
-                .read(keyFilterStateProvider.notifier)
-                .setModeTo(key.mode, v),
-            selected: state.modes.contains(key.mode),
-            addingKey: false,
-          ));
-        }
-      }
-    }
+          ),
+    ];
+  }
 
-    return selectables;
-  });
+  return [
+    for (final mode in _sorted({...available.modes, ...state.modes}))
+      (
+        label: mode,
+        onSelected: (bool v) => keyFilterState.setModeTo(mode, v),
+        selected: state.modes.contains(mode),
+        addingKey: false,
+      ),
+  ];
+}
+
+List<String> _sorted(Iterable<String> values) => values.toList()..sort();
+
+List<KeyField> _sortedKeys(Iterable<KeyField> keys) {
+  final list = keys.toList()
+    ..sort((a, b) {
+      final byPitch = a.pitch.compareTo(b.pitch);
+      return byPitch != 0 ? byPitch : a.mode.compareTo(b.mode);
+    });
+  return list;
 }
