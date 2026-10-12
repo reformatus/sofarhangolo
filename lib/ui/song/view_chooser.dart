@@ -17,6 +17,9 @@ IconData viewTypeIcon(SongViewType viewType) => switch (viewType) {
   SongViewType.chords => Icons.tag_outlined,
 };
 
+/// One selectable view: its type, label and whether it can be picked.
+typedef ViewTypeEntry = ({SongViewType type, String label, bool enabled});
+
 class ViewChooser extends ConsumerWidget {
   const ViewChooser({
     super.key,
@@ -35,25 +38,30 @@ class ViewChooser extends ConsumerWidget {
   /// views before anything is attached; the song page keeps them disabled.
   final bool allowUnavailableViews;
 
+  List<ViewTypeEntry> get _entries => [
+    (
+      type: SongViewType.svg,
+      label: 'Kotta',
+      enabled: song.hasSvg || allowUnavailableViews,
+    ),
+    (
+      type: SongViewType.pdf,
+      label: 'PDF',
+      enabled: song.hasPdf || allowUnavailableViews,
+    ),
+    if (song.hasChords)
+      (type: SongViewType.chords, label: 'Akkordok', enabled: true)
+    else
+      (
+        type: SongViewType.lyrics,
+        label: 'Dalszöveg',
+        enabled: song.hasLyrics || allowUnavailableViews,
+      ),
+  ];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final Map<SongViewType, ({String label, bool enabled})> viewTypeEntries = {
-      SongViewType.svg: (
-        label: 'Kotta',
-        enabled: song.hasSvg || allowUnavailableViews,
-      ),
-      SongViewType.pdf: (
-        label: 'PDF',
-        enabled: song.hasPdf || allowUnavailableViews,
-      ),
-      if (song.hasChords)
-        SongViewType.chords: (label: 'Akkordok', enabled: true)
-      else
-        SongViewType.lyrics: (
-          label: 'Dalszöveg',
-          enabled: song.hasLyrics || allowUnavailableViews,
-        ),
-    };
+    final entries = _entries;
 
     if (songSlide != null) {
       final currentSongSlide = switch (ref
@@ -62,208 +70,168 @@ class ViewChooser extends ConsumerWidget {
         SongSlide currentSlide => currentSlide,
         _ => songSlide!,
       };
-      final viewType = currentSongSlide.viewType;
 
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          if (!useDropdown) {
-            return SegmentedButton<SongViewType>(
-              selected: {viewType},
-              onSelectionChanged: (viewTypeSet) {
-                final newViewType = viewTypeSet.first;
-                ref
-                    .read(activeCueSessionProvider.notifier)
-                    .updateSlide(
-                      currentSongSlide.copyWith(viewType: newViewType),
-                    );
-              },
-              showSelectedIcon: false,
-              multiSelectionEnabled: false,
-              style: ButtonStyle(
-                shape: WidgetStatePropertyAll(
-                  RoundedRectangleBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(9)),
-                  ),
-                ),
-              ),
-              segments: viewTypeEntries.entries
-                  .map(
-                    (entry) => ButtonSegment(
-                      value: entry.key,
-                      label: Text(entry.value.label),
-                      icon: Icon(viewTypeIcon(entry.key)),
-                      enabled: entry.value.enabled,
-                      tooltip: !entry.value.enabled ? 'Nem elérhető' : null,
-                    ),
-                  )
-                  .toList(),
-            );
-          }
-
-          return FilledButton(
-            style: ButtonStyle(
-              padding: WidgetStatePropertyAll(EdgeInsets.zero),
-              enableFeedback: false,
-              splashFactory: NoSplash.splashFactory,
-              overlayColor: WidgetStatePropertyAll(Colors.transparent),
-            ),
-            focusNode: FocusNode(skipTraversal: true),
-            onPressed: () {},
-            child: DropdownButton<SongViewType>(
-              borderRadius: BorderRadius.circular(15),
-              isDense: true,
-              padding: EdgeInsets.only(top: 5, bottom: 5, left: 15, right: 5),
-              underline: SizedBox.shrink(),
-              focusColor: Colors.transparent,
-              icon: Icon(
-                Icons.arrow_drop_down_rounded,
-                color: Theme.of(context).colorScheme.inverseSurface,
-              ),
-              autofocus: false,
-              value: viewType,
-              onChanged: (newViewType) {
-                if (newViewType == null) return;
-                ref
-                    .read(activeCueSessionProvider.notifier)
-                    .updateSlide(
-                      currentSongSlide.copyWith(viewType: newViewType),
-                    );
-              },
-              items: viewTypeEntries.entries
-                  .where((entry) => entry.value.enabled)
-                  .map(
-                    (entry) => DropdownMenuItem(
-                      enabled: entry.value.enabled,
-                      value: entry.key,
-                      child: Row(
-                        children: [
-                          Padding(
-                            padding: EdgeInsets.only(right: 10),
-                            child: Icon(
-                              viewTypeIcon(entry.key),
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.inverseSurface,
-                            ),
-                          ),
-                          Text(
-                            entry.value.label,
-                            style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.inverseSurface,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-          );
-        },
+      return _chooser(
+        entries,
+        selected: currentSongSlide.viewType,
+        onChanged: (viewType) => ref
+            .read(activeCueSessionProvider.notifier)
+            .updateSlide(currentSongSlide.copyWith(viewType: viewType)),
       );
     }
 
     final viewTypeAsync = ref.watch(viewTypeForProvider(song, songSlide));
-
     if (!viewTypeAsync.hasValue) return const SizedBox.shrink();
-    final viewType = viewTypeAsync.requireValue;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (!useDropdown) {
-          return SegmentedButton<SongViewType>(
-            selected: {viewType},
-            onSelectionChanged: (viewTypeSet) {
-              final newViewType = viewTypeSet.first;
-              ref
-                  .read(viewTypeForProvider(song, songSlide).notifier)
-                  .setTo(newViewType);
+    return _chooser(
+      entries,
+      selected: viewTypeAsync.requireValue,
+      onChanged: (viewType) =>
+          ref.read(viewTypeForProvider(song, songSlide).notifier).setTo(viewType),
+    );
+  }
+
+  Widget _chooser(
+    List<ViewTypeEntry> entries, {
+    required SongViewType selected,
+    required ValueChanged<SongViewType> onChanged,
+  }) {
+    if (!useDropdown) {
+      return _ViewTypeSegmented(
+        entries: entries,
+        selected: selected,
+        onChanged: onChanged,
+      );
+    }
+    return _ViewTypeDropdown(
+      entries: entries.where((entry) => entry.enabled).toList(),
+      selected: selected,
+      onChanged: onChanged,
+    );
+  }
+}
+
+class _ViewTypeSegmented extends StatelessWidget {
+  const _ViewTypeSegmented({
+    required this.entries,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final List<ViewTypeEntry> entries;
+  final SongViewType selected;
+  final ValueChanged<SongViewType> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return SegmentedButton<SongViewType>(
+      selected: {selected},
+      onSelectionChanged: (viewTypes) => onChanged(viewTypes.first),
+      showSelectedIcon: false,
+      multiSelectionEnabled: false,
+      style: ButtonStyle(
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(9)),
+          ),
+        ),
+      ),
+      segments: [
+        for (final entry in entries)
+          ButtonSegment(
+            value: entry.type,
+            label: Text(entry.label),
+            icon: Icon(viewTypeIcon(entry.type)),
+            enabled: entry.enabled,
+            tooltip: !entry.enabled ? 'Nem elérhető' : null,
+          ),
+      ],
+    );
+  }
+}
+
+/// The compact form of the view switcher: a filled button whose label is the
+/// current view and whose menu lists the available ones.
+class _ViewTypeDropdown extends StatelessWidget {
+  const _ViewTypeDropdown({
+    required this.entries,
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final List<ViewTypeEntry> entries;
+  final SongViewType selected;
+  final ValueChanged<SongViewType> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return FilledButton(
+      style: ButtonStyle(
+        padding: const WidgetStatePropertyAll(EdgeInsets.zero),
+        enableFeedback: false,
+        splashFactory: NoSplash.splashFactory,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+      ),
+      focusNode: FocusNode(skipTraversal: true),
+      onPressed: () {},
+      child: Builder(
+        builder: (context) {
+          // The dropdown is painted on the button's own background, so its
+          // label and arrow take the button's foreground — whatever the theme
+          // resolved for it — instead of a hardcoded color that only happens
+          // to work on one surface.
+          final onButton =
+              DefaultTextStyle.of(context).style.color ?? colors.onPrimary;
+
+          return DropdownButton<SongViewType>(
+            borderRadius: BorderRadius.circular(15),
+            isDense: true,
+            padding: const EdgeInsets.only(top: 5, bottom: 5, left: 15, right: 5),
+            underline: SizedBox.shrink(),
+            focusColor: Colors.transparent,
+            icon: Icon(Icons.arrow_drop_down_rounded, color: onButton),
+            autofocus: false,
+            value: selected,
+            onChanged: (viewType) {
+              if (viewType != null) onChanged(viewType);
             },
-            showSelectedIcon: false,
-            multiSelectionEnabled: false,
-            style: ButtonStyle(
-              shape: WidgetStatePropertyAll(
-                RoundedRectangleBorder(
-                  borderRadius: BorderRadius.all(Radius.circular(9)),
+            // Menu entries sit on the menu's surface, not on the button.
+            selectedItemBuilder: (context) => [
+              for (final entry in entries)
+                _ViewTypeLabel(entry: entry, color: onButton),
+            ],
+            items: [
+              for (final entry in entries)
+                DropdownMenuItem(
+                  value: entry.type,
+                  child: _ViewTypeLabel(entry: entry, color: colors.onSurface),
                 ),
-              ),
-            ),
-            segments: viewTypeEntries.entries
-                .map(
-                  (entry) => ButtonSegment(
-                    value: entry.key,
-                    label: Text(entry.value.label),
-                    icon: Icon(viewTypeIcon(entry.key)),
-                    enabled: entry.value.enabled,
-                    tooltip: !entry.value.enabled ? 'Nem elérhető' : null,
-                  ),
-                )
-                .toList(),
+            ],
           );
-        } else {
-          return FilledButton(
-            style: ButtonStyle(
-              padding: WidgetStatePropertyAll(EdgeInsets.zero),
-              enableFeedback: false,
-              splashFactory: NoSplash.splashFactory,
-              overlayColor: WidgetStatePropertyAll(Colors.transparent),
-            ),
-            focusNode: FocusNode(skipTraversal: true),
-            onPressed: () {},
-            child: DropdownButton<SongViewType>(
-              borderRadius: BorderRadius.circular(15),
-              isDense: true,
-              padding: EdgeInsets.only(top: 5, bottom: 5, left: 15, right: 5),
-              underline: SizedBox.shrink(),
-              focusColor: Colors.transparent,
-              icon: Icon(
-                Icons.arrow_drop_down_rounded,
-                color: Theme.of(context).colorScheme.inverseSurface,
-              ),
-              autofocus: false,
-              value: viewType,
-              onChanged: (newViewType) {
-                if (newViewType == null) return;
-                ref
-                    .read(viewTypeForProvider(song, songSlide).notifier)
-                    .setTo(newViewType);
-              },
-              items: viewTypeEntries.entries
-                  .where((entry) => entry.value.enabled)
-                  .map(
-                    (entry) => DropdownMenuItem(
-                      enabled: entry.value.enabled,
-                      value: entry.key,
-                      child: Row(
-                        children: [
-                          Padding(
-                            padding: EdgeInsets.only(right: 10),
-                            child: Icon(
-                              viewTypeIcon(entry.key),
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.inverseSurface,
-                            ),
-                          ),
-                          Text(
-                            entry.value.label,
-                            style: TextStyle(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.inverseSurface,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-          );
-        }
-      },
+        },
+      ),
+    );
+  }
+}
+
+class _ViewTypeLabel extends StatelessWidget {
+  const _ViewTypeLabel({required this.entry, required this.color});
+
+  final ViewTypeEntry entry;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(right: 10),
+          child: Icon(viewTypeIcon(entry.type), color: color),
+        ),
+        Text(entry.label, style: TextStyle(color: color)),
+      ],
     );
   }
 }

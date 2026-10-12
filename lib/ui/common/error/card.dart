@@ -5,6 +5,7 @@ import '../../../services/error/app_error.dart';
 import '../../../services/text_export/diagnostics.dart';
 import '../../../services/ui/messenger_service.dart';
 import '../../base/home/parts/feedback/send_mail.dart';
+import '../notice/card.dart';
 import 'code_box.dart';
 
 class LErrorCard extends StatelessWidget {
@@ -104,87 +105,40 @@ class LErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final codeBoxes = errorMessage == null && stack == null
+        ? null
+        : Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: 8,
+            children: [
+              if (errorMessage != null) ErrorCodeBox(errorMessage!),
+              if (stack != null) ErrorCodeBox(stack!),
+            ],
+          );
+
     return SelectionArea(
       child: Padding(
         padding: EdgeInsets.all(10),
-        child: Card(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadiusGeometry.circular(18),
-          ),
-          color: Color.lerp(
-            switch (type) {
-              LErrorType.error => Colors.red,
-              LErrorType.warning => Colors.orange,
-              LErrorType.info => Colors.blue,
-            },
-            Theme.of(context).scaffoldBackgroundColor,
-            0.8,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              ListTile(
-                leading: Icon(
-                  icon,
-                  color: switch (type) {
-                    LErrorType.error => Colors.red,
-                    LErrorType.warning => Colors.orange,
-                    LErrorType.info => Colors.blue,
-                  }.withAlpha(200),
-                ),
-                title: Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-
-                contentPadding: EdgeInsets.only(left: 13, right: 8),
+        child: LNoticeCard(
+          type: switch (type) {
+            LErrorType.error => LNoticeType.error,
+            LErrorType.warning => LNoticeType.warning,
+            LErrorType.info => LNoticeType.info,
+          },
+          icon: icon,
+          title: title,
+          message: message,
+          extraContent: codeBoxes,
+          actions: [
+            // The retry action owns the primary slot whenever it is present.
+            if (onRetry != null)
+              FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: Text(retryLabel ?? 'Újra'),
               ),
-              if (message != null || errorMessage != null || stack != null)
-                Padding(
-                  padding: const EdgeInsets.only(
-                    left: 16,
-                    right: 16,
-                    bottom: 16,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    spacing: 8,
-                    children: [
-                      if (message != null) Text(message!),
-                      if (errorMessage != null) ErrorCodeBox(errorMessage!),
-                      if (stack != null) ErrorCodeBox(stack!),
-                    ],
-                  ),
-                ),
-              if (onRetry != null ||
-                  errorMessage != null ||
-                  stack != null ||
-                  showReportButton)
-                Padding(
-                  padding: const EdgeInsets.only(
-                    left: 16,
-                    right: 16,
-                    bottom: 16,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    spacing: 8,
-                    children: [
-                      // The retry action owns the primary slot whenever
-                      // it is present.
-                      if (onRetry != null)
-                        FilledButton.icon(
-                          onPressed: onRetry,
-                          icon: const Icon(Icons.refresh),
-                          label: Text(retryLabel ?? 'Újra'),
-                        ),
-                      ..._secondaryActions(context),
-                    ],
-                  ),
-                ),
-            ],
-          ),
+            ..._secondaryActions(context),
+          ],
         ),
       ),
     );

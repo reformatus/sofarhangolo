@@ -111,9 +111,9 @@ void main() {
       ),
     );
 
-    // The text button carries the copy wording.
+    // The outlined sidebar button carries the copy wording.
     expect(
-      find.widgetWithText(TextButton, 'Másolat szerkesztése'),
+      find.widgetWithText(OutlinedButton, 'Másolat szerkesztése'),
       findsOneWidget,
     );
 
@@ -136,7 +136,7 @@ void main() {
     await tester.tap(find.text('Másolat szerkesztése'));
     await tester.pumpAndSettle();
 
-    // Confirm in the dialog (the origin button is a TextButton).
+    // Confirm in the dialog.
     await tester.tap(
       find.widgetWithText(FilledButton, 'Másolat szerkesztése'),
     );

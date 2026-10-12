@@ -9,6 +9,7 @@ import 'package:sofarhangolo/services/songs/original_status.dart';
 import 'package:sofarhangolo/services/songs/write_song.dart';
 import 'package:sofarhangolo/ui/cue/session/session_provider.dart';
 import 'package:sofarhangolo/ui/cue/widgets/actions_drawer.dart';
+import 'package:sofarhangolo/ui/common/sidebar/sidebar.dart';
 
 import '../../../harness/cue_widget_harness.dart';
 import '../../../harness/test_harness.dart';
@@ -55,6 +56,19 @@ void main() {
 
     expect(find.text('Helyi másolat'), findsOneWidget);
     expect(find.text('Csere a helyi másolatra'), findsOneWidget);
+
+    // The swap action is part of the hint box, not a button sitting under it.
+    final hintBox = tester.getRect(
+      find.ancestor(
+        of: find.text('Helyi másolat'),
+        matching: find.byType(Card),
+      ),
+    );
+    final swap = tester.getRect(
+      find.widgetWithText(FilledButton, 'Csere a helyi másolatra'),
+    );
+    expect(hintBox.top, lessThan(swap.top));
+    expect(hintBox.bottom, greaterThan(swap.bottom));
 
     await tester.tap(find.text('Csere a helyi másolatra'));
     await tester.pumpAndSettle();
@@ -165,4 +179,97 @@ void main() {
           .flushWrites();
     },
   );
+
+  testWidgets('drawer buttons fill the sidebar, grouped by meaning', (
+    tester,
+  ) async {
+    final cue = await insertCueHarnessCue(
+      cueUuid: 'cue-layout',
+      fixtures: const [
+        CueSongFixture(
+          songUuid: 'song-1',
+          slideUuid: 'slide-1',
+          title: 'Song 1',
+          lyrics: '[V1]\n Alpha line',
+        ),
+      ],
+    );
+    await harness.container
+        .read(activeCueSessionProvider.notifier)
+        .load(cue.uuid);
+    await waitForProviderValue(harness.container, activeCueSessionProvider);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: harness.container,
+        child: MaterialApp(
+          home: Scaffold(
+            body: SizedBox(width: 304, height: 900, child: ActionsDrawer()),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Every button spans the drawer (minus its own padding).
+    final drawer = tester.getRect(find.byType(ActionsDrawer));
+    for (final label in ['Ugrás a dalhoz', 'Másolat szerkesztése']) {
+      final button = tester.getRect(
+        find.ancestor(
+          of: find.text(label),
+          matching: find.byWidgetPredicate((widget) => widget is ButtonStyleButton),
+        ),
+      );
+      expect(button.width, drawer.width - 16, reason: label);
+    }
+
+    // The song group (jump/edit) comes above the view group (chooser).
+    final jump = tester.getCenter(find.text('Ugrás a dalhoz')).dy;
+    final divider = tester.getCenter(find.byType(SidebarDivider)).dy;
+    final chooser = tester.getCenter(find.text('Dalszöveg')).dy;
+    expect(jump, lessThan(divider));
+    expect(divider, lessThan(chooser));
+  });
+
+  testWidgets('the view switcher label uses the button it sits on', (
+    tester,
+  ) async {
+    final cue = await insertCueHarnessCue(
+      cueUuid: 'cue-dropdown',
+      fixtures: const [
+        CueSongFixture(
+          songUuid: 'song-1',
+          slideUuid: 'slide-1',
+          title: 'Song 1',
+          lyrics: '[V1]\n Alpha line',
+        ),
+      ],
+    );
+    await harness.container
+        .read(activeCueSessionProvider.notifier)
+        .load(cue.uuid);
+    await waitForProviderValue(harness.container, activeCueSessionProvider);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: harness.container,
+        child: MaterialApp(
+          home: Scaffold(
+            body: SizedBox(width: 304, height: 900, child: ActionsDrawer()),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // The dropdown is painted on the filled button's background, so its label
+    // must take that button's foreground — not a surface-derived color that
+    // only reads well somewhere else.
+    final colors = Theme.of(
+      tester.element(find.byType(ActionsDrawer)),
+    ).colorScheme;
+    final label = tester.widget<Text>(find.text('Dalszöveg'));
+    expect(label.style?.color, colors.onPrimary);
+    expect(label.style?.color, isNot(colors.inverseSurface));
+  });
 }

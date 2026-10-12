@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../data/song/song.dart';
+import '../../common/sidebar/sidebar.dart';
 import '../song_cue_actions.dart';
 import '../state.dart';
 import '../transpose/state.dart';
@@ -37,23 +38,19 @@ class DesktopSidebar extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 8),
         color: Theme.of(context).scaffoldBackgroundColor,
         child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: SidebarColumn(
+            gap: 10,
             children: [
-              if (viewType == SongViewType.chords) ...[
-                TransposeCard(song: song),
-                SizedBox(height: 10),
-              ],
+              if (viewType == SongViewType.chords) TransposeCard(song: song),
               SongCueActions(
                 song: song,
                 isDesktop: true,
                 viewType: viewType,
                 transpose: transpose,
               ),
-              SizedBox(height: 10),
               EditSongButton(song),
               ReportSongButton(song),
-              const Divider(),
+              const SidebarDivider(),
               SelectableDetailsList(children: detailsContent),
             ],
           ),

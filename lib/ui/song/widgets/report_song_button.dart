@@ -26,7 +26,7 @@ class ReportSongButton extends ConsumerWidget {
           return SizedBox.shrink();
         }
         if (bank.contactEmail != null && bank.contactEmail!.isNotEmpty) {
-          return TextButton.icon(
+          return OutlinedButton.icon(
             onPressed: () => bank.sendReportEmail(song),
             label: Text('Hibajelentés'),
             icon: Icon(Icons.textsms_outlined),

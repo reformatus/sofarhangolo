@@ -135,19 +135,18 @@ class _AddToCueSearchState extends ConsumerState<AddToCueSearch> {
             label: Text(cueActionState.mobileAddToCueLabel),
           );
         } else {
-          return ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: 250),
-            child: SearchBar(
-              controller: controller,
-              leading: Icon(Icons.playlist_add),
-              hintText: cueActionState.desktopSearchHint,
-              shape: WidgetStatePropertyAll(
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              elevation: WidgetStatePropertyAll(1),
-              onTap: () => controller.openView(),
-              onChanged: (_) => controller.openView(),
+          // Sidebars lay their content out full width; the search bar follows
+          // the buttons below it instead of hugging a fixed width.
+          return SearchBar(
+            controller: controller,
+            leading: Icon(Icons.playlist_add),
+            hintText: cueActionState.desktopSearchHint,
+            shape: WidgetStatePropertyAll(
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
+            elevation: WidgetStatePropertyAll(1),
+            onTap: () => controller.openView(),
+            onChanged: (_) => controller.openView(),
           );
         }
       },

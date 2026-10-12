@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/song/song.dart';
 import '../../data/song/transpose.dart';
+import '../common/sidebar/sidebar.dart';
 import '../cue/session/cue_session.dart';
 import '../cue/session/session_provider.dart';
 import 'add_to_cue_search.dart';
@@ -54,8 +55,8 @@ class SongCueActions extends StatelessWidget {
       );
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    return SidebarColumn(
+      gap: 10,
       children: [
         OpenCueActionControl(song: song, transpose: transpose),
         _DesktopCueSearchSpacer(song: song),

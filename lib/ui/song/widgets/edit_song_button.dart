@@ -46,7 +46,7 @@ class EditSongButton extends StatelessWidget {
         label: const Text('Szerkesztés'),
       );
     }
-    return TextButton.icon(
+    return OutlinedButton.icon(
       onPressed: () => _edit(context),
       icon: const Icon(Icons.edit_outlined),
       label: const Text('Másolat szerkesztése'),

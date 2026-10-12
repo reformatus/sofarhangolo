@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../data/song/song.dart';
 import '../../../services/songs/original_status.dart';
+import '../../common/notice/card.dart';
+import '../../common/sidebar/sidebar.dart';
 import 'song_field_editors.dart';
 
 /// Right-pane song details: the original bank song (for copies) and the
@@ -35,9 +37,8 @@ class DetailsPane extends StatelessWidget {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        spacing: 20,
+      child: SidebarColumn(
+        gap: 20,
         children: [
           _OriginalSongCard(song),
           for (final field in editableSongFields())
@@ -71,77 +72,41 @@ class _OriginalSongCard extends ConsumerWidget {
     if (status == null) return const SizedBox.shrink();
 
     final original = ref.watch(originalSongProvider(song)).value;
-    final colors = Theme.of(context).colorScheme;
-    final onContainer = colors.onTertiaryContainer;
 
-    final (statusIcon, statusLabel) = switch (status) {
+    final (statusIcon, statusLabel, type) = switch (status) {
       OriginalSongStatus.unchanged => (
         Icons.check_circle_outline,
         'Nem változott.',
+        LNoticeType.info,
       ),
       OriginalSongStatus.changed => (
         Icons.sync_problem_outlined,
         'Megváltozott a másolás óta.',
+        LNoticeType.warning,
       ),
       OriginalSongStatus.missing => (
         Icons.link_off,
         'Az eredeti dal már nincs meg.',
+        LNoticeType.warning,
       ),
     };
 
-    return Card(
-      margin: EdgeInsets.zero,
-      color: colors.tertiaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          spacing: 8,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.inventory_2_outlined, size: 18, color: onContainer),
-                const SizedBox(width: 8),
-                Text(
-                  'Eredeti dal',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(color: onContainer),
-                ),
-              ],
-            ),
-            Text(
-              original?.title ?? 'Az eredeti dal nem elérhető',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: onContainer),
-            ),
-            Row(
-              children: [
-                Icon(statusIcon, size: 16, color: onContainer),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    statusLabel,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: onContainer),
-                  ),
-                ),
-              ],
-            ),
-            if (original != null)
-              Align(
-                alignment: AlignmentDirectional.centerEnd,
-                child: TextButton(
-                  style: TextButton.styleFrom(foregroundColor: onContainer),
-                  onPressed: () => context.push('/song/${original.uuid}'),
-                  child: const Text('Eredeti megtekintése'),
-                ),
-              ),
-          ],
-        ),
-      ),
+    return LNoticeCard(
+      type: type,
+      icon: statusIcon,
+      title: 'Eredeti dal',
+      message: [
+        original?.title ?? 'Az eredeti dal nem elérhető',
+        statusLabel,
+      ].join('\n'),
+      actions: [
+        if (original != null)
+          OutlinedButton.icon(
+            onPressed: () => context.push('/song/${original.uuid}'),
+            icon: const Icon(Icons.open_in_new),
+            label: const Text('Eredeti megtekintése'),
+          ),
+      ],
     );
   }
 }
