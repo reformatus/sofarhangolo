@@ -13,10 +13,19 @@ import '../slide_views/unknown.dart';
 /// A drawer or side panel that displays a list of slides for a cue
 /// Uses the current slide from state management instead of an index
 class SlideList extends ConsumerStatefulWidget {
-  const SlideList({this.onSlideSelected, this.isVisible = true, super.key});
+  const SlideList({
+    this.onSlideSelected,
+    this.isVisible = true,
+    this.footer,
+    super.key,
+  });
 
   final ValueChanged<Slide>? onSlideSelected;
   final bool isVisible;
+
+  /// Optional content after the last slide, scrolling with the list (e.g. the
+  /// cue editor's suggested "add song" actions).
+  final Widget? footer;
 
   @override
   ConsumerState<SlideList> createState() => _SlideListState();
@@ -67,11 +76,22 @@ class _SlideListState extends ConsumerState<SlideList> {
     final currentSlideUuid = ref.watch(currentSlideUuidProvider);
     final slideUuids = ref.watch(slideDeckProvider).slideUuids;
 
-    if (slideUuids.isEmpty) return CenteredHint('Üres lista');
+    if (slideUuids.isEmpty) {
+      final footer = widget.footer;
+      if (footer == null) return CenteredHint('Üres lista');
+
+      return Column(
+        children: [
+          const Expanded(child: CenteredHint('Üres lista')),
+          footer,
+        ],
+      );
+    }
 
     return ReorderableListView.builder(
       scrollController: _scrollController,
       itemCount: slideUuids.length,
+      footer: widget.footer,
       buildDefaultDragHandles: false,
       onReorderItem: (int from, int to) {
         ref.read(activeCueSessionProvider.notifier).reorderSlides(from, to);

@@ -12,6 +12,7 @@ import '../cue_page_type.dart';
 import '../session/cue_session.dart';
 import '../session/session_provider.dart';
 import '../widgets/actions_drawer.dart';
+import '../widgets/add_slide_actions.dart';
 import '../widgets/slide_navigation_controls.dart';
 import '../widgets/slide_list.dart';
 import '../widgets/slide_view.dart';
@@ -82,7 +83,7 @@ class _CueEditPageState extends ConsumerState<CueEditPage> {
             ? widget.session.cue.description
             : null,
         body: const SlideView(),
-        leftDrawer: const SlideList(),
+        leftDrawer: const SlideList(footer: CueAddSlideActions()),
         leftDrawerIcon: Icons.list,
         leftDrawerTooltip: 'Lista',
         rightDrawer: const ActionsDrawer(),
