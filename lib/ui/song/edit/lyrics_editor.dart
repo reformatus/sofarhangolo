@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../../config/config.dart';
 import '../../common/monospace.dart';
+import '../../common/notice/card.dart';
+import 'opensong_help_dialog.dart';
+import 'opensong_input.dart';
+
+export 'opensong_help_dialog.dart' show showOpenSongHelpDialog;
 
 /// Full-bleed, monospace lyrics editor for the OpenSong format.
 ///
@@ -15,7 +18,10 @@ import '../../common/monospace.dart';
 ///
 /// This is the raw [EditableText] rather than a [TextField] on purpose:
 /// a [TextField] always adopts the width it is given ([forceLine] is not
-/// exposed there), which would wrap lines at the viewport edge.
+/// exposed there), which would wrap lines at the viewport edge. Because there
+/// are no `inputFormatters` either, the OpenSong conveniences (auto leading
+/// space, row-marker override, focus-loss normalisation) are applied through a
+/// controller listener using the pure helpers in `opensong_input.dart`.
 class OpenSongLyricsEditor extends StatefulWidget {
   const OpenSongLyricsEditor({super.key, required this.controller});
 
@@ -29,11 +35,114 @@ class _OpenSongLyricsEditorState extends State<OpenSongLyricsEditor> {
   final FocusNode _focusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
 
+  /// The last value we accepted. Compared against the controller to tell the
+  /// user's edits apart from the values we write back ourselves, which is what
+  /// keeps the listener from looping.
+  late TextEditingValue _lastValue = widget.controller.value;
+
+  /// Offset of the leading space we auto-inserted and whose very next typed
+  /// character may still replace it (see [replaceMarkerAfterAutoSpace]).
+  int? _autoSpaceOffset;
+
+  bool _showFormatWarning = false;
+  bool _disposed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _showFormatWarning = hasOpenSongFormattingWarning(widget.controller.text);
+    widget.controller.addListener(_onControllerChanged);
+    widget.controller.addListener(_refreshFormatWarning);
+    _focusNode.addListener(_onFocusChanged);
+  }
+
   @override
   void dispose() {
+    _disposed = true;
+    // Leaving the editor is when the missing leading spaces are added; running
+    // it here too covers navigation that disposes us without a separate
+    // focus-loss event, so the parent's pending autosave flushes the fixed
+    // text.
+    _normalizeLeadingSpaces();
+    widget.controller.removeListener(_onControllerChanged);
+    widget.controller.removeListener(_refreshFormatWarning);
+    _focusNode.removeListener(_onFocusChanged);
     _focusNode.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _onFocusChanged() {
+    if (!_focusNode.hasFocus) _normalizeLeadingSpaces();
+  }
+
+  /// Reacts to every controller change: it applies the one-time row-marker
+  /// override, then auto-inserts a leading space on a fresh empty line.
+  void _onControllerChanged() {
+    final value = widget.controller.value;
+    if (value == _lastValue) return;
+    final previous = _lastValue;
+    _lastValue = value;
+
+    // 1) The row-marker override consumes the auto-inserted space at most once.
+    final spaceOffset = _autoSpaceOffset;
+    _autoSpaceOffset = null;
+    if (spaceOffset != null) {
+      final replaced = replaceMarkerAfterAutoSpace(
+        previous,
+        value,
+        spaceOffset,
+      );
+      if (replaced != null) {
+        _applyValue(replaced);
+        return;
+      }
+    }
+
+    // 2) A new empty line gets its mandatory leading space.
+    final spaced = autoLeadingSpace(previous, value);
+    if (spaced != null) {
+      _applyValue(spaced.value);
+      _autoSpaceOffset = spaced.offset;
+    }
+  }
+
+  /// Writes [value] back to the controller, recording it first so the listener
+  /// call it triggers is recognised as our own edit and left alone.
+  void _applyValue(TextEditingValue value) {
+    _lastValue = value;
+    widget.controller.value = value;
+  }
+
+  void _refreshFormatWarning() {
+    if (_disposed) return;
+    final warning = hasOpenSongFormattingWarning(widget.controller.text);
+    if (warning != _showFormatWarning) {
+      setState(() => _showFormatWarning = warning);
+    }
+  }
+
+  /// Adds the mandatory leading space to lyric lines that lack one, keeping the
+  /// caret roughly where it was.
+  void _normalizeLeadingSpaces() {
+    final controller = widget.controller;
+    final text = controller.text;
+    final normalized = ensureLyricLeadingSpaces(text);
+    if (normalized == text) return;
+
+    final caret = controller.selection.baseOffset;
+    _applyValue(
+      TextEditingValue(
+        text: normalized,
+        selection: TextSelection.collapsed(
+          offset: caret.isNegative
+              ? normalized.length
+              : caret.clamp(0, normalized.length),
+        ),
+      ),
+    );
+    // The normalised text must not arm the marker override.
+    _autoSpaceOffset = null;
   }
 
   @override
@@ -76,13 +185,12 @@ class _OpenSongLyricsEditorState extends State<OpenSongLyricsEditor> {
                       backgroundCursorColor: colors.outline,
                       selectionColor: colors.primary.withValues(alpha: 0.3),
                       selectionControls: materialTextSelectionControls,
-                      contextMenuBuilder:
-                          (context, editableTextState) =>
-                              AdaptiveTextSelectionToolbar.buttonItems(
-                                anchors: editableTextState.contextMenuAnchors,
-                                buttonItems:
-                                    editableTextState.contextMenuButtonItems,
-                              ),
+                      contextMenuBuilder: (context, editableTextState) =>
+                          AdaptiveTextSelectionToolbar.buttonItems(
+                            anchors: editableTextState.contextMenuAnchors,
+                            buttonItems:
+                                editableTextState.contextMenuButtonItems,
+                          ),
                     ),
                   ),
                 ),
@@ -99,68 +207,32 @@ class _OpenSongLyricsEditorState extends State<OpenSongLyricsEditor> {
             onPressed: () => showOpenSongHelpDialog(context),
           ),
         ),
-      ],
-    );
-  }
-}
-
-/// Opens the OpenSong format help, matching the app's other dialogs: a title
-/// bar with a close button on the right.
-Future<void> showOpenSongHelpDialog(BuildContext context) {
-  return showDialog(context: context, builder: (context) => const _OpenSongHelpDialog());
-}
-
-class _OpenSongHelpDialog extends StatelessWidget {
-  const _OpenSongHelpDialog();
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      clipBehavior: Clip.antiAlias,
-      insetPadding: const EdgeInsets.all(10),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: appConfig.breakpoints.tabletFromWidth,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            AppBar(
-              title: const Text('OpenSong formátum'),
-              automaticallyImplyLeading: false,
-              actions: [
-                IconButton(
-                  onPressed: context.pop,
-                  icon: const Icon(Icons.close),
-                ),
-              ],
-              actionsPadding: const EdgeInsets.only(right: 8),
-            ),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  spacing: 12,
-                  children: [
-                    Text(
-                      'A dalszöveg szakaszokból áll. Minden szakasz egy '
-                      'szögletes zárójeles címkével kezdődik egy saját sorban, '
-                      'például [Verze] vagy [Refrén].',
-                    ),
-                    Text(
-                      'A ponttal (.) kezdődő sorok akkordsorok: a bennük lévő '
-                      'akkordok a következő szöveges sorhoz tartoznak, és '
-                      'szóközökkel igazodnak a hangzatokhoz.',
-                    ),
-                  ],
+        // A floating, non-blocking warning so the editor never gets pushed
+        // around when the format is invalid.
+        if (_showFormatWarning)
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: 12,
+            child: Align(
+              alignment: Alignment.bottomLeft,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 380),
+                child: IgnorePointer(
+                  child: LNoticeCard(
+                    type: LNoticeType.warning,
+                    icon: Icons.warning_amber_rounded,
+                    title: 'Hibás OpenSong formátum',
+                    message:
+                        'Akkordsor mellett olyan szövegsor szerepel, amely '
+                        'nem szóközzel kezdődik. A szövegsoroknak vezető '
+                        'szóközzel kell kezdődniük.',
+                  ),
                 ),
               ),
             ),
-          ],
-        ),
-      ),
+          ),
+      ],
     );
   }
 }
