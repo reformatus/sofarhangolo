@@ -29,21 +29,11 @@ class MultiselectFilterCard extends ConsumerWidget {
     final selected = filterState[apiName]?.toSet() ?? const <String>{};
     final isActive = filterState.containsKey(apiName);
 
-    // The values the current query can still reach, plus the selected ones so
-    // they stay deselectable.
-    List<String> selectable(Set<String> values) =>
-        {...values, ...selected}.toList()..sort();
-
-    final asyncValues = available.whenData(selectable);
-
-    // Nothing to offer and nothing selected: the card has no purpose.
-    //
-    // Read `available.value`, not [asyncValues]: `whenData` blanks out while a
-    // new query loads, which would flash a hidden card back into view.
-    final reachable = available.value;
-    if (reachable != null && selectable(reachable).isEmpty) {
-      return const SizedBox.shrink();
-    }
+    // Values the query can still reach, plus the selected ones so they stay
+    // deselectable.
+    final asyncValues = available.whenData(
+      (values) => ({...values, ...selected}.toList()..sort()),
+    );
 
     return BaseFilterCard(
       icon: field.icon ?? Icons.filter_list,

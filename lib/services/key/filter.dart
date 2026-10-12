@@ -37,7 +37,7 @@ Future<List<KeyFilterSelectable>> selectablePitches(Ref ref) async {
   }
 
   return [
-    for (final pitch in _sorted(available.pitches))
+    for (final pitch in _sorted({...available.pitches, ...state.pitches}))
       (
         label: pitch,
         onSelected: (bool v) => keyFilterState.setPitchTo(pitch, v),
@@ -69,7 +69,7 @@ Future<List<KeyFilterSelectable>> selectableModes(Ref ref) async {
   }
 
   return [
-    for (final mode in _sorted(available.modes))
+    for (final mode in _sorted({...available.modes, ...state.modes}))
       (
         label: mode,
         onSelected: (bool v) => keyFilterState.setModeTo(mode, v),

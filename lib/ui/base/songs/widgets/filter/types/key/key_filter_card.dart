@@ -6,6 +6,7 @@ import '../../../../../../../services/key/filter.dart';
 import '../../../../../../../services/songs/facet.dart';
 import '../../../../../../common/error/card.dart';
 import '../../../../../../common/key_text.dart';
+import '../../common/empty_chip_row.dart';
 import '../../common/filter_chip.dart';
 import '../../common/skeleton_chip_row.dart';
 import 'state.dart';
@@ -20,6 +21,9 @@ class KeyFilterCard extends ConsumerStatefulWidget {
 }
 
 class _KeyFilterCardState extends ConsumerState<KeyFilterCard> {
+  /// A chip row's height; the card shows two of them (pitches, modes).
+  static const _chipRowHeight = 42.0;
+
   @override
   void initState() {
     // init scroll controllers in advance so that fading edge scroll view doesn't lose them on rebuild
@@ -42,12 +46,12 @@ class _KeyFilterCardState extends ConsumerState<KeyFilterCard> {
     final selectablePitches = ref.watch(selectablePitchesProvider);
     final selectableModes = ref.watch(selectableModesProvider);
 
-    // No reachable key and none selected: the card has no purpose. Read the
-    // value, which survives a reload, so a hidden card does not flash back.
+    // No key in the collection matches the current query and none is selected:
+    // the rows have nothing to offer. Read the value, which survives a reload,
+    // so the line does not flash back to a skeleton.
     final availableKeys = ref.watch(keyFacetProvider).value;
-    if (!isActive && availableKeys != null && availableKeys.keys.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    final noReachableKeys =
+        !isActive && availableKeys != null && availableKeys.keys.isEmpty;
 
     return Card(
       elevation: isActive ? 3 : 0,
@@ -107,7 +111,7 @@ class _KeyFilterCardState extends ConsumerState<KeyFilterCard> {
               ),
               if (state.keys.isNotEmpty)
                 SizedBox(
-                  height: 42,
+                  height: _chipRowHeight,
                   child: FadingEdgeScrollView.fromScrollView(
                     child: ListView(
                       controller: keysScrollController,
@@ -129,14 +133,16 @@ class _KeyFilterCardState extends ConsumerState<KeyFilterCard> {
             ],
           ),
         ),
-        subtitle: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            chipsRow(selectablePitches),
-            chipsRow(selectableModes, modes: true),
-          ],
-        ),
+        subtitle: noReachableKeys
+            ? const EmptyChipRow(height: _chipRowHeight * 2)
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  chipsRow(selectablePitches),
+                  chipsRow(selectableModes, modes: true),
+                ],
+              ),
       ),
     );
   }
@@ -173,7 +179,7 @@ class _KeyFilterCardState extends ConsumerState<KeyFilterCard> {
     }
 
     return SizedBox(
-      height: 42,
+      height: _chipRowHeight,
       child: AnimatedOpacity(
         duration: Durations.short4,
         opacity: selectables.isLoading ? 0.45 : 1,

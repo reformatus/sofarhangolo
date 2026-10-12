@@ -4,7 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:riverpod/misc.dart' show Override;
 import 'package:sofarhangolo/data/song/song_fields.dart';
 import 'package:sofarhangolo/services/songs/facet.dart';
-import 'package:sofarhangolo/ui/base/songs/widgets/filter/common/base_filter_card.dart';
+import 'package:sofarhangolo/ui/base/songs/widgets/filter/common/skeleton_chip_row.dart';
 import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/multiselect-tags/multiselect_filter_card.dart';
 import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/search/state.dart';
 
@@ -46,44 +46,38 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('a hidden card stays hidden while its facet reloads', (
-    tester,
-  ) async {
-    // An empty search reaches no value, so the card settles hidden.
+  testWidgets('a card with nothing to offer stays, saying so', (tester) async {
+    // An empty search reaches no value: the card keeps its place and its row
+    // height, with the muted line instead of chips.
     await pumpCard(tester);
-    expect(find.byType(BaseFilterCard), findsNothing);
+    expect(find.text('Nincs szűrhető dal.'), findsOneWidget);
 
-    // The reload must not bring the card back before the new value lands.
+    // A new query must not blank the row back to a skeleton while it loads.
     setSearch('rock');
     await tester.pump();
-    expect(
-      find.byType(BaseFilterCard),
-      findsNothing,
-      reason: 'a hidden card must not flash back while its facet is loading',
-    );
+    expect(find.text('Nincs szűrhető dal.'), findsOneWidget);
+    expect(find.byType(SkeletonChipRow), findsNothing);
 
     await tester.pumpAndSettle();
-    expect(find.byType(BaseFilterCard), findsOneWidget);
+    expect(find.text('Rock'), findsOneWidget);
+    expect(find.text('Nincs szűrhető dal.'), findsNothing);
   });
 
-  testWidgets('a shown card keeps its chips while its facet reloads', (
+  testWidgets('a card with chips keeps them while its facet reloads', (
     tester,
   ) async {
     setSearch('rock');
     await pumpCard(tester);
     expect(find.text('Rock'), findsOneWidget);
 
-    // The card only disappears once the empty result lands; until then it keeps
-    // fading its chips.
+    // The new query reaches nothing, but the card only swaps the chips for the
+    // line once that result lands - it fades what it has meanwhile.
     setSearch('');
     await tester.pump();
-    expect(
-      find.text('Rock'),
-      findsOneWidget,
-      reason: 'the previous chips stay while the new query loads',
-    );
+    expect(find.text('Rock'), findsOneWidget);
 
     await tester.pumpAndSettle();
-    expect(find.byType(BaseFilterCard), findsNothing);
+    expect(find.text('Nincs szűrhető dal.'), findsOneWidget);
+    expect(find.text('Rock'), findsNothing);
   });
 }
