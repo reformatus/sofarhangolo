@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -55,19 +54,13 @@ class AdaptivePage extends StatefulWidget {
 
 class _AdaptivePageState extends State<AdaptivePage>
     with TickerProviderStateMixin {
-  static const Duration _mobileIntroDelay = Duration(seconds: 1);
-
   late final AnimationController leftDrawerController;
   late final Animation<double> leftDrawerAnimation;
   late final AnimationController rightDrawerController;
   late final Animation<double> rightDrawerAnimation;
-  late final AnimationStatusListener leftDrawerStatusListener;
 
   _AdaptivePageViewport? activeViewport;
   _AdaptivePageViewport? scheduledViewport;
-  Timer? mobileIntroTimer;
-  bool showMobileLeftPreview = false;
-  bool hasHandledInitialMobileViewport = false;
 
   @override
   void initState() {
@@ -94,21 +87,6 @@ class _AdaptivePageState extends State<AdaptivePage>
       curve: Curves.easeInOutCubicEmphasized,
       reverseCurve: Curves.easeInOutCubicEmphasized.flipped,
     );
-
-    leftDrawerStatusListener = (status) {
-      if (!mounted || status != AnimationStatus.dismissed) {
-        return;
-      }
-      if (activeViewport != _AdaptivePageViewport.mobile ||
-          !showMobileLeftPreview) {
-        return;
-      }
-
-      setState(() {
-        showMobileLeftPreview = false;
-      });
-    };
-    leftDrawerController.addStatusListener(leftDrawerStatusListener);
 
     super.initState();
   }
@@ -150,6 +128,22 @@ class _AdaptivePageState extends State<AdaptivePage>
     return max(constraints.maxWidth / 5, 250);
   }
 
+  /// Whether the left drawer is a persistent inline panel at [viewport].
+  ///
+  /// The left drawer is default-open on tablet and desktop; on mobile it is
+  /// hidden and opened as a Scaffold overlay drawer.
+  bool _leftDrawerDefaultsOpen(_AdaptivePageViewport viewport) {
+    return viewport != _AdaptivePageViewport.mobile;
+  }
+
+  /// Whether the right drawer is a persistent inline panel at [viewport].
+  ///
+  /// The right drawer is only default-open on desktop; on mobile and tablet it
+  /// is hidden and opened as a Scaffold overlay drawer.
+  bool _rightDrawerDefaultsOpen(_AdaptivePageViewport viewport) {
+    return viewport == _AdaptivePageViewport.desktop;
+  }
+
   void scheduleViewportSync(_AdaptivePageViewport viewport) {
     if (scheduledViewport == viewport) {
       return;
@@ -171,71 +165,25 @@ class _AdaptivePageState extends State<AdaptivePage>
       return;
     }
 
-    cancelMobileIntro();
     activeViewport = viewport;
 
-    switch (viewport) {
-      case _AdaptivePageViewport.mobile:
-        applyMobileViewport(initial: initial);
-      case _AdaptivePageViewport.tablet:
-        showMobileLeftPreview = false;
-        setDrawerOpen(
-          leftDrawerController,
-          open: widget.leftDrawer != null,
-          animate: !initial,
-        );
-        setDrawerOpen(rightDrawerController, open: false, animate: !initial);
-      case _AdaptivePageViewport.desktop:
-        showMobileLeftPreview = false;
-        setDrawerOpen(
-          leftDrawerController,
-          open: widget.leftDrawer != null,
-          animate: !initial,
-        );
-        setDrawerOpen(
-          rightDrawerController,
-          open: widget.rightDrawer != null,
-          animate: !initial,
-        );
-    }
+    // Only default-open drawers are rendered inline, so their controllers
+    // track the persistent panel. Hidden drawers use the Scaffold overlay and
+    // keep their inline controller closed.
+    setDrawerOpen(
+      leftDrawerController,
+      open: widget.leftDrawer != null && _leftDrawerDefaultsOpen(viewport),
+      animate: !initial,
+    );
+    setDrawerOpen(
+      rightDrawerController,
+      open: widget.rightDrawer != null && _rightDrawerDefaultsOpen(viewport),
+      animate: !initial,
+    );
 
     if (!initial && mounted) {
       setState(() {});
     }
-  }
-
-  void applyMobileViewport({required bool initial}) {
-    final shouldShowIntro =
-        initial &&
-        !hasHandledInitialMobileViewport &&
-        widget.leftDrawer != null;
-    hasHandledInitialMobileViewport =
-        hasHandledInitialMobileViewport || initial;
-
-    if (shouldShowIntro) {
-      showMobileLeftPreview = true;
-      setDrawerOpen(leftDrawerController, open: true, animate: false);
-      setDrawerOpen(rightDrawerController, open: false, animate: false);
-      mobileIntroTimer = Timer(_mobileIntroDelay, () {
-        if (!mounted ||
-            activeViewport != _AdaptivePageViewport.mobile ||
-            !showMobileLeftPreview) {
-          return;
-        }
-
-        setDrawerOpen(leftDrawerController, open: false, animate: true);
-      });
-      return;
-    }
-
-    showMobileLeftPreview = false;
-    setDrawerOpen(leftDrawerController, open: false, animate: false);
-    setDrawerOpen(rightDrawerController, open: false, animate: false);
-  }
-
-  void cancelMobileIntro() {
-    mobileIntroTimer?.cancel();
-    mobileIntroTimer = null;
   }
 
   void setDrawerOpen(
@@ -278,6 +226,16 @@ class _AdaptivePageState extends State<AdaptivePage>
         final viewport = viewportForWidth(constraints.maxWidth);
         final tabletOrBigger = viewport != _AdaptivePageViewport.mobile;
         final drawerWidth = drawerWidthFor(constraints);
+
+        // A drawer is either a persistent inline panel (default-open at this
+        // viewport) or fully hidden and opened through the Scaffold's overlay
+        // drawer/endDrawer. There is no off-screen inline in-between state.
+        final leftInline =
+            widget.leftDrawer != null && _leftDrawerDefaultsOpen(viewport);
+        final rightInline =
+            widget.rightDrawer != null && _rightDrawerDefaultsOpen(viewport);
+        final leftOverlay = widget.leftDrawer != null && !leftInline;
+        final rightOverlay = widget.rightDrawer != null && !rightInline;
 
         if (activeViewport == null) {
           applyViewport(viewport, initial: true);
@@ -330,12 +288,12 @@ class _AdaptivePageState extends State<AdaptivePage>
                 SizedBox(width: 8),
               ],
             ),
-            drawer: tabletOrBigger || widget.leftDrawer == null
-                ? null
-                : Drawer(child: SafeArea(child: widget.leftDrawer!)),
-            endDrawer: tabletOrBigger || widget.rightDrawer == null
-                ? null
-                : Drawer(child: SafeArea(child: widget.rightDrawer!)),
+            drawer: leftOverlay
+                ? Drawer(child: SafeArea(child: widget.leftDrawer!))
+                : null,
+            endDrawer: rightOverlay
+                ? Drawer(child: SafeArea(child: widget.rightDrawer!))
+                : null,
             body: Builder(
               builder: (context) {
                 return Container(
@@ -344,7 +302,7 @@ class _AdaptivePageState extends State<AdaptivePage>
                     children: [
                       Row(
                         children: [
-                          if (widget.leftDrawer != null && tabletOrBigger)
+                          if (leftInline)
                             AnimatedBuilder(
                               animation: leftDrawerAnimation,
                               builder: (context, _) {
@@ -369,7 +327,7 @@ class _AdaptivePageState extends State<AdaptivePage>
                                     children: [
                                       if (widget.leftDrawer != null)
                                         AdaptivePageDrawerButton(
-                                          onPressed: tabletOrBigger
+                                          onPressed: leftInline
                                               ? leftDrawerController.toggle
                                               : Scaffold.of(context).openDrawer,
                                           animation: leftDrawerAnimation,
@@ -393,7 +351,7 @@ class _AdaptivePageState extends State<AdaptivePage>
                                       ),
                                       if (widget.rightDrawer != null)
                                         AdaptivePageDrawerButton(
-                                          onPressed: tabletOrBigger
+                                          onPressed: rightInline
                                               ? rightDrawerController.toggle
                                               : Scaffold.of(
                                                   context,
@@ -411,7 +369,7 @@ class _AdaptivePageState extends State<AdaptivePage>
                             ),
                           ),
 
-                          if (widget.rightDrawer != null && tabletOrBigger)
+                          if (rightInline)
                             AnimatedBuilder(
                               animation: rightDrawerAnimation,
                               builder: (context, _) {
@@ -423,8 +381,7 @@ class _AdaptivePageState extends State<AdaptivePage>
                             ),
                         ],
                       ),
-                      if (widget.leftDrawer != null &&
-                          (tabletOrBigger || showMobileLeftPreview))
+                      if (leftInline)
                         Align(
                           alignment: Alignment.centerLeft,
                           child: AnimatedBuilder(
@@ -450,7 +407,7 @@ class _AdaptivePageState extends State<AdaptivePage>
                             },
                           ),
                         ),
-                      if (widget.rightDrawer != null && tabletOrBigger)
+                      if (rightInline)
                         Align(
                           alignment: Alignment.centerRight,
                           child: AnimatedBuilder(
@@ -497,8 +454,6 @@ class _AdaptivePageState extends State<AdaptivePage>
 
   @override
   void dispose() {
-    cancelMobileIntro();
-    leftDrawerController.removeStatusListener(leftDrawerStatusListener);
     leftDrawerController.dispose();
     rightDrawerController.dispose();
     super.dispose();

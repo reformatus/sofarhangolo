@@ -37,46 +37,86 @@ Future<void> resizeViewport(WidgetTester tester, Size size) async {
   await tester.pump();
 }
 
+/// The FractionalTranslation wrappers of the *inline* drawers only.
+///
+/// A default-open drawer is wrapped by our own [FractionalTranslation] so it
+/// can collapse/expand inline. The Scaffold overlay drawer instead lives in a
+/// [SlideTransition], which happens to build a FractionalTranslation too, so we
+/// scope the search to ancestors of the inline [Drawer]s. Inline drawers are
+/// the only ones using a rounded [RoundedRectangleBorder] shape.
 List<FractionalTranslation> inlineDrawerTranslations(WidgetTester tester) {
+  final inlineDrawers = find.byWidgetPredicate(
+    (widget) => widget is Drawer && widget.shape is RoundedRectangleBorder,
+  );
   return tester
       .widgetList<FractionalTranslation>(
-        find.descendant(
-          of: find.byType(AdaptivePage),
-          matching: find.byType(FractionalTranslation),
+        find.ancestor(
+          of: inlineDrawers,
+          matching: find.descendant(
+            of: find.byType(AdaptivePage),
+            matching: find.byType(FractionalTranslation),
+          ),
         ),
       )
       .toList();
 }
 
+Finder drawerContent(Color color) {
+  return find.byWidgetPredicate(
+    (widget) => widget is ColoredBox && widget.color == color,
+  );
+}
+
 void main() {
-  testWidgets('mobile shows the left preview and then hides inline drawers', (
+  testWidgets('mobile hides both drawers inline and opens them as overlays', (
     tester,
   ) async {
     await pumpAdaptivePage(tester, const Size(600, 900));
 
-    expect(inlineDrawerTranslations(tester), hasLength(1));
-    expect(
-      inlineDrawerTranslations(tester).single.translation.dx,
-      closeTo(0, 0.001),
-    );
+    // Nothing is rendered inline and neither drawer content is on screen.
+    expect(inlineDrawerTranslations(tester), isEmpty);
+    expect(drawerContent(Colors.red), findsNothing);
+    expect(drawerContent(Colors.blue), findsNothing);
 
-    await tester.pump(const Duration(seconds: 1));
+    // The left toggle opens the Scaffold overlay drawer instead.
+    await tester.tap(find.byTooltip('Left drawer'));
     await tester.pumpAndSettle();
 
+    expect(drawerContent(Colors.red), findsOneWidget);
     expect(inlineDrawerTranslations(tester), isEmpty);
   });
 
-  testWidgets('tablet defaults to left open and right closed', (tester) async {
+  testWidgets('tablet keeps only the left drawer inline', (tester) async {
     await pumpAdaptivePage(tester, const Size(800, 900));
 
     final drawers = inlineDrawerTranslations(tester);
 
-    expect(drawers, hasLength(2));
-    expect(drawers.first.translation.dx, closeTo(0, 0.001));
-    expect(drawers.last.translation.dx, closeTo(1, 0.001));
+    expect(drawers, hasLength(1));
+    expect(drawers.single.translation.dx, closeTo(0, 0.001));
+    expect(drawerContent(Colors.red), findsOneWidget);
+    // The right drawer is hidden, so its content is not built at all.
+    expect(drawerContent(Colors.blue), findsNothing);
   });
 
-  testWidgets('desktop defaults to both drawers open', (tester) async {
+  testWidgets('tablet right drawer opens as an overlay, never inline', (
+    tester,
+  ) async {
+    await pumpAdaptivePage(tester, const Size(800, 900));
+
+    expect(inlineDrawerTranslations(tester), hasLength(1));
+    expect(drawerContent(Colors.blue), findsNothing);
+
+    await tester.tap(find.byTooltip('Right drawer'));
+    await tester.pumpAndSettle();
+
+    // The content is now visible, but no inline panel was created for it.
+    expect(drawerContent(Colors.blue), findsOneWidget);
+    expect(inlineDrawerTranslations(tester), hasLength(1));
+  });
+
+  testWidgets('desktop defaults to both drawers inline and open', (
+    tester,
+  ) async {
     await pumpAdaptivePage(tester, const Size(1200, 900));
 
     final drawers = inlineDrawerTranslations(tester);
@@ -84,34 +124,43 @@ void main() {
     expect(drawers, hasLength(2));
     expect(drawers.first.translation.dx, closeTo(0, 0.001));
     expect(drawers.last.translation.dx, closeTo(0, 0.001));
+    expect(drawerContent(Colors.red), findsOneWidget);
+    expect(drawerContent(Colors.blue), findsOneWidget);
   });
 
   testWidgets(
-    'resizing to desktop keeps a user-opened tablet right drawer open',
+    'widening to desktop brings an overlay-opened right drawer inline',
     (tester) async {
       await pumpAdaptivePage(tester, const Size(800, 900));
 
       await tester.tap(find.byTooltip('Right drawer'));
       await tester.pumpAndSettle();
+      expect(drawerContent(Colors.blue), findsOneWidget);
+      expect(inlineDrawerTranslations(tester), hasLength(1));
 
-      expect(
-        inlineDrawerTranslations(tester).last.translation.dx,
-        closeTo(0, 0.001),
-      );
-
+      // On desktop the right drawer becomes default-open, so it is rendered
+      // inline (and the overlay is torn down).
       await resizeViewport(tester, const Size(1200, 900));
+      await tester.pumpAndSettle();
 
-      expect(
-        inlineDrawerTranslations(tester).last.translation.dx,
-        closeTo(0, 0.001),
-      );
-
-      await tester.pump();
-
-      expect(
-        inlineDrawerTranslations(tester).last.translation.dx,
-        closeTo(0, 0.001),
-      );
+      final drawers = inlineDrawerTranslations(tester);
+      expect(drawers, hasLength(2));
+      expect(drawers.last.translation.dx, closeTo(0, 0.001));
+      expect(drawerContent(Colors.blue), findsOneWidget);
     },
   );
+
+  testWidgets('narrowing keeps an open overlay drawer working', (tester) async {
+    await pumpAdaptivePage(tester, const Size(800, 900));
+
+    await tester.tap(find.byTooltip('Right drawer'));
+    await tester.pumpAndSettle();
+
+    await resizeViewport(tester, const Size(600, 900));
+    await tester.pumpAndSettle();
+
+    // Still an overlay on mobile: open and never rendered inline.
+    expect(drawerContent(Colors.blue), findsOneWidget);
+    expect(inlineDrawerTranslations(tester), isEmpty);
+  });
 }
