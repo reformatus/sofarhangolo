@@ -16,6 +16,7 @@ import '../../../services/song/verse_tag_pretty.dart';
 import '../../common/error/card.dart';
 import '../../cue/session/session_provider.dart';
 import '../transpose/state.dart';
+import '../widgets/report_song_button.dart';
 import 'text_actions/lyrics_actions_menu.dart';
 import 'text_actions/lyrics_selection_dialog.dart';
 import 'text_actions/lyrics_text_actions.dart';
@@ -80,6 +81,9 @@ class LyricsView extends ConsumerWidget {
                 type: LErrorType.warning,
                 title: 'A dalhoz nem tartozik dalszöveg!',
                 icon: Icons.error,
+                // Content issue in the song's own bank, so the report goes to
+                // that bank — and disappears for local songs.
+                reportAction: ReportSongButton(song, filled: true),
               ),
             );
           }
@@ -271,6 +275,12 @@ class _VerseCardState extends ConsumerState<VerseCard> {
                                     title: 'Ismeretlen sortípus',
                                     message: original,
                                     icon: Icons.question_mark,
+                                    // Also a bank content issue: report it
+                                    // there, or hide the action for locals.
+                                    reportAction: ReportSongButton(
+                                      widget.song,
+                                      filled: true,
+                                    ),
                                   ),
                               },
                             )

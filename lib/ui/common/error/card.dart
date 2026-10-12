@@ -18,6 +18,7 @@ class LErrorCard extends StatelessWidget {
     this.stack,
     required this.icon,
     this.showReportButton = true,
+    this.reportAction,
     this.onRetry,
     this.retryLabel,
   });
@@ -100,6 +101,13 @@ class LErrorCard extends StatelessWidget {
   final String? stack;
   final IconData icon;
   final bool showReportButton;
+
+  /// Replaces the built-in "report to the app's feedback address" action, for
+  /// notices about content that belongs to someone else (e.g. a song's own
+  /// bank). The widget decides whether it renders at all, so passing a
+  /// bank report button for a local song simply hides the action.
+  final Widget? reportAction;
+
   final VoidCallback? onRetry;
   final String? retryLabel;
 
@@ -177,7 +185,7 @@ class LErrorCard extends StatelessWidget {
           icon: const Icon(Icons.copy),
           label: const Text('Részletek másolása'),
         ),
-      if (showReportButton) reportButton(),
+      if (showReportButton) reportAction ?? reportButton(),
     ];
 
     final isMobile =

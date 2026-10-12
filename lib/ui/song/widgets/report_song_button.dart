@@ -7,9 +7,14 @@ import '../../../services/bank/bank_of_song.dart';
 import '../../../services/bank/report_song.dart';
 
 class ReportSongButton extends ConsumerWidget {
-  const ReportSongButton(this.song, {super.key});
+  const ReportSongButton(this.song, {this.filled = false, super.key});
 
   final Song song;
+
+  /// Filled (primary) instead of outlined. Notice cards use the filled form
+  /// when the report is the card's main action; sidebars keep the outlined one
+  /// so the sidebar's buttons stay quiet.
+  final bool filled;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -26,11 +31,20 @@ class ReportSongButton extends ConsumerWidget {
           return SizedBox.shrink();
         }
         if (bank.contactEmail != null && bank.contactEmail!.isNotEmpty) {
-          return OutlinedButton.icon(
-            onPressed: () => bank.sendReportEmail(song),
-            label: Text('Hibajelentés'),
-            icon: Icon(Icons.textsms_outlined),
-          );
+          final icon = Icon(Icons.textsms_outlined);
+          final label = Text('Hibajelentés');
+          void onPressed() => bank.sendReportEmail(song);
+          return filled
+              ? FilledButton.icon(
+                  onPressed: onPressed,
+                  label: label,
+                  icon: icon,
+                )
+              : OutlinedButton.icon(
+                  onPressed: onPressed,
+                  label: label,
+                  icon: icon,
+                );
         } else {
           return SizedBox.shrink();
         }
