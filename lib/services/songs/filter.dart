@@ -9,11 +9,12 @@ import '../../data/database.dart';
 import '../../data/song/song.dart';
 import '../../data/song/song_fields.dart';
 import '../../data/song/song_fts_index.dart';
-import '../bank/banks.dart';
 import '../../ui/base/songs/widgets/filter/types/bank/state.dart';
 import '../../ui/base/songs/widgets/filter/types/multiselect-tags/state.dart';
 import '../../ui/base/songs/widgets/filter/types/search/state.dart';
 import '../assets/downloaded.dart';
+import '../bank/banks.dart';
+import 'search_index.dart';
 
 part 'filter.g.dart';
 
@@ -494,48 +495,53 @@ Stream<SongResultPage> searchSongs({
 
   final foldedTerm = SongFtsIndex.foldTerm(searchString);
 
-  return db
-      .customSelect(
-        query.sql,
-        variables: query.variables,
-        readsFrom: {db.songs},
-      )
-      .watch()
-      .asyncMap((hits) async {
-        if (hits.isEmpty) return const SongResultPage([], 0);
+  // The one query that reads the FTS content, so the one that trips over an
+  // index left corrupt by an older write path; it heals itself (see
+  // [withSearchIndexRepair]).
+  return withSearchIndexRepair(
+    () => db
+        .customSelect(
+          query.sql,
+          variables: query.variables,
+          readsFrom: {db.songs},
+        )
+        .watch()
+        .asyncMap((hits) async {
+          if (hits.isEmpty) return const SongResultPage([], 0);
 
-        final total = hits.first.read<int>('total');
-        final uuids = [for (final hit in hits) hit.read<String>('uuid')];
-        final rows = await (db.select(db.songs).addColumns([
-          subqueryExpression(downloadedAssetsSubquery),
-        ])..where(db.songs.uuid.isIn(uuids))).get();
-        final songsByUuid = {
-          for (final row in rows) row.readTable(db.songs).uuid: row,
-        };
+          final total = hits.first.read<int>('total');
+          final uuids = [for (final hit in hits) hit.read<String>('uuid')];
+          final rows = await (db.select(db.songs).addColumns([
+            subqueryExpression(downloadedAssetsSubquery),
+          ])..where(db.songs.uuid.isIn(uuids))).get();
+          final songsByUuid = {
+            for (final row in rows) row.readTable(db.songs).uuid: row,
+          };
 
-        return SongResultPage([
-          for (final hit in hits)
-            if (songsByUuid[hit.read<String>('uuid')] case final row?)
-              SongResult(
-                row.readTable(db.songs),
-                downloadedAssets:
-                    row.rawData
-                        .readNullableWithType(DriftSqlType.string, 'c0')
-                        ?.split(',') ??
-                    const <String>[],
-                match: SongMatch(
-                  tier: hit.read<int>('tier'),
-                  rank: hit.readNullable<double>('rank') ?? 0,
-                  matches: _matchedFields(
-                    row.readTable(db.songs),
-                    hit,
-                    fields,
-                    foldedTerm,
+          return SongResultPage([
+            for (final hit in hits)
+              if (songsByUuid[hit.read<String>('uuid')] case final row?)
+                SongResult(
+                  row.readTable(db.songs),
+                  downloadedAssets:
+                      row.rawData
+                          .readNullableWithType(DriftSqlType.string, 'c0')
+                          ?.split(',') ??
+                      const <String>[],
+                  match: SongMatch(
+                    tier: hit.read<int>('tier'),
+                    rank: hit.readNullable<double>('rank') ?? 0,
+                    matches: _matchedFields(
+                      row.readTable(db.songs),
+                      hit,
+                      fields,
+                      foldedTerm,
+                    ),
                   ),
                 ),
-              ),
-        ], total);
-      });
+          ], total);
+        }),
+  );
 }
 
 /// Highlighted snippets for the fields a song matched in, keyed by field name.
