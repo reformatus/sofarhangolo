@@ -10,7 +10,7 @@ import 'song_field_editors.dart';
 
 /// Right-pane song details: the original bank song (for copies) and the
 /// editable metadata fields.
-class DetailsPane extends StatelessWidget {
+class DetailsPane extends ConsumerWidget {
   const DetailsPane({
     super.key,
     required this.song,
@@ -34,13 +34,25 @@ class DetailsPane extends StatelessWidget {
   final ValueChanged<List<KeyField>> onKeysChanged;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // null for songs that are not a copy; `unchanged` is the copy whose bank
+    // original is still exactly what the copy was made of.
+    final originalStatus = ref.watch(originalSongStatusProvider(song)).value;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: SidebarColumn(
         gap: 20,
         children: [
-          _OriginalSongCard(song),
+          // Only surface the original-song card when there is something to
+          // report: the original changed since the copy was made, or it
+          // vanished. An unchanged copy would otherwise show a permanent
+          // "nothing to see here" box. The card is left out of the children
+          // entirely (instead of building an empty box) so SidebarColumn's
+          // spacing does not leave a stray gap where it used to be.
+          if (originalStatus != null &&
+              originalStatus != OriginalSongStatus.unchanged)
+            _OriginalSongCard(song, originalStatus),
           for (final field in editableSongFields())
             if (songFieldEditorKind(field) == SongFieldEditorKind.key)
               SongKeyField(
@@ -61,16 +73,19 @@ class DetailsPane extends StatelessWidget {
   }
 }
 
+/// The notice about the bank song a local copy was made from.
+///
+/// [status] is only ever [OriginalSongStatus.changed] or
+/// [OriginalSongStatus.missing]; [DetailsPane] decides whether to show the
+/// card at all.
 class _OriginalSongCard extends ConsumerWidget {
-  const _OriginalSongCard(this.song);
+  const _OriginalSongCard(this.song, this.status);
 
   final Song song;
+  final OriginalSongStatus status;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final status = ref.watch(originalSongStatusProvider(song)).value;
-    if (status == null) return const SizedBox.shrink();
-
     final original = ref.watch(originalSongProvider(song)).value;
 
     final (statusIcon, statusLabel, type) = switch (status) {
