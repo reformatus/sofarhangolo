@@ -22,6 +22,7 @@ import 'ui/cue/cue_page_type.dart';
 import 'ui/cue/loader.dart';
 import 'ui/loading/launch_page.dart';
 import 'ui/loading/page.dart';
+import 'ui/song/lyrics/theme.dart';
 import 'ui/song/page.dart';
 
 part 'router.dart';
@@ -81,32 +82,40 @@ class _LyricAppState extends ConsumerState<LyricApp> {
   Widget build(BuildContext context) {
     final generalPrefs = ref.watch(generalPreferencesProvider);
 
+    final lightColorScheme = ColorScheme.fromSeed(
+      seedColor: appConfig.colors.seedColor,
+      primary: appConfig.colors.primaryColor,
+      brightness: Brightness.light,
+    );
+    final darkColorScheme = ColorScheme.fromSeed(
+      seedColor: appConfig.colors.seedColor,
+      primary: appConfig.colors.primaryColor,
+      surface: generalPrefs.oledBlackBackground ? Colors.black : null,
+      brightness: Brightness.dark,
+    );
+
     final theme =
         ThemeData.from(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: appConfig.colors.seedColor,
-            primary: appConfig.colors.primaryColor,
-            brightness: Brightness.light,
-          ),
+          colorScheme: lightColorScheme,
           useMaterial3: true,
         ).copyWith(
           tooltipTheme: const TooltipThemeData(
             waitDuration: Duration(milliseconds: 500),
           ),
+          extensions: [LyricsTheme.standard(lightColorScheme)],
         );
-    final darkTheme =
-        ThemeData.from(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: appConfig.colors.seedColor,
-            primary: appConfig.colors.primaryColor,
-            surface: generalPrefs.oledBlackBackground ? Colors.black : null,
-            brightness: Brightness.dark,
-          ),
-        ).copyWith(
-          tooltipTheme: const TooltipThemeData(
-            waitDuration: Duration(milliseconds: 500),
-          ),
-        );
+    final darkTheme = ThemeData.from(colorScheme: darkColorScheme).copyWith(
+      tooltipTheme: const TooltipThemeData(
+        waitDuration: Duration(milliseconds: 500),
+      ),
+      // When the OLED black background is on, lyrics drop the cards and the
+      // tag chip and render as plain (bold-tagged) text on that background.
+      extensions: [
+        generalPrefs.oledBlackBackground
+            ? LyricsTheme.flat(darkColorScheme)
+            : LyricsTheme.standard(darkColorScheme),
+      ],
+    );
 
     final commonArgs = (
       themeMode: generalPrefs.appBrightness,
