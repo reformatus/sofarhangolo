@@ -316,23 +316,34 @@ class LyricsSegment extends ConsumerWidget {
       transpose.finalTransposeBy,
     );
 
+    final chordStyle = TextStyle(
+      fontWeight: FontWeight.w600,
+      fontSize: lyricsViewStyle.chordsSize,
+    );
+    final lyricsStyle = TextStyle(fontSize: lyricsViewStyle.lyricsSize);
+
+    // Text widgets merge in the ambient style, so measure through it (and the
+    // text scale) to get the metrics that actually get laid out.
+    final ambientStyle = DefaultTextStyle.of(context).style;
+    final textScaler = MediaQuery.textScalerOf(context);
+
     final TextPainter chordPainter = TextPainter(
+      // A glyph, so a segment without a chord still measures a full chord line.
       text: TextSpan(
-        text: chord ?? '',
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          fontSize: lyricsViewStyle.chordsSize,
-        ),
+        text: chord ?? 'C',
+        style: ambientStyle.merge(chordStyle),
       ),
       textDirection: TextDirection.ltr,
+      textScaler: textScaler,
     )..layout();
 
     final TextPainter lyricsPainter = TextPainter(
       text: TextSpan(
         text: segment.lyrics,
-        style: TextStyle(fontSize: lyricsViewStyle.lyricsSize),
+        style: ambientStyle.merge(lyricsStyle),
       ),
       textDirection: TextDirection.ltr,
+      textScaler: textScaler,
     )..layout();
 
     final double chordWidth = chord != null ? chordPainter.width + 4 : 0;
@@ -352,13 +363,24 @@ class LyricsSegment extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (segments.any((s) => s.chord != null))
-              Padding(
-                padding: EdgeInsets.only(right: 4),
-                child: Text(
-                  chord ?? '',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: lyricsViewStyle.chordsSize,
+              // The chord slot keeps a full chord line's height whatever the
+              // segment holds, so the lyrics of every segment in a line share
+              // one baseline. The chord itself is measured with a tight line
+              // box and sits at the bottom of the slot, hugging its lyrics;
+              // the slot's height (and so the line height) is unchanged.
+              SizedBox(
+                height: chordPainter.height,
+                child: Align(
+                  alignment: Alignment.bottomLeft,
+                  // Hug the chord: filling the width would push every segment
+                  // onto its own run.
+                  widthFactor: 1,
+                  child: Padding(
+                    padding: EdgeInsets.only(right: 4),
+                    child: Text(
+                      chord ?? '',
+                      style: chordStyle.copyWith(height: 1),
+                    ),
                   ),
                 ),
               ),
@@ -370,8 +392,7 @@ class LyricsSegment extends ConsumerWidget {
                     constraints: BoxConstraints(maxWidth: constraints.maxWidth),
                     child: Text(
                       segment.lyrics,
-                      style: TextStyle(
-                        fontSize: lyricsViewStyle.lyricsSize,
+                      style: lyricsStyle.copyWith(
                         decoration: highlightLyrics
                             ? TextDecoration.underline
                             : null,
