@@ -4,11 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sofarhangolo/data/database.dart';
 import 'package:sofarhangolo/data/song/song.dart';
 
-/// Guards the FTS write path: songs must be upserted with an explicit
-/// `ON CONFLICT(uuid) DO UPDATE` (via [BankSongUpdateTask._upsertSong]),
-/// never with `InsertMode.insertOrReplace`. REPLACE's implicit delete
-/// skips DELETE triggers, orphaning the FTS entry for the old rowid and
-/// breaking the index.
+/// Guards the FTS write path: upsert via `ON CONFLICT(uuid) DO UPDATE`, never
+/// `InsertMode.insertOrReplace` (REPLACE skips the DELETE triggers and orphans
+/// the FTS entry).
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -30,8 +28,8 @@ void main() {
     contentMap: {'composer': composer},
   );
 
-  // The row class has no id, which is exactly why the conflict target must
-  // be uuid — read the rowid through raw SQL when the test needs it.
+  // The row class has no id, so the conflict target must be uuid; read the
+  // rowid through raw SQL.
   Future<int> onlyRowid() async {
     final row = await db.customSelect('SELECT id FROM songs').getSingle();
     return row.read<int>('id');
@@ -55,8 +53,7 @@ void main() {
     await upsert(songWith('a', 'Első dal', 'Kiss Áron'));
     final rowidBefore = await onlyRowid();
 
-    // Second write for the same uuid — this is what the variation merge
-    // does within a single update run.
+    // Second write for the same uuid, as the variation merge does.
     await upsert(songWith('a', 'Második dal', 'Kiss Áron'));
 
     expect(await db.select(db.songs).get(), hasLength(1));
@@ -75,8 +72,7 @@ void main() {
         .get();
     expect(fresh, hasLength(1));
 
-    // Full FTS consistency against the content view (rank > 0 checks the
-    // content table too, which is what broke with insertOrReplace).
+    // `rank` makes it check the content table too, which is what broke.
     await db.customStatement(
       "INSERT INTO songs_fts(songs_fts, rank) VALUES('integrity-check', 1)",
     );

@@ -187,8 +187,7 @@ void main() {
         expect(field.hasSearchUse, isTrue, reason: entry.key);
         expect(field.searchGroup, entry.value, reason: entry.key);
       }
-      // Every search-use field must have a group: the FTS weight vector
-      // is generated from these.
+      // Every search-use field needs a group: the FTS weight vector uses them.
       for (final field in defaultSongFields) {
         if (field.hasSearchUse) {
           expect(field.searchGroup, isNotNull, reason: field.apiName);
@@ -324,8 +323,7 @@ void main() {
 
       final orchestra = merged['orchestra']!;
       expect(orchestra.searchGroup, SongSearchGroup.people);
-      // Inert today — overlay fields are not full-text searchable — but
-      // the declared group survives for a future promotion.
+      // Inert: overlay fields are not searchable, but the group carries over.
       expect(orchestra.hasSearchUse, isFalse);
     });
 

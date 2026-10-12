@@ -6,7 +6,6 @@ import '../../../config/config.dart';
 import '../../../data/bank/bank.dart';
 import '../../../services/bank/banks.dart';
 import '../../../services/songs/filter.dart';
-import '../../../services/songs/search_index.dart';
 import '../../common/centered_hint.dart';
 import '../../common/error/card.dart';
 import '../../common/key_text.dart';
@@ -136,13 +135,6 @@ class _SongsPageState extends ConsumerState<SongsPage> {
   late TextEditingController _searchFieldController;
   late FocusNode _searchFieldFocusNode;
   final _link = LayerLink();
-
-  /// Rebuilds the search index from `songs` and runs the search again. Offered
-  /// on the error card for an index the automatic repair could not heal.
-  Future<void> _rebuildSearchIndex() async {
-    await rebuildSearchIndex();
-    ref.invalidate(filteredSongsProvider);
-  }
 
   bool get _areAllFiltersEmpty {
     final filterState = ref.read(multiselectTagsFilterStateProvider);
@@ -374,14 +366,6 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                                       stackTrace: stackTrace,
                                       title: 'Hová lettek a dalok? :(',
                                       icon: Icons.error,
-                                      // The search index is the one failure
-                                      // the app can heal by itself: rebuild it
-                                      // from `songs` and search again.
-                                      onRetry:
-                                          isSearchIndexCorruption(error)
-                                          ? _rebuildSearchIndex
-                                          : null,
-                                      retryLabel: 'Keresőindex újraépítése',
                                     ),
                                   ),
                                 AsyncValue(:final value) =>

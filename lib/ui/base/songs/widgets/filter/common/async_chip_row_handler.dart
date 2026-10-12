@@ -6,11 +6,8 @@ import '../../../../../common/error/card.dart';
 import 'filter_chip.dart';
 import 'skeleton_chip_row.dart';
 
-/// A reusable widget that displays an async list of values as horizontal filter chips.
-///
-/// While the values refresh it keeps the chips it already has and fades them,
-/// rather than replacing them with the loading placeholder - the list is being
-/// recomputed for a new search/filter, not starting from nothing.
+/// An async list of values as horizontal filter chips. A refresh keeps the chips
+/// it already has and fades them instead of showing the placeholder.
 class AsyncChipRowHandlerOf<T> extends StatefulWidget {
   const AsyncChipRowHandlerOf({
     required this.asyncValue,

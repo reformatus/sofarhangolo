@@ -5,9 +5,8 @@ import 'package:sofarhangolo/data/song/song.dart';
 import 'package:sofarhangolo/services/songs/filter.dart';
 import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/key/state.dart';
 
-/// End-to-end coverage of the registry-driven search query, which had none
-/// before (the bug this guards against: resolving hits to typed songs through
-/// an API that requires drift-generated table metadata).
+/// End-to-end coverage of the search query (it resolves hits to typed songs,
+/// which needs drift's generated table metadata).
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -88,9 +87,8 @@ void main() {
 
     final results = await search('talalj');
 
-    // Only title and lyrics are in the FTS index. Their bm25 weights (10, 1)
-    // rank them, while the composer hit is a LIKE-only match (no FTS rank)
-    // and sorts after them.
+    // Only title and lyrics are indexed; the composer hit has no FTS rank and
+    // sorts after them.
     expect(results.map((r) => r.song.uuid).toList(), [
       'title-hit',
       'lyrics-hit',

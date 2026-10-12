@@ -13,14 +13,12 @@ typedef KeyFilterSelectable = ({
   bool addingKey,
 });
 
-/// Pitch or complete-key chips the key card offers, limited to the keys that
-/// still match the current query (see [keyFacet]). When a single mode is
-/// selected the row narrows to the complete keys carrying it.
+/// Pitch/complete-key chips the key card offers, limited to the keys the query
+/// can reach ([keyFacet]); one selected mode narrows it to that mode's keys.
 @riverpod
 Future<List<KeyFilterSelectable>> selectablePitches(Ref ref) async {
-  // Captured once: the provider rebuilds with a fresh Ref, so a chip rendered
-  // from a previous value must not reach back through that provider's ref when
-  // it is tapped.
+  // Captured once: a chip built from a previous value must not reach through a
+  // stale provider Ref when tapped.
   final keyFilterState = ref.read(keyFilterStateProvider.notifier);
   final state = ref.watch(keyFilterStateProvider);
   final available = await ref.watch(keyFacetProvider.future);
@@ -49,9 +47,8 @@ Future<List<KeyFilterSelectable>> selectablePitches(Ref ref) async {
   ];
 }
 
-/// Mode or complete-key chips the key card offers, limited to the keys that
-/// still match the current query (see [keyFacet]). When a single pitch is
-/// selected the row narrows to the complete keys carrying it.
+/// Mode/complete-key chips the key card offers, limited to the keys the query
+/// can reach ([keyFacet]); one selected pitch narrows it to that pitch's keys.
 @riverpod
 Future<List<KeyFilterSelectable>> selectableModes(Ref ref) async {
   final keyFilterState = ref.read(keyFilterStateProvider.notifier);

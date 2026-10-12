@@ -9,12 +9,9 @@ import 'types/bank/bank_filter_card.dart';
 import 'types/key/key_filter_card.dart';
 import 'types/multiselect-tags/multiselect_filter_card.dart';
 
-/// The filter cards.
-///
-/// A lazy list on purpose: a card scrolled out of view is disposed, which stops
-/// its facet query from running (the facets are auto-dispose). Pages that place
-/// it inside another scroll view pass [shrinkWrap] and a non-scrolling
-/// [physics]; the wide sidebar lets it scroll itself via [scrollController].
+/// The filter cards, as a lazy list so a card scrolled out of view is disposed
+/// and stops querying. Callers embedding it in another scroll view pass
+/// [shrinkWrap] and [physics].
 class FiltersColumn extends ConsumerWidget {
   const FiltersColumn({
     this.scrollController,

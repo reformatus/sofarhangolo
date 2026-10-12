@@ -38,12 +38,8 @@ class MultiselectFilterCard extends ConsumerWidget {
 
     // Nothing to offer and nothing selected: the card has no purpose.
     //
-    // This reads `available.value`, not [asyncValues]: while a new query is in
-    // flight `whenData` yields a value-less AsyncLoading, so a card that had
-    // already hidden itself would pop back into view for the length of the
-    // debounce and vanish again on the empty result. `value` carries the
-    // previous set across the reload, so the card only returns once a query
-    // actually reaches something.
+    // Read `available.value`, not [asyncValues]: `whenData` blanks out while a
+    // new query loads, which would flash a hidden card back into view.
     final reachable = available.value;
     if (reachable != null && selectable(reachable).isEmpty) {
       return const SizedBox.shrink();

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// A row of placeholder chips shown while a filter's values load.
-///
-/// It mirrors the real chip row's height and rough chip size, so the card does
-/// not change height (or shift the cards below it) when the values arrive.
+/// Placeholder chips shown while a filter's values load, sized like the real row
+/// so the card does not jump when they arrive.
 class SkeletonChipRow extends StatelessWidget {
   const SkeletonChipRow({
     this.height = 42,

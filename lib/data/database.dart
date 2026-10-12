@@ -131,11 +131,8 @@ class LyricDatabase extends _$LyricDatabase {
   }
 
   static QueryExecutor _openConnection() {
-    // `flutter run --dart-define=LYRIC_DB_PATH=/path/to/lyric3.sqlite` opens
-    // a throwaway database instead of the user's real one, so a test build
-    // can run next to a stable install. An env override cannot do this:
-    // path_provider's documents dir comes from XDG_DOCUMENTS_DIR, which is
-    // an absolute path in user-dirs.dirs.
+    // `LYRIC_DB_PATH` opens a throwaway database instead of the user's real
+    // one. An env override cannot do this: XDG_DOCUMENTS_DIR wins over HOME.
     const dbPath = String.fromEnvironment('LYRIC_DB_PATH');
     return driftDatabase(
       name: 'lyric3',

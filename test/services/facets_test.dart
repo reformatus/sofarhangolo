@@ -39,17 +39,15 @@ class FixedSearchStringState extends SearchStringState {
   String build() => value;
 }
 
-/// Which filter values still match the current query - the options the cards
-/// should offer. The load-bearing rule is self-exclusion: a field's own
-/// selection must not hide its siblings, but it must narrow the other fields.
+/// Which filter values still match the query. The load-bearing rule is
+/// self-exclusion: a field's own selection must not hide its siblings.
 void main() {
   late LyricDatabase testDb;
 
   setUp(() async {
     testDb = createTestDatabase();
     db = testDb;
-    // Same as songs_update_test: the songs→banks FK is unusable with
-    // in-memory schemas, and these tests do not rely on it.
+    // The songs→banks FK is unusable with in-memory schemas; unused here.
     await testDb.customStatement('PRAGMA foreign_keys = OFF');
   });
 
@@ -235,7 +233,7 @@ void main() {
           song('s2', title: 'Beta', genre: ['Pop'], keys: ['A-moll']),
         ]);
 
-        // Rock only has the C key, so A disappears - even with a key selected.
+        // Rock only has C, so A disappears - even with a key selected.
         final narrowed = await keys(
           filters: {
             'genre': ['Rock'],

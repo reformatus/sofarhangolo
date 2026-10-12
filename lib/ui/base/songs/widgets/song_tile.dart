@@ -37,8 +37,7 @@ class LSongResultTile extends ConsumerWidget {
       ),
     );
     final firstLine = song.firstLine;
-    // The fields the search matched besides the title, shown with the
-    // field's registry icon.
+    // Other matched fields, with their registry icons.
     final matchRows = <Widget>[
       for (final entry in result?.matches.entries ?? const <MapEntry<String, String>>[])
         if (entry.key != 'title')
@@ -392,8 +391,7 @@ class SongFeatures extends StatelessWidget {
   }
 }
 
-/// The registry icon for a matched field, with a neutral fallback for fields
-/// the vocabulary does not know.
+/// The registry icon for a matched field, with a neutral fallback.
 IconData _fieldIcon(String field) =>
     defaultSongFieldRegistry[field]?.icon ?? Icons.label_outline;
 

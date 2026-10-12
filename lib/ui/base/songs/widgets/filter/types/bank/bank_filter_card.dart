@@ -30,9 +30,8 @@ class _BankFilterCardState extends ConsumerState<BankFilterCard> {
 
     final asyncBanks = banks.hasValue ? available.whenData(selectable) : banks;
 
-    // Nothing to offer and nothing selected: the card has no purpose. Reads
-    // `available.value` rather than [asyncBanks] so a facet that is still
-    // loading keeps the card hidden instead of flashing it back in (see
+    // Nothing to offer and nothing selected: the card has no purpose. Read
+    // `available.value` so a loading facet keeps it hidden (see
     // [MultiselectFilterCard]).
     final reachable = available.value;
     if (banks.hasValue && reachable != null && selectable(reachable).isEmpty) {

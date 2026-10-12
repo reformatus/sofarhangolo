@@ -42,10 +42,8 @@ class _KeyFilterCardState extends ConsumerState<KeyFilterCard> {
     final selectablePitches = ref.watch(selectablePitchesProvider);
     final selectableModes = ref.watch(selectableModesProvider);
 
-    // No key in the collection matches the current query and none is selected:
-    // the card has no purpose. Reads the value (which survives a reload) so a
-    // card that has already hidden itself waits for the new result instead of
-    // flashing back in while the facet recomputes.
+    // No reachable key and none selected: the card has no purpose. Read the
+    // value, which survives a reload, so a hidden card does not flash back.
     final availableKeys = ref.watch(keyFacetProvider).value;
     if (!isActive && availableKeys != null && availableKeys.keys.isEmpty) {
       return const SizedBox.shrink();

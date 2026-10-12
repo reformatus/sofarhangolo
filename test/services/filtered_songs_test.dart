@@ -159,8 +159,7 @@ void main() {
       );
     });
 
-    // The plain listing (no search) shares this group's database, since
-    // downloadedAssetsSubquery is global.
+    // Shares this group's database: downloadedAssetsSubquery is global.
     const noKeyFilters = (
       pitches: <String>{},
       modes: <String>{},

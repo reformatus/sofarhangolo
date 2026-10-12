@@ -7,13 +7,7 @@ import 'package:sofarhangolo/services/songs/search_index.dart';
 
 import '../harness/test_database.dart';
 
-/// `songs_fts` is derived data, so the app heals a corrupt index instead of
-/// leaving a dead error card on screen.
-///
-/// The damage the tests reproduce is what the old write path left behind: an
-/// index row whose song is gone. `bm25()` never reads the content table, so it
-/// looks fine; `snippet()` does, and the search materialises the hits, so every
-/// matched row asks for one.
+/// The app heals a corrupt search index instead of leaving a dead error card.
 void main() {
   // Shared database: searchSongs reads through downloadedAssetsSubquery, a
   // global initialized against the first `db` it sees.
@@ -22,8 +16,6 @@ void main() {
   setUpAll(() async {
     testDb = createTestDatabase();
     db = testDb;
-    // Same as songs_update_test: the songs→banks FK is unusable with in-memory
-    // schemas, and these tests do not rely on it.
     await testDb.customStatement('PRAGMA foreign_keys = OFF');
   });
 
@@ -32,9 +24,8 @@ void main() {
   });
 
   setUp(() async {
-    // Every test starts from an empty, consistent index. The delete goes
-    // through the triggers, and the rebuild drops the orphan rows a previous
-    // test injected.
+    // Empty and consistent: the delete goes through the triggers, and the
+    // rebuild drops the orphans a previous test injected.
     await testDb.delete(testDb.songs).go();
     await rebuildSearchIndex();
   });
@@ -50,15 +41,14 @@ void main() {
   Future<void> insert(Iterable<Song> songs) =>
       testDb.batch((batch) => batch.insertAll(testDb.songs, songs));
 
-  /// An index row no song backs - the state a REPLACE-style upsert leaves
-  /// behind, since its implicit delete skips the DELETE triggers.
+  /// An index row no song backs - what a REPLACE-style upsert leaves behind.
   Future<void> orphanIndexRow(int rowid, String text) => testDb.customStatement(
     "INSERT INTO songs_fts(rowid, title, lyrics) VALUES (?, ?, '')",
     [rowid, text],
   );
 
-  /// FTS5's `integrity-check` with `rank` also compares the index against the
-  /// content table - the part the plain check skips, and the part that breaks.
+  /// FTS5's `integrity-check` with `rank` also compares against the content
+  /// table - the part the plain check skips, and the part that breaks.
   Future<void> expectIndexConsistent() async {
     await expectLater(
       testDb.customStatement(
@@ -99,7 +89,7 @@ void main() {
 
       await searchTitles('alma');
 
-      // The orphan's text is gone with it: only the song matches any more.
+      // The orphan's text went with it: only the song matches any more.
       expect(await searchTitles('régi'), isEmpty);
       expect(await searchTitles('alma'), ['Alma dal']);
     });
@@ -109,6 +99,25 @@ void main() {
 
       expect(await searchTitles('alma'), ['Alma dal']);
       await expectIndexConsistent();
+    });
+
+    test('a rebuild that fails surfaces its error', () async {
+      await insert([song('a', 'Alma dal')]);
+      await orphanIndexRow(999999, 'Alma régi');
+      // The rebuild is a write, so a read-only connection refuses it.
+      await testDb.customStatement('PRAGMA query_only = ON');
+      addTearDown(() => testDb.customStatement('PRAGMA query_only = OFF'));
+
+      await expectLater(
+        searchTitles('alma'),
+        throwsA(
+          isA<SqliteException>().having(
+            (error) => error.message,
+            'message',
+            contains('readonly'),
+          ),
+        ),
+      );
     });
 
     test('a stream that already produced a value is not re-run', () async {

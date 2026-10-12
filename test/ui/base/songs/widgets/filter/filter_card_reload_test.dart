@@ -8,12 +8,10 @@ import 'package:sofarhangolo/ui/base/songs/widgets/filter/common/base_filter_car
 import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/multiselect-tags/multiselect_filter_card.dart';
 import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/search/state.dart';
 
-/// How long the fake facet takes to answer, so a test can hold it in the
-/// reloading state that used to flash a hidden card back into view.
+/// How long the fake facet takes to answer, so a test can hold it reloading.
 const _reload = Duration(milliseconds: 50);
 
-/// A facet whose reachable values follow the search string: none for an empty
-/// search, one otherwise. Delayed, so the reload is observable.
+/// Reachable values follow the search string: none when empty, one otherwise.
 Override _facetThatFollowsTheSearch() =>
     fieldFacetProvider.overrideWith((ref, field) async* {
       final search = ref.watch(searchStringStateProvider);
@@ -51,13 +49,11 @@ void main() {
   testWidgets('a hidden card stays hidden while its facet reloads', (
     tester,
   ) async {
-    // The empty search reaches no value for this field, so the card settles
-    // hidden.
+    // An empty search reaches no value, so the card settles hidden.
     await pumpCard(tester);
     expect(find.byType(BaseFilterCard), findsNothing);
 
-    // A new query starts a reload. The card must keep waiting until the new
-    // value actually arrives instead of popping back for the length of it.
+    // The reload must not bring the card back before the new value lands.
     setSearch('rock');
     await tester.pump();
     expect(
@@ -77,9 +73,8 @@ void main() {
     await pumpCard(tester);
     expect(find.text('Rock'), findsOneWidget);
 
-    // The new query reaches nothing, but the card only disappears once that
-    // result lands - it fades the chips it has meanwhile, rather than flashing
-    // or blinking them away.
+    // The card only disappears once the empty result lands; until then it keeps
+    // fading its chips.
     setSearch('');
     await tester.pump();
     expect(

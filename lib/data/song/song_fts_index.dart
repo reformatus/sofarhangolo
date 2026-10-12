@@ -3,9 +3,8 @@ import 'package:drift/drift.dart';
 
 import 'song_fields.dart';
 
-/// One column of the drift-declared search index (see song.drift). Its position
-/// in [SongFtsIndex.columns] is the `snippet()` column index and the bm25
-/// weight position.
+/// One column of the search index (song.drift). Its position in
+/// [SongFtsIndex.columns] is the `snippet()` column index and bm25 weight.
 class SongFtsColumn {
   final String name;
   final SongSearchGroup group;
@@ -15,20 +14,15 @@ class SongFtsColumn {
   double get weight => group.weight;
 }
 
-/// Builds the unified text search query on top of the drift-owned FTS index.
+/// Builds the unified text search query on top of the FTS index.
 ///
-/// Only `title` and `lyrics` live in `songs_fts` (song.drift) - the two long
-/// columns the index is actually worth. Every other searchable field is matched
-/// by expression over `songs` (folded LIKE and exact equality), so the index
-/// layout is static and needs no dynamic DDL or runtime reconciliation.
-///
-/// Hits are tiered - 0 exact, 1 substring, 2 FTS-only - then ordered by bm25,
-/// the folded title and finally the rowid, so LIMIT/OFFSET pages stay stable.
-/// The FTS set is a `MATERIALIZED` CTE (FTS5 also rejects `MATCH` inside an OR
-/// over a left join) so `bm25` and the snippets are computed once per query
-/// instead of per scanned song. The statement also reports the total number of
-/// matches with `COUNT(*) OVER ()`, evaluated before `LIMIT`, so the UI needs
-/// no separate counting query.
+/// Only `title` and `lyrics` live in `songs_fts` (song.drift); every other
+/// searchable field matches by expression over `songs`, so the index layout is
+/// static. Hits are tiered (0 exact, 1 substring, 2 FTS-only) then ordered by
+/// bm25, folded title and rowid for stable paging. The FTS set is a
+/// `MATERIALIZED` CTE (FTS5 rejects `MATCH` in an OR over a left join) so bm25
+/// and snippets compute once per query, and `COUNT(*) OVER ()` carries the
+/// total before `LIMIT`.
 class SongFtsIndex {
   static const tableName = 'songs_fts';
   static const snippetStart = '<?';
@@ -44,8 +38,7 @@ class SongFtsIndex {
     for (final column in columns) column.name,
   };
 
-  /// Fields backed by a dedicated `songs` column; every other searchable field
-  /// is read from `content_map`.
+  /// Fields read from a `songs` column; the rest come from `content_map`.
   static const Set<String> coreFields = {'title', 'lyrics'};
 
   static bool isFtsField(String field) => _ftsFieldNames.contains(field);
@@ -55,10 +48,9 @@ class SongFtsIndex {
       ? 'songs.$field'
       : "json_extract(songs.content_map, '\$.$field')";
 
-  /// Hungarian accent folding, mirroring `removeDiacritics(...).toLowerCase()`
-  /// on the Dart side. SQLite's `lower()` folds ASCII only, so both cases of
-  /// every accented letter are mapped explicitly (a fixed Hungarian set - the
-  /// FTS tokenizer's `remove_diacritics` handles the rest when matching).
+  /// Hungarian accent folding, mirroring `removeDiacritics(...).toLowerCase()`.
+  /// `lower()` folds ASCII only, so both cases of each accented letter are
+  /// mapped explicitly.
   static const _foldReplacements = {
     'á': 'a',
     'é': 'e',
@@ -71,8 +63,7 @@ class SongFtsIndex {
     'ű': 'u',
   };
 
-  /// Wraps [expression] in the fold chain (see [_foldReplacements]), used for
-  /// LIKE/exact matching and folded-title ordering.
+  /// [expression] wrapped in the fold chain (see [_foldReplacements]).
   static String foldExpression(String expression) {
     var sql = 'lower($expression)';
     for (final entry in _foldReplacements.entries) {
@@ -93,8 +84,7 @@ class SongFtsIndex {
           "'...', 30) AS ${matchAlias(column.name)}",
   ].join(', ');
 
-  /// Folds a search term the same way [foldExpression] folds database values:
-  /// diacritics removed, lowercased.
+  /// Folds a term the way [foldExpression] folds values.
   static String foldTerm(String term) => removeDiacritics(term).toLowerCase();
 
   /// Escapes LIKE wildcards so the term is matched literally.
@@ -112,26 +102,21 @@ class SongFtsIndex {
       if (fields.contains(column.name)) column.name,
   ];
 
-  /// The `{a b} : term` match string restricting MATCH to [ftsFields]; the bare
-  /// term when every column takes part.
+  /// The match string restricting MATCH to [ftsFields]; the bare term when all
+  /// columns take part.
   static String _matchString(String term, List<String> ftsFields) =>
       ftsFields.length == columns.length
       ? term
       : '{${ftsFields.join(' ')}} : $term';
 
   /// The candidate test every query shares: the FTS set as a `MATERIALIZED` CTE
-  /// (FTS5 rejects `MATCH` in an OR over a left join, and materialising keeps
-  /// `bm25`/snippets from being recomputed per scanned row) OR a folded LIKE per
-  /// searchable field.
+  /// OR a folded LIKE per searchable field.
   ///
-  /// Returned as fragments because callers place the condition differently - the
-  /// list puts its exact/LIKE CASE between the CTE and the WHERE, a facet puts
-  /// nothing between. Binds are split to match: [SearchCandidate.variables] bind
-  /// first (the CTE precedes the SELECT), [SearchCandidate.likeVariables] bind
-  /// where [SearchCandidate.condition] appears.
+  /// Returned as fragments because callers place the condition differently; the
+  /// binds split to match ([SearchCandidate.variables] precede the SELECT,
+  /// [SearchCandidate.likeVariables] sit where the condition appears).
   ///
-  /// [cteSelect] is the CTE's projection (`rowid AS id`; the list adds rank and
-  /// the snippets).
+  /// [cteSelect] is the CTE's projection.
   static SearchCandidate searchCandidate({
     required String term,
     required List<String> fields,
@@ -168,19 +153,13 @@ class SongFtsIndex {
     );
   }
 
-  /// Builds the integrated search statement: FTS ∪ LIKE ∪ exact, tiered
-  /// (0 exact, 1 LIKE, 2 FTS-only) and ordered by tier, relevance, folded
-  /// title (then rowid, so [limit]/[offset] pages are stable). [fields] are
-  /// the searchable field names taking part; [extraWhere] and [extraVariables]
-  /// append caller filters (tags, banks, key).
+  /// The integrated search statement: FTS ∪ LIKE ∪ exact, tiered (0 exact,
+  /// 1 LIKE, 2 FTS-only) and ordered by tier, relevance, folded title, rowid.
+  /// [extraWhere]/[extraVariables] append caller filters (tags, banks, key).
   ///
-  /// Also returns `total`, the full match count - a window count evaluated
-  /// before the limit, so no second counting query is needed.
-  ///
-  /// Prepared-statement variables are bound positionally, so their order must
-  /// follow the placeholders in the SQL text: the CTE's MATCH comes first
-  /// (the CTE precedes the outer SELECT), then the exact conditions, the LIKE
-  /// conditions, the WHERE LIKE conditions, extras, then the limit and offset.
+  /// Variables bind positionally, in SQL-text order: the CTE's MATCH, the exact
+  /// conditions, the LIKE conditions, the WHERE LIKE conditions, extras, then
+  /// the limit and offset.
   static ({String sql, List<Variable> variables}) buildSearchQuery({
     required String term,
     required List<String> fields,
@@ -222,8 +201,7 @@ class SongFtsIndex {
       ..add(Variable<int>(limit))
       ..add(Variable<int>(offset));
 
-    // A bare integer in ORDER BY is a column ordinal, so use NULL as the
-    // neutral constant when there is no FTS rank.
+    // A bare integer in ORDER BY is a column ordinal, hence NULL.
     final rankColumn = hasFts ? 'hit.rank AS rank' : 'NULL AS rank';
     final matches = [
       for (final column in columns)
@@ -251,11 +229,9 @@ class SongFtsIndex {
   }
 }
 
-/// Fragments of the shared search candidate test, see
-/// [SongFtsIndex.searchCandidate].
+/// Fragments of the shared candidate test ([SongFtsIndex.searchCandidate]).
 class SearchCandidate {
-  /// `''` or the `WITH hit AS MATERIALIZED (...)` prefix, which must precede the
-  /// statement's SELECT.
+  /// `''` or the `WITH hit AS MATERIALIZED (...)` prefix.
   final String cte;
 
   /// `''` or the `LEFT JOIN hit ...` to append after the caller's own joins.
@@ -264,7 +240,7 @@ class SearchCandidate {
   /// `''` (no term) or the condition to AND into the WHERE.
   final String condition;
 
-  /// Binds for [cte]'s `MATCH`, bound before everything else.
+  /// Binds for [cte]'s `MATCH`.
   final List<Variable> variables;
 
   /// Binds for [condition]'s LIKE placeholders, bound where it appears.

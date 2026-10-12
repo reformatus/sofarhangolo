@@ -18,20 +18,16 @@ import 'search_index.dart';
 
 part 'filter.g.dart';
 
-// Searchable fields come from the field registry; the selector UI lists them
-// uniformly. Only title and lyrics are backed by the FTS index (song.drift) -
-// the rest are matched by expression over `songs` (see [SongFtsIndex]).
+// Searchable fields come from the registry. Only title and lyrics are FTS-
+// backed (song.drift); the rest match by expression over `songs`.
 final List<String> fullTextSearchFields = [
   for (final field in defaultSongFieldRegistry.values)
     if (field.hasSearchUse) field.apiName,
 ];
 
-/// Filterable fields that at least one song carries a value for, with the
-/// number of such songs.
+/// Filterable fields at least one song has a value for, with that count.
 ///
-/// The counts are aggregated in SQLite (`json_each` over `content_map` plus
-/// the dedicated `key` column), so opening the filter UI never has to load
-/// every song into Dart.
+/// Aggregated in SQLite, so opening the filter UI loads no songs into Dart.
 @Riverpod(keepAlive: true)
 Future<Map<String, ({SongField field, int count})>> existingFilterableFields(
   Ref ref,
@@ -39,8 +35,7 @@ Future<Map<String, ({SongField field, int count})>> existingFilterableFields(
   return ref.watch(_existingFilterableFieldsStream.future);
 }
 
-/// Aggregate stream behind [existingFilterableFields], recomputed whenever the
-/// bank overlays or the `songs` table change.
+/// Aggregate stream behind [existingFilterableFields].
 final _existingFilterableFieldsStream =
     StreamProvider<Map<String, ({SongField field, int count})>>((ref) async* {
       final banks = await ref.watch(watchAllBanksProvider.future);
@@ -51,13 +46,9 @@ final _existingFilterableFieldsStream =
       yield* buildExistingFilterableFields(registry);
     });
 
-/// Reactive stream of the filter-card metadata for [registry].
-///
-/// Only fields at least one song has are returned: registry fields without a
-/// filter use are skipped, a text field counts songs with a non-blank value, a
-/// list field counts songs with at least one non-blank element, and the
-/// pseudo-field `key` (backed by the `key_field` column, not `content_map`)
-/// counts songs with a key.
+/// Filter-card metadata for [registry]: only fields a song has a value for.
+/// A text field counts non-blank values, a list field non-blank elements, and
+/// the `key` pseudo-field (the `key_field` column) songs with a key.
 Stream<Map<String, ({SongField field, int count})>>
 buildExistingFilterableFields([Map<String, SongField>? registry]) {
   final effectiveRegistry = registry ?? defaultSongFieldRegistry;
@@ -75,13 +66,11 @@ buildExistingFilterableFields([Map<String, SongField>? registry]) {
       .map((rows) => _readExistingFilterableFields(rows, effectiveRegistry));
 }
 
-/// The single aggregate query behind [buildExistingFilterableFields].
+/// The aggregate query behind [buildExistingFilterableFields].
 ///
-/// `json_each(content_map)` yields one row per field a song stores, so
-/// `COUNT(DISTINCT songs.id)` counts songs rather than values. Array values
-/// are expanded through a nested `json_each` to require at least one non-blank
-/// element; `json('[]')` keeps that nested call valid for scalar rows. The
-/// `key` pseudo-field comes from `key_field` and is unioned in.
+/// `json_each(content_map)` gives one row per field, so `COUNT(DISTINCT id)`
+/// counts songs. `json('[]')` keeps the nested array expansion valid for
+/// scalar rows; `key_field` is unioned in for the `key` pseudo-field.
 ({String sql, List<Variable> variables})? _existingFilterableFieldsQuery(
   Map<String, SongField> registry,
 ) {
@@ -150,11 +139,8 @@ Stream<int> songTotalCount(Ref ref) {
       .map((rows) => rows.first.read<int>('count'));
 }
 
-/// Number of songs matching the current search and filters - the "filtered"
-/// count in the filters subtitle.
-///
-/// Taken from the list query's own window count ([SongResultPage.total]), so
-/// the subtitle costs no second query.
+/// Matching songs - the "filtered" count in the filters subtitle, taken from
+/// the list query's window count ([SongResultPage.total]).
 @Riverpod(keepAlive: true)
 int? songMatchCount(Ref ref) {
   return ref.watch(filteredSongsProvider).value?.total;
@@ -165,8 +151,7 @@ const snippetTags = (
   end: SongFtsIndex.snippetEnd,
 );
 
-/// The empty key filter, for callers that must not apply one (a facet drops the
-/// selection of the field it is computing).
+/// The empty key filter, for callers that must not apply one.
 const noKeyFilters = (
   pitches: <String>{},
   modes: <String>{},
@@ -176,8 +161,7 @@ const noKeyFilters = (
 bool matchesKeyFilters(Song song, KeyFilters keyFilters) =>
     matchesKeyField(song.keyField, keyFilters);
 
-/// Whether a song's key fields satisfy the key filter, mirroring
-/// [matchesKeyFilters] for callers that only have the raw key field.
+/// [matchesKeyFilters] for callers holding only the raw key field.
 bool matchesKeyField(List<KeyField> keyField, KeyFilters keyFilters) {
   if (keyFilters.isEmpty) return true;
 
@@ -201,15 +185,12 @@ bool matchesKeyField(List<KeyField> keyField, KeyFilters keyFilters) {
   return matchesCompleteKey || matchesPartialKeyGroup;
 }
 
-/// Number of results fetched per page; [SongResultsLimit] grows it as the
-/// results list is scrolled to the end.
+/// Results per page; [SongResultsLimit] grows it as the list is scrolled.
 const songSearchPageSize = 50;
 
-/// How many search results are currently requested. Kept as its own notifier
-/// (rather than a provider family keyed by the limit) so that growing it
-/// recomputes [filteredSongs] in place: the list keeps showing the already
-/// loaded results while the next page is fetched, and the page can render a
-/// footer spinner instead of swapping the whole view for one.
+/// How many results are requested. Its own notifier (not a family keyed by the
+/// limit) so growing it recomputes [filteredSongs] in place: loaded results
+/// stay on screen and the page shows a footer spinner.
 @riverpod
 class SongResultsLimit extends _$SongResultsLimit {
   @override
@@ -238,13 +219,9 @@ Stream<SongResultPage> filteredSongs(Ref ref) {
   );
 }
 
-/// The one paginated query behind the songs page.
-///
-/// [limit] always applies - with or without a search term - so the page grows
-/// its window by the same rule in both cases (see [SongResultsLimit]). Without
-/// a term the songs are ordered by folded title; with one, by the relevance
-/// order of [searchSongs]. Both apply the same tag, bank and key filters, and
-/// both report the full match count alongside the page.
+/// The paginated query behind the songs page: folded-title order without a
+/// term, [searchSongs] relevance with one. Both apply the same filters and
+/// report the full match count.
 Stream<SongResultPage> songResults({
   required String searchString,
   required List<String> searchFields,
@@ -271,16 +248,12 @@ Stream<SongResultPage> songResults({
   );
 }
 
-/// `songs.title` folded for a diacritic-insensitive order - the SQL equivalent
-/// of the Dart `removeDiacritics(...).compareTo(...)` sort it replaces (see
-/// [SongFtsIndex.foldExpression]).
+/// `songs.title` folded for a diacritic-insensitive order
+/// ([SongFtsIndex.foldExpression]).
 final String foldedTitle = SongFtsIndex.foldExpression('songs.title');
 
-/// The plain listing: songs matching the filters only, ordered by folded title
-/// and paged with [limit].
-/// The plain listing: songs matching the filters only, ordered by folded title
-/// and paged with [limit]. The window count rides along, so the total comes
-/// from the same query.
+/// The plain listing: songs matching the filters, folded-title order, paged
+/// with [limit]. The window count rides along.
 Stream<SongResultPage> filteredSongsPage({
   required Map<String, List<String>> filters,
   required Set<String> bankFilters,
@@ -289,8 +262,8 @@ Stream<SongResultPage> filteredSongsPage({
 }) {
   return (db.select(db.songs).addColumns([
           subqueryExpression(downloadedAssetsSubquery),
-          // `COUNT(*) OVER ()` counts the rows matching the WHERE, before the
-          // LIMIT; drift aliases added expressions `c0`, `c1`, ...
+          // `COUNT(*) OVER ()` counts rows before LIMIT; drift aliases the
+          // added expressions `c0`, `c1`, ...
           CustomExpression<int>('COUNT(*) OVER ()'),
         ])
         ..where(filterExpression(db.songs, filters, bankFilters, keyFilters))
@@ -320,8 +293,7 @@ int _windowTotal(List<TypedResult> rows) {
   return rows.first.rawData.readNullableWithType(DriftSqlType.int, 'c1') ?? 0;
 }
 
-/// Drift expression for the tag and bank filters plus the key filter, used by
-/// the plain listing ([filteredSongsPage]).
+/// Tag, bank and key filters as a drift expression ([filteredSongsPage]).
 Expression<bool> filterExpression(
   Songs songs,
   Map<String, List<String>> filters,
@@ -334,10 +306,8 @@ Expression<bool> filterExpression(
           final fieldData = songs.contentMap.jsonExtract<String>(
             '\$.${entry.key}',
           );
-          // json_extract unquotes scalars but keeps array elements
-          // quoted, so list fields match on the quoted element (avoids
-          // substring hits inside longer values) while text fields match
-          // plainly.
+          // List fields match the quoted element (json_extract keeps array
+          // elements quoted), text fields plainly.
           return Expression.or(
             entry.value.map((value) {
               final likePattern = bankApiListValueFields.contains(entry.key)
@@ -355,10 +325,9 @@ Expression<bool> filterExpression(
   );
 }
 
-/// SQL mirror of [matchesKeyFilters]: `key_field` stores a song's keys as
-/// `pitch-mode` joined with ', '. A complete key is a plain substring, a pitch
-/// anchors on the trailing dash and a mode on the leading one. Pitch and mode
-/// may be satisfied by different keys, exactly as [matchesKeyFilters] allows.
+/// SQL mirror of [matchesKeyFilters]: `key_field` holds `pitch-mode` key
+/// strings joined with ', ' - a key is a substring, a pitch anchors on the
+/// trailing dash, a mode on the leading one.
 Expression<bool> keyFilterExpression(Songs songs, KeyFilters keyFilters) {
   if (keyFilters.isEmpty) return const Constant(true);
 
@@ -386,8 +355,7 @@ Expression<bool> keyFilterExpression(Songs songs, KeyFilters keyFilters) {
   return Expression.or(parts);
 }
 
-/// The searchable field names selected by [searchFields]; all of them when the
-/// selection is empty, and the known subset otherwise.
+/// The selected [searchFields], or all of them when none is selected.
 List<String> searchableFields(List<String> searchFields) {
   final selected = searchFields.toSet();
   final fields = [
@@ -401,8 +369,8 @@ List<String> searchableFields(List<String> searchFields) {
   return fields;
 }
 
-/// SQL `WHERE` for the tag, bank and key filters, shared by the search query
-/// and the match count so both see the same rows.
+/// SQL `WHERE` for the tag, bank and key filters, shared with the search so
+/// both see the same rows.
 ({String where, List<Variable> variables}) filterWhere(
   Map<String, List<String>> filters,
   Set<String> bankFilters,
@@ -414,8 +382,8 @@ List<String> searchableFields(List<String> searchFields) {
   for (final entry in filters.entries) {
     final valueClauses = <String>[];
     for (final value in entry.value) {
-      // Quoted matching for list fields, plain for text fields — mirrors the
-      // drift expression filter used without a search.
+      // Quoted matching for list fields, plain for text - mirrors
+      // [filterExpression].
       final likePattern = bankApiListValueFields.contains(entry.key)
           ? '%"$value"%'
           : '%$value%';
@@ -433,9 +401,8 @@ List<String> searchableFields(List<String> searchFields) {
     variables.addAll(bankFilters.map(Variable<String>.new));
   }
   if (keyFilters.isNotEmpty) {
-    // Mirrors [matchesKeyFilters] / [keyFilterExpression]: complete keys are
-    // plain substrings, a pitch anchors on the trailing dash, a mode on the
-    // leading one, and pitch/mode may come from different keys.
+    // Mirrors [keyFilterExpression]: keys are substrings, a pitch anchors on
+    // the trailing dash, a mode on the leading one.
     final keyClauses = <String>[];
     if (keyFilters.keys.isNotEmpty) {
       keyClauses.add(
@@ -466,14 +433,11 @@ List<String> searchableFields(List<String> searchFields) {
   return (where: clauses.join(' AND '), variables: variables);
 }
 
-/// Searches the drift-owned FTS index (see [SongFtsIndex]): `title` and
-/// `lyrics` are matched by FTS5, every other searchable field by a folded LIKE
-/// or exact equality over `songs`, so the index layout stays static.
+/// Searches the drift-owned FTS index ([SongFtsIndex]): FTS5 for title/lyrics,
+/// folded LIKE and exact equality for the rest.
 ///
-/// Two phases: a custom select reads the hit columns (uuid, rank, tier and
-/// snippets) plus the window total, then a normal typed select resolves those
-/// songs. A single query cannot be typed: the FTS columns drift cannot join
-/// into `readTable`.
+/// Two phases - a custom select for the hits and the window total, then a typed
+/// select for the songs, which `readTable` needs.
 Stream<SongResultPage> searchSongs({
   required String searchString,
   required List<String> searchFields,
@@ -495,9 +459,8 @@ Stream<SongResultPage> searchSongs({
 
   final foldedTerm = SongFtsIndex.foldTerm(searchString);
 
-  // The one query that reads the FTS content, so the one that trips over an
-  // index left corrupt by an older write path; it heals itself (see
-  // [withSearchIndexRepair]).
+  // The query that reads the FTS content, so the one that trips over a corrupt
+  // index; it heals itself ([withSearchIndexRepair]).
   return withSearchIndexRepair(
     () => db
         .customSelect(
@@ -544,12 +507,9 @@ Stream<SongResultPage> searchSongs({
   );
 }
 
-/// Highlighted snippets for the fields a song matched in, keyed by field name.
-///
-/// The FTS snippet is preferred (it is index-driven, token-based); for hits
-/// the trigram index cannot cover — short terms, and exact/substring matches
-/// outside the FTS' reach — a snippet is built in Dart around the folded
-/// match, so LIKE and exact hits highlight just like FTS ones.
+/// Snippets for the fields a song matched in, by field name. The FTS snippet is
+/// preferred; hits the trigram index cannot cover (short terms, exact matches)
+/// get one built in Dart around the folded match.
 Map<String, String> _matchedFields(
   Song song,
   QueryRow hit,
@@ -558,8 +518,7 @@ Map<String, String> _matchedFields(
 ) {
   final matched = <String, String>{};
   for (final field in fields) {
-    // Only the FTS-backed fields have a snippet column; the rest fall back to
-    // a Dart snippet around the folded match.
+    // Only FTS-backed fields have a snippet column.
     final ftsSnippet = SongFtsIndex.isFtsField(field)
         ? hit.readNullable<String>(SongFtsIndex.matchAlias(field))
         : null;
@@ -581,9 +540,8 @@ String? _fieldValue(Song song, String field) => switch (field) {
   _ => song.contentDisplay(field),
 };
 
-/// Slices [value] around its folded match of [foldedTerm] and wraps the match
-/// in the snippet highlight tags. The fold maps characters one-to-one, so
-/// indices in the folded string line up with the original.
+/// Slices [value] around its folded match of [foldedTerm], wrapped in the
+/// snippet tags. The fold maps characters one-to-one, so indices line up.
 String? _snippetFor(String value, String foldedTerm) {
   if (foldedTerm.isEmpty) return null;
   final index = SongFtsIndex.foldTerm(value).indexOf(foldedTerm);
@@ -610,9 +568,8 @@ class SongResult {
   SongResult(this.song, {required this.downloadedAssets, this.match});
 }
 
-/// Relevance metadata for a song matched through the search index: the match
-/// tier (0 exact, 1 substring, 2 FTS-only), the bm25 rank, and highlighted
-/// snippets for the fields that matched, keyed by field name.
+/// Match metadata: tier (0 exact, 1 substring, 2 FTS-only), bm25 rank and
+/// snippets by field.
 class SongMatch {
   final int tier;
   final double rank;
@@ -624,9 +581,8 @@ class SongMatch {
   String? get matchLyrics => matches['lyrics'];
 }
 
-/// One page of the songs list plus [total], the number of rows the query
-/// matched before its limit. The count is a window count in the same statement,
-/// so the page and the subtitle never disagree and never need a second query.
+/// One page of the songs list plus [total] - the window count from the same
+/// statement, before the limit.
 class SongResultPage {
   final List<SongResult> results;
   final int total;
