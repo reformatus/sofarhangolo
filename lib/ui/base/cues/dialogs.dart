@@ -131,18 +131,26 @@ class EditCueDialogState extends ConsumerState<EditCueDialog> {
   }
 }
 
-class DeleteCueDialog extends StatelessWidget {
+class DeleteCueDialog extends ConsumerWidget {
   const DeleteCueDialog({super.key, required this.cue});
 
   final Cue cue;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return ConfirmDialog(
       title: '${cue.title} törlése - biztos vagy benne?',
       actionLabel: 'Törlés',
       actionIcon: Icons.delete_forever,
       actionOnPressed: () async {
+        // Close the cue first if it is the active session, so no live state
+        // (nor its debounced writes) outlives the deleted row.
+        final notifier = ref.read(activeCueSessionProvider.notifier);
+        final isActiveCue =
+            ref.read(activeCueSessionProvider).value?.cue.uuid == cue.uuid;
+        if (isActiveCue) {
+          await notifier.unload();
+        }
         await deleteCueWithUuid(cue.uuid);
       },
       dangerousAction: true,

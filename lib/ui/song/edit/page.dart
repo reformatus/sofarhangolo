@@ -210,7 +210,9 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
       ),
     );
     if (!mounted || !_deleteConfirmed) return;
-    context.pop();
+    // The deleted song's page may sit directly below us in the stack and
+    // would only show a "not found" card, so return to the songs list.
+    context.go('/bank');
   }
 
   @override
