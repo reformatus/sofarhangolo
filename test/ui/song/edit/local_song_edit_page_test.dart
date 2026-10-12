@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart' hide isNotNull, isNull;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -58,6 +59,95 @@ void main() {
     );
     await tester.pumpAndSettle();
   }
+
+  /// Inserts a bank song and makes a local copy linked back to it. Returns
+  /// both so a test can mutate the original to drive the copy's status:
+  /// editing its content makes it `changed`, deleting it makes it `missing`.
+  Future<({Song original, Song copy})> makeCopyOfBankSong() async {
+    final original = Song(
+      uuid: 'bank-original',
+      title: 'A banki dal',
+      lyrics: '<song><lyrics>a</lyrics></song>',
+      keyField: const [],
+      contentMap: const {},
+      sourceBank: 'bank-x',
+    );
+    await db.into(db.songs).insert(original);
+    final copy = await copySongToLocal(original);
+    return (original: original, copy: copy);
+  }
+
+  testWidgets('hides the original-song card for an unchanged copy', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1500, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final songs = await makeCopyOfBankSong();
+    await pumpApp(tester);
+
+    tester
+        .element(find.text('bank-page-marker'))
+        .push('/song/local/${songs.copy.uuid}');
+    await tester.pumpAndSettle();
+
+    expect(find.byType(LocalSongEditor), findsOneWidget);
+    // An unchanged copy has nothing to report: the card (and its noise-y
+    // "Nem változott." status) must be gone entirely.
+    expect(find.text('Eredeti dal'), findsNothing);
+    expect(find.textContaining('Nem változott.'), findsNothing);
+  });
+
+  testWidgets('shows the original-song card when the original changed', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1500, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final songs = await makeCopyOfBankSong();
+    // Edit the original's content so its hash drifts from the copy's link.
+    await (db.songs.update()
+          ..where((s) => s.uuid.equals(songs.original.uuid)))
+        .write(
+          SongsCompanion(lyrics: Value('<song><lyrics>b</lyrics></song>')),
+        );
+
+    await pumpApp(tester);
+    tester
+        .element(find.text('bank-page-marker'))
+        .push('/song/local/${songs.copy.uuid}');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Eredeti dal'), findsOneWidget);
+    expect(find.textContaining('Megváltozott a másolás óta.'), findsOneWidget);
+    expect(
+      find.widgetWithText(OutlinedButton, 'Eredeti megtekintése'),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('shows the original-song card when the original is missing', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(1500, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final songs = await makeCopyOfBankSong();
+    await (db.songs.delete()
+          ..where((s) => s.uuid.equals(songs.original.uuid)))
+        .go();
+
+    await pumpApp(tester);
+    tester
+        .element(find.text('bank-page-marker'))
+        .push('/song/local/${songs.copy.uuid}');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Eredeti dal'), findsOneWidget);
+    expect(find.textContaining('Az eredeti dal már nincs meg.'), findsOneWidget);
+    // A deleted original cannot be opened.
+    expect(find.text('Eredeti megtekintése'), findsNothing);
+  });
 
   testWidgets('deleting a song returns to the songs list, not its page', (
     tester,
