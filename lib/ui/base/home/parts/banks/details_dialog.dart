@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../../data/bank/bank.dart';
 import '../../../../../config/config.dart';
+import '../../../../common/bank_logo.dart';
 
 class BankDetailsDialog extends ConsumerStatefulWidget {
   const BankDetailsDialog(this.bank, {super.key});
@@ -46,13 +47,9 @@ class _BankDetailsDialogState extends ConsumerState<BankDetailsDialog> {
                             top: 10,
                             bottom: 10,
                           ),
-                          child: SizedBox.square(
-                            dimension: 54,
-                            child: FittedBox(
-                              child: widget.bank.logo != null
-                                  ? Image.memory(widget.bank.logo!)
-                                  : Icon(Icons.library_music),
-                            ),
+                          child: BankLogo(
+                            image: widget.bank.logo,
+                            size: 54,
                           ),
                         ),
                         Expanded(

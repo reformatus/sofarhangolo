@@ -9,6 +9,7 @@ import '../../../../../services/bank/banks.dart';
 import '../../../../../services/songs/update.dart';
 import '../../../../common/error/card.dart';
 import '../../../../common/hero_dialog_route.dart';
+import '../../../../common/bank_logo.dart';
 import '../../../../loading/banner.dart';
 import '../../../songs/widgets/filter/types/bank/state.dart';
 import 'details_dialog.dart';
@@ -108,20 +109,12 @@ class BankTile extends ConsumerWidget {
               children: [
                 Padding(
                   padding: EdgeInsets.only(left: 10, top: 10, bottom: 10),
-                  child: SizedBox.square(
-                    dimension: isLocal ? 36 : 54,
-                    child: FittedBox(
-                      child: bank.logo != null
-                          ? Image.memory(bank.logo!)
-                          : Icon(
-                              Icons.library_music,
-                              color: isLocal
-                                  ? Theme.of(
-                                      context,
-                                    ).colorScheme.onSurfaceVariant
-                                  : null,
-                            ),
-                    ),
+                  child: BankLogo(
+                    image: bank.logo,
+                    size: isLocal ? 36 : 54,
+                    color: isLocal
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
+                        : null,
                   ),
                 ),
                 Expanded(

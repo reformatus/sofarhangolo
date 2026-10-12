@@ -9,6 +9,7 @@ import '../../services/preferences/preferences_parent.dart';
 import '../../services/songs/bank_song_update_task.dart';
 import '../../services/songs/update.dart';
 import '../../services/task/task_queue.dart';
+import '../common/bank_logo.dart';
 import '../common/error/card.dart';
 import 'banner.dart';
 
@@ -247,12 +248,7 @@ class _BankDownloadProgress extends StatelessWidget {
               (task) => Padding(
                 padding: const EdgeInsets.only(left: 20),
                 child: ListTile(
-                  leading: SizedBox.square(
-                    dimension: 32,
-                    child: task.logo != null
-                        ? Image.memory(task.logo!)
-                        : const Icon(Icons.library_music),
-                  ),
+                  leading: BankLogo(image: task.logo, size: 32),
                   title: Text(
                     task.title,
                     style: const TextStyle(fontWeight: FontWeight.w500),

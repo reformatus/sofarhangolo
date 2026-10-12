@@ -7,6 +7,7 @@ import '../../services/songs/bank_song_update_task.dart';
 import '../../services/songs/update.dart';
 import '../../services/task/task_queue.dart';
 import '../../services/ui/messenger_service.dart';
+import '../common/bank_logo.dart';
 import '../common/error/card.dart';
 
 void showOnlineBanksUpdatingBanner() {
@@ -148,13 +149,9 @@ class UpdatingBanner extends ConsumerWidget {
       title = 'Online tárak frissítése';
       message = 'Frissítendő tárak betöltése...';
     } else {
-      leading = SizedBox.square(
-        dimension: 28,
-        child: task?.tinyLogo != null
-            ? Image.memory(task!.tinyLogo!)
-            : task?.logo != null
-            ? Image.memory(task!.logo!)
-            : Icon(Icons.library_music),
+      leading = BankLogo(
+        image: task?.tinyLogo ?? task?.logo,
+        size: 28,
       );
 
       if (task != null) {

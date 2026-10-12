@@ -10,6 +10,7 @@ import '../../../services/bank/banks.dart';
 import '../../../services/songs/filter.dart';
 import '../../../services/songs/write_song.dart';
 import '../../common/centered_hint.dart';
+import '../../common/bank_logo.dart';
 import '../../common/error/card.dart';
 import '../../common/key_text.dart';
 import '../cue_shell_inset.dart';
@@ -487,26 +488,13 @@ class FiltersTitle extends ConsumerWidget {
           ...banksFilterState
               .map((i) => banks.firstWhere((b) => b.uuid == i))
               .map(
-                (b) => b.tinyLogo != null
-                    ? Padding(
-                        padding: EdgeInsets.only(right: 5),
-                        child: Tooltip(
-                          message: b.name,
-                          child: SizedBox.square(
-                            dimension: 30,
-                            child: Image.memory(b.tinyLogo!),
-                          ),
-                        ),
-                      )
-                    : ConstrainedBox(
-                        constraints: BoxConstraints(maxWidth: 50),
-                        child: Text(
-                          b.name,
-                          overflow: TextOverflow.fade,
-                          maxLines: 1,
-                          softWrap: false,
-                        ),
-                      ),
+                (b) => Padding(
+                  padding: EdgeInsets.only(right: 5),
+                  child: Tooltip(
+                    message: b.name,
+                    child: BankLogo(image: b.tinyLogo, size: 30),
+                  ),
+                ),
               ),
           if (banksFilterState.isNotEmpty) SizedBox(width: 10),
           if (filterState.isNotEmpty ||

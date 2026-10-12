@@ -12,6 +12,7 @@ import '../../../../services/app_links/navigation.dart';
 import '../../../../services/connectivity/provider.dart';
 import '../../../../services/songs/filter.dart';
 import '../../../../services/ui/messenger_service.dart';
+import '../../../common/bank_logo.dart';
 import '../../../common/key_text.dart';
 import '../../../cue/session/session_provider.dart';
 import '../../../song/state.dart';
@@ -42,21 +43,19 @@ class LSongResultTile extends ConsumerWidget {
         final hideSongFeatures =
             showActiveCueQuickAdd &&
             constraints.maxWidth < _hideDownloadIndicatorsBelowWidth;
+        final bank = this.bank;
         final leadingChildren = <Widget>[
           if (showActiveCueQuickAdd)
             Padding(
               padding: EdgeInsets.only(right: 10),
               child: ActiveCueQuickAddButton(song: song),
             ),
-          if (bank?.tinyLogo != null)
+          if (bank != null)
             Tooltip(
-              message: bank!.name,
+              message: bank.name,
               child: Padding(
                 padding: const EdgeInsets.only(right: 5),
-                child: SizedBox.square(
-                  dimension: 26,
-                  child: Image.memory(bank!.tinyLogo!),
-                ),
+                child: BankLogo(image: bank.tinyLogo, size: 26),
               ),
             ),
         ];

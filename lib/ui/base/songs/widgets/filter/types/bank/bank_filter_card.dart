@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../../../data/bank/bank.dart';
 import '../../../../../../../services/bank/banks.dart';
+import '../../../../../../common/bank_logo.dart';
 import '../../common/async_chip_row_handler.dart';
 import '../../common/base_filter_card.dart';
 import 'state.dart';
@@ -36,12 +37,7 @@ class _BankFilterCardState extends ConsumerState<BankFilterCard> {
             .read(banksFilterStateProvider.notifier)
             .setFilter(bank.uuid, setTo),
         chipLabelBuilder: (bank) => bank.name,
-        chipLeadingBuilder: (bank) => (bank.tinyLogo != null)
-            ? SizedBox.square(
-                dimension: 20,
-                child: Image.memory(bank.tinyLogo!),
-              )
-            : null,
+        chipLeadingBuilder: (bank) => BankLogo(image: bank.tinyLogo, size: 20),
       ),
     );
   }
