@@ -77,6 +77,38 @@ void main() {
     return (original: original, copy: copy);
   }
 
+  testWidgets('leaving a malformed editor normalizes and saves it', (
+    tester,
+  ) async {
+    final song = await writeLocalSong(
+      Song.local(title: 'Helyi dal', lyrics: '[V1]\nHello\n.C G'),
+    );
+
+    final router = buildRouter();
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: harness.container,
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    router.go('/song/local/${song.uuid}');
+    await tester.pumpAndSettle();
+
+    // The malformed row is called out…
+    expect(find.text('Hibás OpenSong formátum'), findsOneWidget);
+
+    // …and leaving the editor adds the missing leading space without tripping
+    // the page's autosave listener (which is live during the editor's dispose).
+    router.go('/bank');
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+
+    final saved = (await dbSongFromUuid(song.uuid))!;
+    expect(saved.lyrics, contains('\n Hello'));
+  });
+
   testWidgets('hides the original-song card for an unchanged copy', (
     tester,
   ) async {
