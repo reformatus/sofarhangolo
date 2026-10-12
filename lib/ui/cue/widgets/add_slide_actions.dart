@@ -69,13 +69,21 @@ class _CueAddSlideActionsState extends ConsumerState<CueAddSlideActions> {
 
   @override
   Widget build(BuildContext context) {
+    // [shrinkWrap] keeps a chip's box at its painted size, so the paddings below
+    // are exactly the gaps that are seen (a padded tap target would add the same
+    // invisible margin around every chip, swallowing the group's top gap).
+    const tapTarget = MaterialTapTargetSize.shrinkWrap;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+      // One related group closing the list: a clearly larger gap above it than
+      // between the chips, so it does not look glued to the last slide.
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 12),
       child: Wrap(
         spacing: 8,
         runSpacing: 8,
         children: [
           ActionChip(
+            materialTapTargetSize: tapTarget,
             avatar: _adding
                 ? const SizedBox.square(
                     dimension: 16,
@@ -86,6 +94,7 @@ class _CueAddSlideActionsState extends ConsumerState<CueAddSlideActions> {
             onPressed: _adding ? null : _addNewSong,
           ),
           ActionChip(
+            materialTapTargetSize: tapTarget,
             avatar: const Icon(Icons.playlist_add, size: 18),
             label: const Text('Meglévő dal hozzáadása'),
             onPressed: _openSongsPage,

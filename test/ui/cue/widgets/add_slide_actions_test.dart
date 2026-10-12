@@ -8,6 +8,7 @@ import 'package:sofarhangolo/data/database.dart';
 import 'package:sofarhangolo/services/song/from_uuid.dart';
 import 'package:sofarhangolo/ui/cue/session/session_provider.dart';
 import 'package:sofarhangolo/ui/cue/widgets/add_slide_actions.dart';
+import 'package:sofarhangolo/ui/cue/widgets/slide_list.dart';
 
 import '../../../harness/cue_widget_harness.dart';
 import '../../../harness/test_harness.dart';
@@ -141,5 +142,57 @@ void main() {
       harness.container.read(activeCueSessionProvider).value!.slides,
       hasLength(1),
     );
+  });
+
+  testWidgets('the chips read as one group below the last slide', (
+    tester,
+  ) async {
+    final cue = await insertCueHarnessCue(
+      cueUuid: 'cue-spacing',
+      fixtures: const [
+        CueSongFixture(
+          songUuid: 'song-1',
+          slideUuid: 'slide-1',
+          title: 'Song 1',
+          lyrics: '[V1]\n Alpha line',
+        ),
+      ],
+    );
+    await harness.container
+        .read(activeCueSessionProvider.notifier)
+        .load(cue.uuid);
+    await waitForProviderValue(harness.container, activeCueSessionProvider);
+
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: harness.container,
+        child: const MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 304,
+              height: 600,
+              child: SlideList(footer: CueAddSlideActions()),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final lastSlide = tester.getRect(find.byType(ListTile));
+    final chips = find.byType(ActionChip);
+    final firstChip = tester.getRect(chips.first);
+    final secondChip = tester.getRect(chips.last);
+
+    // The group is separated from the list by more than its own chips are
+    // separated from each other — no longer glued to the last slide.
+    expect(firstChip.top - lastSlide.bottom, greaterThan(0));
+    expect(
+      firstChip.top - lastSlide.bottom,
+      greaterThan(secondChip.top - firstChip.bottom),
+    );
+    // The drawn paddings are exactly the seen ones (no tap-target margin).
+    expect(firstChip.top - lastSlide.bottom, 16);
+    expect(secondChip.top - firstChip.bottom, 8);
   });
 }
