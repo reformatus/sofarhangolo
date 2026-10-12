@@ -23,18 +23,19 @@ class _BankFilterCardState extends ConsumerState<BankFilterCard> {
     final available = ref.watch(bankFacetProvider);
 
     // Only the banks the current query can still reach, plus the selected ones.
-    final asyncBanks = banks.hasValue
-        ? available.whenData(
-            (uuids) => [
-              for (final bank in banks.requireValue)
-                if (uuids.contains(bank.uuid) || bankUuids.contains(bank.uuid))
-                  bank,
-            ],
-          )
-        : banks;
+    List<Bank> selectable(Set<String> uuids) => [
+      for (final bank in banks.requireValue)
+        if (uuids.contains(bank.uuid) || bankUuids.contains(bank.uuid)) bank,
+    ];
 
-    // Nothing to offer and nothing selected: the card has no purpose.
-    if (asyncBanks.hasValue && asyncBanks.requireValue.isEmpty) {
+    final asyncBanks = banks.hasValue ? available.whenData(selectable) : banks;
+
+    // Nothing to offer and nothing selected: the card has no purpose. Reads
+    // `available.value` rather than [asyncBanks] so a facet that is still
+    // loading keeps the card hidden instead of flashing it back in (see
+    // [MultiselectFilterCard]).
+    final reachable = available.value;
+    if (banks.hasValue && reachable != null && selectable(reachable).isEmpty) {
       return const SizedBox.shrink();
     }
 
