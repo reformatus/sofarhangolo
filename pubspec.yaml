@@ -71,7 +71,7 @@ dependencies:
   share_plus: ^13.3.1
   font_awesome_flutter: ^11.0.0
   xml: ^7.0.1
-  connectivity_plus: ^7.3.0
+  connectivity_plus: ^7.3.2
   web: ^1.1.1
   cached_network_image: ^4.0.4 # TODO Replace with our implementation, as this uses sqflite
   flutter_test:
