@@ -1558,10 +1558,10 @@ packages:
     dependency: "direct main"
     description:
       name: wtf_sliding_sheet
-      sha256: eb2f844a03fc64b9b904dc441bbb2283ee4dcf5244fe64bd91063bfbad70e89c
+      sha256: "0711210cc9f7c69961360d6b6fc2114822d70be1aef0b5a749b486a6fc8af0f8"
       url: "https://pub.dev"
     source: hosted
-    version: "1.1.5"
+    version: "1.1.7"
   xdg_directories:
     dependency: transitive
     description:
