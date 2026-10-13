@@ -53,7 +53,7 @@ dependencies:
   flutter_svg: ^2.1.0
   package_info_plus: ^10.2.2
   uuid: ^4.5.1
-  url_launcher: ^6.3.1
+  url_launcher: ^6.3.3
   msgpack_dart: ^1.0.1
   mailto: ^2.0.0
   dart_opensong: ^0.0.4
