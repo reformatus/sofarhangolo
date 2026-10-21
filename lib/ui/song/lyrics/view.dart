@@ -19,6 +19,7 @@ import '../transpose/state.dart';
 import 'text_actions/lyrics_actions_menu.dart';
 import 'text_actions/lyrics_selection_dialog.dart';
 import 'text_actions/lyrics_text_actions.dart';
+import 'theme.dart';
 
 class LyricsView extends ConsumerWidget {
   LyricsView(
@@ -164,6 +165,7 @@ class _VerseCardState extends ConsumerState<VerseCard> {
   @override
   Widget build(BuildContext context) {
     final lyricsViewStyle = ref.watch(lyricsViewStylePreferencesProvider);
+    final lyricsTheme = context.lyricsTheme;
 
     return MouseRegion(
       cursor: SystemMouseCursors.text,
@@ -203,7 +205,7 @@ class _VerseCardState extends ConsumerState<VerseCard> {
               padding: EdgeInsets.only(top: 5, left: 5, right: 5),
               child: Card(
                 elevation: 0,
-                color: Theme.of(context).colorScheme.onPrimary,
+                color: lyricsTheme.cardColor,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   mainAxisSize: MainAxisSize.min,
@@ -219,7 +221,7 @@ class _VerseCardState extends ConsumerState<VerseCard> {
                             topLeft: Radius.circular(5),
                             bottomRight: Radius.circular(5),
                           ),
-                          color: Theme.of(context).colorScheme.primary,
+                          color: lyricsTheme.verseTagBackgroundColor,
                         ),
                         child: Text(
                           getPrettyVerseTagFrom(
@@ -227,7 +229,8 @@ class _VerseCardState extends ConsumerState<VerseCard> {
                             widget.verse.index,
                           ),
                           style: TextStyle(
-                            color: Theme.of(context).colorScheme.onPrimary,
+                            color: lyricsTheme.verseTagForegroundColor,
+                            fontWeight: lyricsTheme.verseTagFontWeight,
                             fontSize: lyricsViewStyle.verseTagSize,
                           ),
                         ),
