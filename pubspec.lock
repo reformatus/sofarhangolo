@@ -310,10 +310,10 @@ packages:
     dependency: "direct main"
     description:
       name: dart_opensong
-      sha256: e21cee4eaff9ad367f2827290e99a0ee576f6cfe03c63b76f79a93806eba3151
+      sha256: cce9f0b84f54e03808b2215b74ea3bf3e6f468b7fac9d5cfc9bcdf64796c87bd
       url: "https://pub.dev"
     source: hosted
-    version: "0.0.4"
+    version: "0.0.9"
   dart_style:
     dependency: transitive
     description:
