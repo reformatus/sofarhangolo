@@ -72,7 +72,7 @@ void main() {
       sourceBank: bank,
       contentMap: {
         if (genre.isNotEmpty) 'genre': genre,
-        if (language != null) 'language': language,
+        'language': ?language,
         if (holiday.isNotEmpty) 'holiday': holiday,
       },
     );
