@@ -31,7 +31,7 @@ dependencies:
   flutter_web_plugins:
     sdk: flutter
   archive: ^4.5.2
-  crypto: ^3.0.7
+  crypto: ^3.0.8
   intl: any
   flutter_localizations:
     sdk: flutter
