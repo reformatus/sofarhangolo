@@ -35,7 +35,7 @@ class LyricDatabase extends _$LyricDatabase {
     : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 9;
+  int get schemaVersion => 10;
 
   @override
   MigrationStrategy get migration {
@@ -147,6 +147,29 @@ class LyricDatabase extends _$LyricDatabase {
           // an official one. New banks get their source from the metadata API.
           await customStatement('UPDATE banks SET source = 0');
           await _insertLocalBankRow();
+        },
+        from9To10: (m, schema) async {
+          // Local songs never shipped, and their attachment references
+          // (local://...) are replaced by md5 values, so drop them with
+          // their links and assets. Bank songs, cues and preferences stay.
+          await customStatement(
+            'DELETE FROM assets WHERE song_uuid IN '
+            '(SELECT uuid FROM songs WHERE source_bank = ?)',
+            [localBankUuid],
+          );
+          await customStatement(
+            'DELETE FROM song_links WHERE source_uuid IN '
+            '(SELECT uuid FROM songs WHERE source_bank = ?)',
+            [localBankUuid],
+          );
+          await customStatement('DELETE FROM songs WHERE source_bank = ?', [
+            localBankUuid,
+          ]);
+
+          // Local attachments have no source URL: make it nullable. The
+          // unique index (recreated by alterTable) ignores nulls.
+          // ignore: experimental_member_use
+          await m.alterTable(TableMigration(schema.assets));
         },
       ),
     );

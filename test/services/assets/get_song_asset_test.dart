@@ -7,9 +7,11 @@ import 'package:sofarhangolo/data/bank/bank.dart';
 import 'package:sofarhangolo/data/database.dart';
 import 'package:sofarhangolo/data/song/song.dart';
 import 'package:sofarhangolo/services/assets/get_song_asset.dart';
+import 'package:sofarhangolo/services/assets/write_song_asset.dart';
 import 'package:sofarhangolo/services/bank/banks.dart';
 import 'package:sofarhangolo/services/error/app_error.dart';
 import 'package:sofarhangolo/services/http/dio_provider.dart';
+import 'package:sofarhangolo/services/songs/write_song.dart';
 
 import '../../harness/test_harness.dart';
 
@@ -109,7 +111,9 @@ void main() {
         uuid: 'local-1',
         title: 'Helyi',
         keyField: const [],
-        contentMap: const {'pdf': 'local://abc'},
+        contentMap: {
+          'pdf': localAssetHash([7]),
+        },
         sourceBank: localBankUuid,
       );
       await db.into(db.songs).insert(song);
@@ -119,7 +123,6 @@ void main() {
             AssetsCompanion.insert(
               songUuid: 'local-1',
               fieldName: 'pdf',
-              sourceUrl: 'local://abc',
               content: Uint8List.fromList([7]),
             ),
           );
@@ -127,6 +130,27 @@ void main() {
       final bytes = await fetchSongAsset(song, 'pdf', dio: createMockDio());
 
       expect(bytes, Uint8List.fromList([7]));
+    });
+
+    test('local attachments resolve by (song, field), not colliding', () async {
+      await localBank();
+      final a = await createLocalSong(Song.local(title: 'A'));
+      final b = await createLocalSong(Song.local(title: 'B'));
+      final same = Uint8List.fromList([5, 5]);
+      final sa = await writeLocalSongAsset(a.uuid, 'pdf', same);
+      final sb = await writeLocalSongAsset(b.uuid, 'pdf', same);
+      final sb2 = await writeLocalSongAsset(
+        b.uuid,
+        'svg',
+        Uint8List.fromList([1]),
+      );
+
+      expect(await fetchSongAsset(sa, 'pdf', dio: createMockDio()), same);
+      expect(await fetchSongAsset(sb, 'pdf', dio: createMockDio()), same);
+      expect(
+        await fetchSongAsset(sb2, 'svg', dio: createMockDio()),
+        Uint8List.fromList([1]),
+      );
     });
 
     test('surfaces a download failure as an AppError', () async {
@@ -161,16 +185,15 @@ void main() {
 
       final events = <AssetResult>[];
       final done = Completer<void>();
-      final sub = container.listen(
-        getSongAssetProvider(song, 'pdf'),
-        (previous, next) {
-          final event = next.value;
-          if (event == null) return;
-          events.add(event);
-          if (event.data != null && !done.isCompleted) done.complete();
-        },
-        fireImmediately: true,
-      );
+      final sub = container.listen(getSongAssetProvider(song, 'pdf'), (
+        previous,
+        next,
+      ) {
+        final event = next.value;
+        if (event == null) return;
+        events.add(event);
+        if (event.data != null && !done.isCompleted) done.complete();
+      }, fireImmediately: true);
       addTearDown(sub.close);
 
       await done.future.timeout(const Duration(seconds: 5));
@@ -191,7 +214,7 @@ void main() {
             AssetsCompanion.insert(
               songUuid: song.uuid,
               fieldName: 'pdf',
-              sourceUrl: 'https://example.com/song.pdf',
+              sourceUrl: Value('https://example.com/song.pdf'),
               content: Uint8List.fromList([8]),
             ),
           );
@@ -201,16 +224,15 @@ void main() {
 
       final events = <AssetResult>[];
       final done = Completer<void>();
-      final sub = container.listen(
-        getSongAssetProvider(song, 'pdf'),
-        (previous, next) {
-          final event = next.value;
-          if (event == null) return;
-          events.add(event);
-          if (event.data != null && !done.isCompleted) done.complete();
-        },
-        fireImmediately: true,
-      );
+      final sub = container.listen(getSongAssetProvider(song, 'pdf'), (
+        previous,
+        next,
+      ) {
+        final event = next.value;
+        if (event == null) return;
+        events.add(event);
+        if (event.data != null && !done.isCompleted) done.complete();
+      }, fireImmediately: true);
       addTearDown(sub.close);
 
       await done.future.timeout(const Duration(seconds: 5));

@@ -1,13 +1,13 @@
+import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
-import 'package:uuid/v4.dart';
 
 import '../../data/database.dart';
 import '../../data/song/song.dart';
 
-/// The bank-independent reference scheme used in local songs' contentMap
-/// values to point at their attachments, which live in the assets table
-/// under this exact sourceUrl.
-String localAssetReference(String assetUuid) => 'local://$assetUuid';
+/// The attachment value for [bytes] in a local song's contentMap: the
+/// lowercase md5 hex of the content, so identical files give identical
+/// values (and identical song hashes) on every device.
+String localAssetHash(List<int> bytes) => md5.convert(bytes).toString();
 
 Future<Song> _storedSong(String songUuid) async {
   final song = await (db.songs.select()..where((s) => s.uuid.equals(songUuid)))
@@ -23,9 +23,9 @@ Future<void> _writeContentMap(String songUuid, Map<String, Object> map) =>
       SongsCompanion(contentMap: Value(map)),
     );
 
-/// Stores an attachment for a local song: writes the content into the
-/// assets table under a fresh [localAssetReference] and points the song's
-/// [fieldName] contentMap entry at it, all in one transaction. Returns the
+/// Stores an attachment for a local song: upserts the (song, [fieldName])
+/// row of the assets table with the content and sets the song's [fieldName]
+/// contentMap entry to its [localAssetHash], all in one transaction. Returns the
 /// song as stored afterwards; throws a [StateError] (writing nothing) when
 /// the song does not exist.
 Future<Song> writeLocalSongAsset(
@@ -33,7 +33,7 @@ Future<Song> writeLocalSongAsset(
   String fieldName,
   Uint8List content,
 ) {
-  final reference = localAssetReference(UuidV4().generate());
+  final hash = localAssetHash(content);
 
   return db.transaction(() async {
     final song = await _storedSong(songUuid);
@@ -45,14 +45,10 @@ Future<Song> writeLocalSongAsset(
       AssetsCompanion.insert(
         songUuid: songUuid,
         fieldName: fieldName,
-        sourceUrl: reference,
         content: content,
       ),
     );
-    await _writeContentMap(songUuid, {
-      ...song.contentMap,
-      fieldName: reference,
-    });
+    await _writeContentMap(songUuid, {...song.contentMap, fieldName: hash});
     return _storedSong(songUuid);
   });
 }

@@ -164,8 +164,8 @@ void main() {
       expect(fetched, containsAll(<String>['svg', 'pdf']));
 
       final stored = await storedSong(copy.uuid);
-      expect(stored.contentMap['svg'], startsWith('local://'));
-      expect(stored.contentMap['pdf'], startsWith('local://'));
+      expect(stored.contentMap['svg'], localAssetHash([115]));
+      expect(stored.contentMap['pdf'], localAssetHash([112]));
 
       // The bytes live as assets owned by the copy, not the original.
       final assets = await db.assets.select().get();
@@ -381,33 +381,63 @@ void main() {
   });
 
   group('writeLocalSongAsset', () {
-    test('stores the asset and points the field at it', () async {
+    test('stores the asset and its md5 as the field value', () async {
       final song = await createLocalSong(Song.local(title: 'Kottás dal'));
 
       await writeLocalSongAsset(song.uuid, 'pdf', Uint8List.fromList([9, 9]));
 
       final stored = await storedSong(song.uuid);
-      final reference = stored.contentMap['pdf'];
-      expect(reference, startsWith('local://'));
+      expect(stored.contentMap['pdf'], localAssetHash([9, 9]));
+      expect(stored.contentMap['pdf'], matches(RegExp(r'^[0-9a-f]{32}$')));
 
       final assets = await db.assets.select().get();
       expect(assets, hasLength(1));
-      expect(assets.single.sourceUrl, reference);
+      expect(assets.single.sourceUrl, isNull);
+      expect(assets.single.songUuid, song.uuid);
       expect(assets.single.content, Uint8List.fromList([9, 9]));
     });
 
-    test('replaces the previous asset of the same field', () async {
+    test('same bytes on two songs give equal contentHash', () async {
+      final a = await createLocalSong(Song.local(title: 'Egy'));
+      final b = await createLocalSong(Song.local(title: 'Egy'));
+      final bytes = Uint8List.fromList([1, 2, 3]);
+      final sa = await writeLocalSongAsset(a.uuid, 'pdf', bytes);
+      final sb = await writeLocalSongAsset(b.uuid, 'pdf', bytes);
+
+      expect(sa.contentHash, sb.contentHash);
+      expect(await db.assets.select().get(), hasLength(2));
+    });
+
+    test('replacing with other bytes changes value and hash', () async {
       final song = await createLocalSong(Song.local(title: 'Csere dal'));
 
-      await writeLocalSongAsset(song.uuid, 'pdf', Uint8List.fromList([1]));
-      await writeLocalSongAsset(song.uuid, 'pdf', Uint8List.fromList([2]));
+      final first = await writeLocalSongAsset(
+        song.uuid,
+        'pdf',
+        Uint8List.fromList([1]),
+      );
+      final second = await writeLocalSongAsset(
+        song.uuid,
+        'pdf',
+        Uint8List.fromList([2]),
+      );
 
       final assets = await db.assets.select().get();
       expect(assets, hasLength(1));
       expect(assets.single.content, Uint8List.fromList([2]));
+      expect(second.contentMap['pdf'], isNot(first.contentMap['pdf']));
+      expect(second.contentMap['pdf'], localAssetHash([2]));
+      expect(second.contentHash, isNot(first.contentHash));
+    });
 
-      final stored = await storedSong(song.uuid);
-      expect(stored.contentMap['pdf'], assets.single.sourceUrl);
+    test('removing deletes the row and the key', () async {
+      final song = await createLocalSong(Song.local(title: 'Törlés'));
+      await writeLocalSongAsset(song.uuid, 'pdf', Uint8List.fromList([1]));
+
+      final after = await removeLocalSongAsset(song.uuid, 'pdf');
+
+      expect(after.contentMap.containsKey('pdf'), isFalse);
+      expect(await db.assets.select().get(), isEmpty);
     });
   });
 
@@ -429,7 +459,7 @@ void main() {
         'pdf',
         Uint8List.fromList([1]),
       );
-      expect(updated.contentMap['pdf'], startsWith('local://'));
+      expect(updated.contentMap['pdf'], localAssetHash([1]));
       expect(song.contentMap.containsKey('pdf'), isFalse);
     });
   });

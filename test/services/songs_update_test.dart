@@ -63,7 +63,7 @@ void main() {
           .insert(
             AssetsCompanion.insert(
               songUuid: 'song-1',
-              sourceUrl: 'https://example.com/api/old.pdf',
+              sourceUrl: Value('https://example.com/api/old.pdf'),
               fieldName: 'pdf',
               content: Uint8List.fromList([1, 2, 3]),
             ),
@@ -156,7 +156,7 @@ void main() {
           .insert(
             AssetsCompanion.insert(
               songUuid: 'song-1',
-              sourceUrl: 'https://example.com/api/same.pdf',
+              sourceUrl: Value('https://example.com/api/same.pdf'),
               fieldName: 'pdf',
               content: Uint8List.fromList([9, 9, 9]),
             ),
@@ -178,7 +178,7 @@ void main() {
           .insert(
             AssetsCompanion.insert(
               songUuid: 'song-2',
-              sourceUrl: 'https://example.com/api/other.pdf',
+              sourceUrl: Value('https://example.com/api/other.pdf'),
               fieldName: 'pdf',
               content: Uint8List.fromList([7, 7, 7]),
             ),
@@ -236,7 +236,7 @@ void main() {
             .insert(
               AssetsCompanion.insert(
                 songUuid: 'song-1',
-                sourceUrl: 'https://example.com/api/same.pdf',
+                sourceUrl: Value('https://example.com/api/same.pdf'),
                 fieldName: 'pdf',
                 content: Uint8List.fromList([4, 5, 6]),
               ),

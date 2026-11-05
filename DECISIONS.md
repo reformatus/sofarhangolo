@@ -39,3 +39,9 @@ have no stable line identity, so overlays/merging are not attempted.
 - Copy stores the bytes under the new song and writes the md5.
 - Bank songs, the bank file cache and the "downloaded" query are unchanged.
 - Local songs were never shipped: no conversion of earlier local data.
+- Storage (schema 10): `Assets.sourceUrl` is nullable (local rows have none;
+  the unique index on it ignores nulls). Uniqueness of (song, field) is kept
+  in code only, because the bank cache can hold several URLs per (song,
+  field). A md5 mismatch between bytes and `contentMap` value is logged when
+  reading, the bytes are still returned. The 9->10 migration deletes local
+  songs with their links and assets.

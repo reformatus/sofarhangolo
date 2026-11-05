@@ -9,6 +9,7 @@ import '../../data/database.dart';
 import '../../data/log/logger.dart';
 import '../../data/song/song.dart';
 import '../bank/bank_of_song.dart';
+import 'write_song_asset.dart';
 import '../error/app_error.dart';
 import '../http/dio_provider.dart';
 
@@ -57,19 +58,28 @@ Future<Uint8List> fetchSongAssetBytes(
   }
 
   if (bank.access == BankAccess.local) {
-    // Local songs reference their attachments with a bank-independent
-    // local:// scheme stored verbatim as the asset's sourceUrl.
+    // Local attachments belong to their song: found by (song, field), and
+    // contentReference is the md5 of the bytes.
     final asset =
-        await (db.assets.select()
-              ..where((a) => a.sourceUrl.equals(contentReference)))
+        await (db.assets.select()..where(
+              (a) =>
+                  a.songUuid.equals(song.uuid) & a.fieldName.equals(fieldName),
+            ))
             .getSingleOrNull();
 
     if (asset == null) {
       throw AppError.from(
-        StateError('Missing local song attachment: $contentReference'),
+        StateError('Missing local song attachment: ${song.uuid} $fieldName'),
         userMessage: 'A csatolmány nem található.',
         technicalMessage:
-            'Helyi dal csatolmánya nem található: $contentReference',
+            'Helyi dal csatolmánya nem található: ${song.uuid} $fieldName',
+      );
+    }
+    // A mismatch is only logged: better to show the file than brick a song.
+    if (localAssetHash(asset.content) != contentReference) {
+      log.warning(
+        'A helyi dal csatolmányának hash-e nem egyezik: '
+        '${song.uuid} $fieldName',
       );
     }
     return asset.content;
@@ -132,8 +142,7 @@ Future<Uint8List> fetchSongAssetBytes(
     throw AppError.from(
       error,
       stackTrace: stackTrace,
-      userMessage:
-          'A kotta letöltése nem sikerült. Ellenőrizd a kapcsolatot, majd próbáld újra.',
+      userMessage: 'A kotta letöltése nem sikerült. Ellenőrizd a kapcsolatot, majd próbáld újra.',
       technicalMessage: 'Kotta letöltési hiba: $sourceUrl',
     );
   }
@@ -167,7 +176,9 @@ Stream<AssetResult> getSongAsset(Ref ref, Song song, String fieldName) {
       controller.add((progress: 1.0, data: bytes));
     } catch (error, stackTrace) {
       controller.addError(
-        error is AppError ? error : AppError.from(error, stackTrace: stackTrace),
+        error is AppError
+            ? error
+            : AppError.from(error, stackTrace: stackTrace),
         stackTrace,
       );
     } finally {

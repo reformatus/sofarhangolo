@@ -146,7 +146,10 @@ void main() {
       final controller = await open();
 
       await controller.attach('svg', Uint8List.fromList([1, 2, 3]));
-      expect(current().song.contentMap['svg'], startsWith('local://'));
+      expect(
+        current().song.contentMap['svg'],
+        matches(RegExp(r'^[0-9a-f]{32}$')),
+      );
       final reference = current().song.contentMap['svg'];
 
       controller.setTitle('Új cím');

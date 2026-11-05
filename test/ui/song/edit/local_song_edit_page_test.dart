@@ -277,7 +277,7 @@ void main() {
 
       final saved = (await tester.runAsync(() => dbSongFromUuid(song.uuid)))!;
       expect(saved.title, 'Új cím');
-      expect(saved.contentMap['svg'], startsWith('local://'));
+      expect(saved.contentMap['svg'], matches(RegExp(r'^[0-9a-f]{32}$')));
     },
   );
 }

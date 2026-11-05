@@ -15,6 +15,7 @@ import 'generated/schema_v6.dart' as v6;
 import 'generated/schema_v7.dart' as v7;
 import 'generated/schema_v8.dart' as v8;
 import 'generated/schema_v9.dart' as v9;
+import 'generated/schema_v10.dart' as v10;
 
 import 'package:sofarhangolo/data/bank/bank.dart';
 import 'package:sofarhangolo/data/database.dart';
@@ -771,4 +772,46 @@ void main() {
       );
     },
   );
+
+  test('migration from v9 to v10 keeps bank data, drops local songs', () async {
+    final schema = await verifier.schemaAt(9);
+    final old = schema.rawDatabase;
+    old.execute('PRAGMA foreign_keys = OFF');
+    old.execute(
+      "INSERT INTO songs (uuid, source_bank, content_map, title, key_field) "
+      "VALUES ('bank-song', 'bank-1', '{}', 'Bank', ''), "
+      "('local-song', '$localBankUuid', '{\"pdf\":\"local://x\"}', 'Local', '')",
+    );
+    old.execute(
+      "INSERT INTO assets (song_uuid, source_url, field_name, content) VALUES "
+      "('bank-song', 'https://e.com/a.pdf', 'pdf', x'01'), "
+      "('local-song', 'local://x', 'pdf', x'02')",
+    );
+    old.execute(
+      "INSERT INTO song_links (source_uuid, type, target_uuid) "
+      "VALUES ('local-song', 0, 'bank-song')",
+    );
+    old.execute(
+      "INSERT INTO cues (uuid, title, description, cue_version, content) "
+      "VALUES ('cue-1', 'Cue', '', 1, '[]')",
+    );
+
+    final db = LyricDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 10);
+
+    final songs = await db.songs.select().get();
+    expect(songs.map((s) => s.uuid), ['bank-song']);
+    final assets = await db.assets.select().get();
+    expect(assets.single.songUuid, 'bank-song');
+    expect(assets.single.sourceUrl, 'https://e.com/a.pdf');
+    expect(await db.songLinks.select().get(), isEmpty);
+    expect(await db.cues.select().get(), hasLength(1));
+
+    // sourceUrl is nullable now, and null rows may repeat.
+    await db.customStatement(
+      "INSERT INTO assets (song_uuid, field_name, content) VALUES "
+      "('s1', 'pdf', x'01'), ('s2', 'pdf', x'01')",
+    );
+    await db.close();
+  });
 }

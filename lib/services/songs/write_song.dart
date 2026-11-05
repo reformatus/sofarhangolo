@@ -120,9 +120,8 @@ Future<Song> copySongToLocal(Song song, {AssetFetcher? fetchAsset}) async {
   }
 
   final uuid = UuidV4().generate();
-  final references = {
-    for (final field in fetched.keys)
-      field: localAssetReference(UuidV4().generate()),
+  final hashes = {
+    for (final entry in fetched.entries) entry.key: localAssetHash(entry.value),
   };
 
   final local = await _asLocalSong(
@@ -136,7 +135,7 @@ Future<Song> copySongToLocal(Song song, {AssetFetcher? fetchAsset}) async {
         ...Map.of(song.contentMap)
           ..remove('svg')
           ..remove('pdf'),
-        ...references,
+        ...hashes,
       },
     ),
     'copySongToLocal',
@@ -157,7 +156,6 @@ Future<Song> copySongToLocal(Song song, {AssetFetcher? fetchAsset}) async {
         AssetsCompanion.insert(
           songUuid: local.uuid,
           fieldName: entry.key,
-          sourceUrl: references[entry.key]!,
           content: entry.value,
         ),
       );
