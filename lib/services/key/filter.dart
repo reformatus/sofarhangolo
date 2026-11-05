@@ -16,6 +16,11 @@ typedef KeyFilterSelectable = ({
 @Riverpod(keepAlive: true)
 Stream<List<KeyFilterSelectable>> selectablePitches(Ref ref) {
   final state = ref.watch(keyFilterStateProvider);
+  // Capture the (keepAlive) notifier instead of `ref` so that the chips'
+  // callbacks stay usable after this provider rebuilds and its own Ref is
+  // unmounted. Capturing `ref` would make tapping a stale chip throw
+  // UnmountedRefException.
+  final keyFilterState = ref.read(keyFilterStateProvider.notifier);
   return db.select(db.songs).watch().map((songs) {
     final selectables = <KeyFilterSelectable>[];
     final seenPitches = <String>{};
@@ -29,9 +34,7 @@ Stream<List<KeyFilterSelectable>> selectablePitches(Ref ref) {
           if (state.keys.contains(selectableKey)) continue;
           selectables.add((
             label: selectableKey.toString(),
-            onSelected: (v) => ref
-                .read(keyFilterStateProvider.notifier)
-                .setKeyTo(selectableKey, v),
+            onSelected: (v) => keyFilterState.setKeyTo(selectableKey, v),
             selected: state.keys.contains(selectableKey),
             addingKey: true,
           ));
@@ -39,9 +42,7 @@ Stream<List<KeyFilterSelectable>> selectablePitches(Ref ref) {
           if (!seenPitches.add(key.pitch)) continue;
           selectables.add((
             label: key.pitch,
-            onSelected: (v) => ref
-                .read(keyFilterStateProvider.notifier)
-                .setPitchTo(key.pitch, v),
+            onSelected: (v) => keyFilterState.setPitchTo(key.pitch, v),
             selected: state.pitches.contains(key.pitch),
             addingKey: false,
           ));
@@ -56,6 +57,8 @@ Stream<List<KeyFilterSelectable>> selectablePitches(Ref ref) {
 @Riverpod(keepAlive: true)
 Stream<List<KeyFilterSelectable>> selectableModes(Ref ref) {
   final state = ref.watch(keyFilterStateProvider);
+  // See selectablePitches: the callbacks must not touch this provider's Ref.
+  final keyFilterState = ref.read(keyFilterStateProvider.notifier);
   return db.select(db.songs).watch().map((songs) {
     final selectables = <KeyFilterSelectable>[];
     final seenModes = <String>{};
@@ -69,9 +72,7 @@ Stream<List<KeyFilterSelectable>> selectableModes(Ref ref) {
           if (state.keys.contains(selectableKey)) continue;
           selectables.add((
             label: selectableKey.toString(),
-            onSelected: (v) => ref
-                .read(keyFilterStateProvider.notifier)
-                .setKeyTo(selectableKey, v),
+            onSelected: (v) => keyFilterState.setKeyTo(selectableKey, v),
             selected: state.keys.contains(selectableKey),
             addingKey: true,
           ));
@@ -79,9 +80,7 @@ Stream<List<KeyFilterSelectable>> selectableModes(Ref ref) {
           if (!seenModes.add(key.mode)) continue;
           selectables.add((
             label: key.mode,
-            onSelected: (v) => ref
-                .read(keyFilterStateProvider.notifier)
-                .setModeTo(key.mode, v),
+            onSelected: (v) => keyFilterState.setModeTo(key.mode, v),
             selected: state.modes.contains(key.mode),
             addingKey: false,
           ));
