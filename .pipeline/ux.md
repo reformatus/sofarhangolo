@@ -17,7 +17,7 @@ fresh test starts with none.
 | `/song/<uuid>` and `/song/<uuid>/lyrics`, `/svg`, `/pdf` | One song: lyrics with chords, sheet music (SVG), PDF | transposing, switching views, the add-to-list action |
 | `/cues` | Lists ("Listáim"): the user's set lists; empty state when there are none | creating a list ("Új lista"), the empty state, editing and deleting |
 | `/cue/<uuid>/edit` | Editing a list: slides, order, songs | adding a song, reordering |
-| `/cue/<uuid>/present` (+ `/musician`) | Present mode for a list, full screen | moving between slides |
+| `/cue/<uuid>/present/musician` | Present mode for a list, full screen | moving between slides |
 
 Navigation: on phones a bottom bar ("Főoldal", "Dalok", "Listák"), on tablets and desktops a side
 rail. Always check a change that touches layout at a phone width (390 px) and a desktop width
