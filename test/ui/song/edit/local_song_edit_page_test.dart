@@ -5,12 +5,20 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sofarhangolo/data/database.dart';
 import 'package:sofarhangolo/data/song/song.dart';
+import 'package:sofarhangolo/services/connectivity/provider.dart';
 import 'package:sofarhangolo/services/assets/write_song_asset.dart';
 import 'package:sofarhangolo/services/song/from_uuid.dart';
 import 'package:sofarhangolo/services/songs/write_song.dart';
 import 'package:sofarhangolo/ui/song/edit/page.dart';
 
 import '../../../harness/test_harness.dart';
+
+/// Wider layouts show widgets that watch connectivity; the plugin has no
+/// test implementation.
+class _FakeConnection extends Connection {
+  @override
+  ConnectionType build() => ConnectionType.unlimited;
+}
 
 void main() {
   late LyricDatabase testDb;
@@ -20,7 +28,11 @@ void main() {
     testDb = createTestDatabase();
     db = testDb;
     await db.customStatement('PRAGMA foreign_keys = OFF');
-    harness = TestHarness();
+    harness = TestHarness(
+      additionalOverrides: [
+        connectionProvider.overrideWith(_FakeConnection.new),
+      ],
+    );
   });
 
   tearDown(() async {
