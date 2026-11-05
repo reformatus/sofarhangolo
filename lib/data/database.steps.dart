@@ -2041,6 +2041,224 @@ i1.GeneratedColumn<String> _column_47(String aliasedName) =>
       type: i1.DriftSqlType.string,
       $customConstraints: 'NULL',
     );
+
+final class Schema11 extends i0.VersionedSchema {
+  Schema11({required super.database}) : super(version: 11);
+  @override
+  late final List<i1.DatabaseSchemaEntity> entities = [
+    banks,
+    songs,
+    songsFts,
+    songLinks,
+    songLinksSource,
+    songLinksTarget,
+    preferenceStorage,
+    cues,
+    cuesUuid,
+    assets,
+    assetSourceUrl,
+    songsUuid,
+    songsVariationOf,
+    songsAi,
+    songsAd,
+    songsAu,
+  ];
+  late final Shape9 banks = Shape9(
+    source: i0.VersionedTable(
+      entityName: 'banks',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_1,
+        _column_2,
+        _column_3,
+        _column_4,
+        _column_5,
+        _column_6,
+        _column_7,
+        _column_8,
+        _column_39,
+        _column_40,
+        _column_41,
+        _column_10,
+        _column_11,
+        _column_12,
+        _column_13,
+        _column_14,
+        _column_15,
+        _column_16,
+        _column_34,
+        _column_35,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape11 songs = Shape11(
+    source: i0.VersionedTable(
+      entityName: 'songs',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_1,
+        _column_17,
+        _column_18,
+        _column_19,
+        _column_36,
+        _column_21,
+        _column_37,
+        _column_22,
+        _column_38,
+        _column_48,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape5 songsFts = Shape5(
+    source: i0.VersionedVirtualTable(
+      entityName: 'songs_fts',
+      moduleAndArgs: 'fts5(title, lyrics, content=\'songs\', content_rowid=\'id\', tokenize=\'trigram remove_diacritics 1\')',
+      columns: [_column_32, _column_33],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape10 songLinks = Shape10(
+    source: i0.VersionedTable(
+      entityName: 'song_links',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: ['UNIQUE(source_uuid, type, target_uuid)'],
+      columns: [
+        _column_0,
+        _column_42,
+        _column_43,
+        _column_44,
+        _column_45,
+        _column_46,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  final i1.Index songLinksSource = i1.Index(
+    'song_links_source',
+    'CREATE INDEX song_links_source ON song_links (source_uuid)',
+  );
+  final i1.Index songLinksTarget = i1.Index(
+    'song_links_target',
+    'CREATE INDEX song_links_target ON song_links (target_uuid)',
+  );
+  late final Shape2 preferenceStorage = Shape2(
+    source: i0.VersionedTable(
+      entityName: 'preference_storage',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: ['PRIMARY KEY("key")'],
+      columns: [_column_23, _column_24],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  late final Shape3 cues = Shape3(
+    source: i0.VersionedTable(
+      entityName: 'cues',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [
+        _column_0,
+        _column_1,
+        _column_19,
+        _column_25,
+        _column_26,
+        _column_27,
+      ],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  final i1.Index cuesUuid = i1.Index(
+    'cues_uuid',
+    'CREATE UNIQUE INDEX cues_uuid ON cues (uuid)',
+  );
+  late final Shape4 assets = Shape4(
+    source: i0.VersionedTable(
+      entityName: 'assets',
+      withoutRowId: false,
+      isStrict: false,
+      tableConstraints: [],
+      columns: [_column_0, _column_28, _column_47, _column_30, _column_31],
+      attachedDatabase: database,
+    ),
+    alias: null,
+  );
+  final i1.Index assetSourceUrl = i1.Index(
+    'asset_source_url',
+    'CREATE UNIQUE INDEX asset_source_url ON assets (source_url)',
+  );
+  final i1.Index songsUuid = i1.Index(
+    'songs_uuid',
+    'CREATE UNIQUE INDEX songs_uuid ON songs (uuid)',
+  );
+  final i1.Index songsVariationOf = i1.Index(
+    'songs_variation_of',
+    'CREATE INDEX songs_variation_of ON songs (variation_of)',
+  );
+  final i1.Trigger songsAi = i1.Trigger(
+    'CREATE TRIGGER songs_ai AFTER INSERT ON songs BEGIN INSERT INTO songs_fts ("rowid", title, lyrics) VALUES (new.id, new.title, new.lyrics);END',
+    'songs_ai',
+  );
+  final i1.Trigger songsAd = i1.Trigger(
+    'CREATE TRIGGER songs_ad AFTER DELETE ON songs BEGIN INSERT INTO songs_fts (songs_fts, "rowid", title, lyrics) VALUES (\'delete\', old.id, old.title, old.lyrics);END',
+    'songs_ad',
+  );
+  final i1.Trigger songsAu = i1.Trigger(
+    'CREATE TRIGGER songs_au AFTER UPDATE ON songs BEGIN INSERT INTO songs_fts (songs_fts, "rowid", title, lyrics) VALUES (\'delete\', old.id, old.title, old.lyrics);INSERT INTO songs_fts ("rowid", title, lyrics) VALUES (new.id, new.title, new.lyrics);END',
+    'songs_au',
+  );
+}
+
+class Shape11 extends i0.VersionedTable {
+  Shape11({required super.source, required super.alias}) : super.aliased();
+  i1.GeneratedColumn<int> get id =>
+      columnsByName['id']! as i1.GeneratedColumn<int>;
+  i1.GeneratedColumn<String> get uuid =>
+      columnsByName['uuid']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get sourceBank =>
+      columnsByName['source_bank']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get contentMap =>
+      columnsByName['content_map']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get title =>
+      columnsByName['title']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get lyrics =>
+      columnsByName['lyrics']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get lyricsFormat =>
+      columnsByName['lyrics_format']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get variationOf =>
+      columnsByName['variation_of']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get keyField =>
+      columnsByName['key_field']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get ownership =>
+      columnsByName['ownership']! as i1.GeneratedColumn<String>;
+  i1.GeneratedColumn<String> get checkpoints =>
+      columnsByName['checkpoints']! as i1.GeneratedColumn<String>;
+}
+
+i1.GeneratedColumn<String> _column_48(String aliasedName) =>
+    i1.GeneratedColumn<String>(
+      'checkpoints',
+      aliasedName,
+      false,
+      type: i1.DriftSqlType.string,
+      $customConstraints: 'NOT NULL DEFAULT \'[]\'',
+      defaultValue: const i1.CustomExpression('\'[]\''),
+    );
 i0.MigrationStepWithVersion migrationSteps({
   required Future<void> Function(i1.Migrator m, Schema2 schema) from1To2,
   required Future<void> Function(i1.Migrator m, Schema3 schema) from2To3,
@@ -2051,6 +2269,7 @@ i0.MigrationStepWithVersion migrationSteps({
   required Future<void> Function(i1.Migrator m, Schema8 schema) from7To8,
   required Future<void> Function(i1.Migrator m, Schema9 schema) from8To9,
   required Future<void> Function(i1.Migrator m, Schema10 schema) from9To10,
+  required Future<void> Function(i1.Migrator m, Schema11 schema) from10To11,
 }) {
   return (currentVersion, database) async {
     switch (currentVersion) {
@@ -2099,6 +2318,11 @@ i0.MigrationStepWithVersion migrationSteps({
         final migrator = i1.Migrator(database, schema);
         await from9To10(migrator, schema);
         return 10;
+      case 10:
+        final schema = Schema11(database: database);
+        final migrator = i1.Migrator(database, schema);
+        await from10To11(migrator, schema);
+        return 11;
       default:
         throw ArgumentError.value('Unknown migration from $currentVersion');
     }
@@ -2115,6 +2339,7 @@ i1.OnUpgrade stepByStep({
   required Future<void> Function(i1.Migrator m, Schema8 schema) from7To8,
   required Future<void> Function(i1.Migrator m, Schema9 schema) from8To9,
   required Future<void> Function(i1.Migrator m, Schema10 schema) from9To10,
+  required Future<void> Function(i1.Migrator m, Schema11 schema) from10To11,
 }) => i0.VersionedSchema.stepByStepHelper(
   step: migrationSteps(
     from1To2: from1To2,
@@ -2126,5 +2351,6 @@ i1.OnUpgrade stepByStep({
     from7To8: from7To8,
     from8To9: from8To9,
     from9To10: from9To10,
+    from10To11: from10To11,
   ),
 );

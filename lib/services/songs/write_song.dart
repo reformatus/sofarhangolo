@@ -48,7 +48,8 @@ Future<Song> createLocalSong(Song song) async {
 /// deleted while a save was in flight). Attachment references (the
 /// [assetFieldExtensions] keys of the contentMap) are owned exclusively by
 /// [writeLocalSongAsset]/[removeLocalSongAsset]: they are always preserved
-/// from the stored row, whatever [song] holds for them. Returns the song as
+/// from the stored row, whatever [song] holds for them; so are the
+/// [Song.checkpoints]. Returns the song as
 /// stored.
 Future<Song?> updateLocalSong(Song song) async {
   final owned = await _asLocalSong(song, 'updateLocalSong');
@@ -65,7 +66,10 @@ Future<Song?> updateLocalSong(Song song) async {
       final stored = current.contentMap[key];
       if (stored != null) contentMap[key] = stored;
     }
-    final toStore = owned.copyWith(contentMap: contentMap);
+    final toStore = owned.copyWith(
+      contentMap: contentMap,
+      checkpoints: current.checkpoints,
+    );
 
     await (db.update(
       db.songs,
@@ -79,6 +83,7 @@ Future<Song?> updateLocalSong(Song song) async {
         variationOf: Value(toStore.variationOf),
         keyField: Value(toStore.keyField),
         ownership: Value(toStore.ownership),
+        // checkpoints are deliberately absent: the editor cannot change them.
       ),
     );
     return toStore;
@@ -141,8 +146,10 @@ Future<Song> copySongToLocal(Song song, {AssetFetcher? fetchAsset}) async {
     'copySongToLocal',
   );
 
+  final stored = local.copyWith(checkpoints: [local.contentHash]);
+
   await db.transaction(() async {
-    await db.into(db.songs).insert(local);
+    await db.into(db.songs).insert(stored);
     await db.songLinks.insert().insert(
       SongLinksCompanion.insert(
         sourceUuid: local.uuid,
@@ -162,7 +169,39 @@ Future<Song> copySongToLocal(Song song, {AssetFetcher? fetchAsset}) async {
     }
   });
 
-  return local;
+  return stored;
+}
+
+/// Most checkpoints kept per local song; older ones are dropped.
+const int maxSongCheckpoints = 50;
+
+/// Records the local song's current [Song.contentHash] as a checkpoint (call
+/// when the song crosses a device boundary: export, import). Appends it
+/// unless it already is the newest entry, then keeps only the newest
+/// [maxSongCheckpoints]. One transaction; returns the stored song, throws a
+/// [StateError] (writing nothing) when the song does not exist.
+Future<Song> addLocalSongCheckpoint(String songUuid) {
+  return db.transaction(() async {
+    final song =
+        await (db.songs.select()..where((s) => s.uuid.equals(songUuid)))
+            .getSingleOrNull();
+    if (song == null) {
+      throw StateError('Local song $songUuid does not exist.');
+    }
+
+    final hash = song.contentHash;
+    if (song.checkpoints.isNotEmpty && song.checkpoints.last == hash) {
+      return song;
+    }
+    var list = [...song.checkpoints, hash];
+    if (list.length > maxSongCheckpoints) {
+      list = list.sublist(list.length - maxSongCheckpoints);
+    }
+    await (db.songs.update()..where((s) => s.uuid.equals(songUuid))).write(
+      SongsCompanion(checkpoints: Value(list)),
+    );
+    return song.copyWith(checkpoints: list);
+  });
 }
 
 /// Deletes a local song together with its links and any cached assets, in

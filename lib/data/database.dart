@@ -35,7 +35,7 @@ class LyricDatabase extends _$LyricDatabase {
     : super(executor ?? _openConnection());
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration {
@@ -170,6 +170,9 @@ class LyricDatabase extends _$LyricDatabase {
           // unique index (recreated by alterTable) ignores nulls.
           // ignore: experimental_member_use
           await m.alterTable(TableMigration(schema.assets));
+        },
+        from10To11: (m, schema) async {
+          await m.addColumn(schema.songs, schema.songs.checkpoints);
         },
       ),
     );

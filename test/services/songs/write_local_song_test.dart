@@ -166,6 +166,8 @@ void main() {
       final stored = await storedSong(copy.uuid);
       expect(stored.contentMap['svg'], localAssetHash([115]));
       expect(stored.contentMap['pdf'], localAssetHash([112]));
+      expect(stored.checkpoints, [stored.contentHash]);
+      expect(copy.checkpoints, [copy.contentHash]);
 
       // The bytes live as assets owned by the copy, not the original.
       final assets = await db.assets.select().get();
@@ -438,6 +440,65 @@ void main() {
 
       expect(after.contentMap.containsKey('pdf'), isFalse);
       expect(await db.assets.select().get(), isEmpty);
+    });
+  });
+
+  group('checkpoints', () {
+    test(
+      'updateLocalSong ignores a draft\'s checkpoints and attachments',
+      () async {
+        final song = await createLocalSong(Song.local(title: 'Régi'));
+        await writeLocalSongAsset(song.uuid, 'pdf', Uint8List.fromList([4]));
+        await addLocalSongCheckpoint(song.uuid);
+        final stored = await storedSong(song.uuid);
+
+        final updated = await updateLocalSong(
+          stored.copyWith(
+            title: 'Új',
+            checkpoints: ['evil'],
+            contentMap: {'pdf': 'deadbeef'},
+          ),
+        );
+
+        expect(updated!.checkpoints, stored.checkpoints);
+        expect(updated.contentMap['pdf'], localAssetHash([4]));
+        final reread = await storedSong(song.uuid);
+        expect(reread.title, 'Új');
+        expect(reread.checkpoints, stored.checkpoints);
+        expect(reread.contentMap['pdf'], localAssetHash([4]));
+      },
+    );
+
+    test(
+      'addLocalSongCheckpoint appends once and dedups consecutive',
+      () async {
+        final song = await createLocalSong(Song.local(title: 'Cp'));
+        final one = await addLocalSongCheckpoint(song.uuid);
+        expect(one.checkpoints, [one.contentHash]);
+        final again = await addLocalSongCheckpoint(song.uuid);
+        expect(again.checkpoints, hasLength(1));
+
+        final firstHash = one.contentHash;
+        await updateLocalSong(one.copyWith(title: 'Cp2'));
+        final two = await addLocalSongCheckpoint(song.uuid);
+        expect(two.checkpoints, [firstHash, two.contentHash]);
+        expect((await storedSong(song.uuid)).checkpoints, two.checkpoints);
+      },
+    );
+
+    test('addLocalSongCheckpoint caps the list to the newest', () async {
+      final song = await createLocalSong(Song.local(title: 't0'));
+      Song last = song;
+      for (var i = 1; i <= maxSongCheckpoints + 5; i++) {
+        await updateLocalSong(last.copyWith(title: 't$i'));
+        last = await addLocalSongCheckpoint(song.uuid);
+      }
+      expect(last.checkpoints, hasLength(maxSongCheckpoints));
+      expect(last.checkpoints.last, last.contentHash);
+    });
+
+    test('throws for a missing song', () async {
+      await expectLater(addLocalSongCheckpoint('nope'), throwsStateError);
     });
   });
 

@@ -16,6 +16,7 @@ import 'generated/schema_v7.dart' as v7;
 import 'generated/schema_v8.dart' as v8;
 import 'generated/schema_v9.dart' as v9;
 import 'generated/schema_v10.dart' as v10;
+import 'generated/schema_v11.dart' as v11;
 
 import 'package:sofarhangolo/data/bank/bank.dart';
 import 'package:sofarhangolo/data/database.dart';
@@ -797,10 +798,11 @@ void main() {
     );
 
     final db = LyricDatabase(schema.newConnection());
-    await verifier.migrateAndValidate(db, 10);
+    await verifier.migrateAndValidate(db, 11);
 
     final songs = await db.songs.select().get();
     expect(songs.map((s) => s.uuid), ['bank-song']);
+    expect(songs.single.checkpoints, isEmpty);
     final assets = await db.assets.select().get();
     expect(assets.single.songUuid, 'bank-song');
     expect(assets.single.sourceUrl, 'https://e.com/a.pdf');
@@ -812,6 +814,24 @@ void main() {
       "INSERT INTO assets (song_uuid, field_name, content) VALUES "
       "('s1', 'pdf', x'01'), ('s2', 'pdf', x'01')",
     );
+    await db.close();
+  });
+
+  test('migration from v10 to v11 adds empty checkpoints', () async {
+    final schema = await verifier.schemaAt(10);
+    final old = schema.rawDatabase;
+    old.execute('PRAGMA foreign_keys = OFF');
+    old.execute(
+      "INSERT INTO songs (uuid, source_bank, content_map, title, key_field) "
+      "VALUES ('song-1', 'bank-1', '{}', 'Song', '')",
+    );
+
+    final db = LyricDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 11);
+
+    final songs = await db.songs.select().get();
+    expect(songs.single.uuid, 'song-1');
+    expect(songs.single.checkpoints, isEmpty);
     await db.close();
   });
 }

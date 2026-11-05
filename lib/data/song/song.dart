@@ -37,6 +37,12 @@ class Song extends Insertable<Song> {
   /// locally, and recover their metadata on the next full bank refetch.
   final SongFieldOwnership? ownership;
 
+  /// [contentHash]es recorded when a local song crossed a device boundary
+  /// (copy from a bank, export, import), oldest first. Always empty for bank
+  /// songs. Deliberately not part of [contentHash]; the local-song editor
+  /// never changes it (see `addLocalSongCheckpoint`).
+  final List<String> checkpoints;
+
   static String? _nonBlankString(dynamic value) {
     if (value is! String) return null;
     return value.trim().isEmpty ? null : value;
@@ -116,6 +122,7 @@ class Song extends Insertable<Song> {
     required this.contentMap,
     this.sourceBank,
     this.ownership,
+    this.checkpoints = const [],
   });
 
   /// Creates a new local song with a fresh uuid. Local songs live in the
@@ -149,6 +156,7 @@ class Song extends Insertable<Song> {
     List<KeyField>? keyField,
     Map<String, Object>? contentMap,
     SongFieldOwnership? ownership,
+    List<String>? checkpoints,
   }) {
     return Song(
       uuid: uuid ?? this.uuid,
@@ -160,6 +168,7 @@ class Song extends Insertable<Song> {
       keyField: keyField ?? this.keyField,
       contentMap: contentMap ?? this.contentMap,
       ownership: ownership ?? this.ownership,
+      checkpoints: checkpoints ?? this.checkpoints,
     );
   }
 
@@ -259,6 +268,7 @@ class Song extends Insertable<Song> {
       variationOf: Value(variationOf),
       keyField: Value(keyField),
       ownership: Value(ownership),
+      checkpoints: Value(checkpoints),
     ).toColumns(nullToAbsent);
   }
 }
@@ -319,6 +329,23 @@ class Songs extends Table {
   TextColumn get keyField => text().map(const KeyFieldConverter())();
   TextColumn get ownership =>
       text().nullable().map(const SongFieldOwnershipConverter())();
+
+  /// JSON list of content hashes, see [Song.checkpoints]. Non-null with an
+  /// empty default so bank rows and pre-existing rows need no special case.
+  TextColumn get checkpoints => text()
+      .withDefault(const Constant('[]'))
+      .map(const StringListConverter())();
+}
+
+class StringListConverter extends TypeConverter<List<String>, String> {
+  const StringListConverter();
+
+  @override
+  List<String> fromSql(String fromDb) =>
+      (jsonDecode(fromDb) as List).map((e) => e.toString()).toList();
+
+  @override
+  String toSql(List<String> value) => jsonEncode(value);
 }
 
 /// Which fields of a song come from its own bank data rather than being
