@@ -14,7 +14,7 @@ fresh test starts with none.
 |---|---|---|
 | `/home` | Home: news, links, quick access to banks | that it loads, news and buttons |
 | `/bank` | Songs ("Dalok"): search and filters over all banks | search with and without accents (`ajandek` finds "Ajándék") |
-| `/song/<uuid>` and `/song/<uuid>/lyrics`, `/svg`, `/pdf` | One song: lyrics with chords, sheet music (SVG), PDF | transposing, switching views, the add-to-list action |
+| `/song/<uuid>` | One song: lyrics with chords, sheet music (SVG), PDF | transposing, switching views with the song-view controls, the add-to-list action |
 | `/cues` | Lists ("Listáim"): the user's set lists; empty state when there are none | creating a list ("Új lista"), the empty state, editing and deleting |
 | `/cue/<uuid>/edit` | Editing a list: slides, order, songs | adding a song, reordering |
 | `/cue/<uuid>/present/musician` | Present mode for a list, full screen | moving between slides |
