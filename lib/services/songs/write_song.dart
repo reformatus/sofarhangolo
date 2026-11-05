@@ -13,48 +13,76 @@ import 'delete_for_song.dart';
 
 /// Fetches the bytes of an attachment field for [song] (e.g. by downloading it
 /// from the song's bank). Returns null when the field has no attachment.
-typedef AssetFetcher =
-    Future<Uint8List?> Function(Song song, String fieldName);
+typedef AssetFetcher = Future<Uint8List?> Function(Song song, String fieldName);
 
-/// Creates a new local song, or updates an existing one by uuid.
-///
-/// Local songs live in the built-in local bank ([BankAccess.local]), so
-/// they are never touched by bank updates and can be freely edited. Songs
-/// coming from a regular bank must not be written this way.
-Future<Song> writeLocalSong(Song song) async {
+/// Checks that [song] may live in the local bank and returns it with its
+/// sourceBank assigned to the local bank when it had none.
+Future<Song> _asLocalSong(Song song, String caller) async {
   final local = await localBank();
 
   if (song.sourceBank != null && song.sourceBank != local.uuid) {
     throw ArgumentError.value(
       song.sourceBank,
       'song.sourceBank',
-      'writeLocalSong only accepts songs of the local bank',
+      '$caller only accepts songs of the local bank',
     );
   }
 
-  final owned = song.sourceBank == null
-      ? song.copyWith(sourceBank: local.uuid)
-      : song;
+  return song.sourceBank == null ? song.copyWith(sourceBank: local.uuid) : song;
+}
 
-  final updatedRows = await (db.update(
-    db.songs,
-  )..where((s) => s.uuid.equals(owned.uuid))).writeReturning(
-    SongsCompanion(
-      sourceBank: Value(owned.sourceBank),
-      contentMap: Value(owned.contentMap),
-      title: Value(owned.title),
-      lyrics: Value(owned.lyrics),
-      lyricsFormat: Value(owned.lyricsFormat),
-      variationOf: Value(owned.variationOf),
-      keyField: Value(owned.keyField),
-      ownership: Value(owned.ownership),
-    ),
-  );
-
-  if (updatedRows.isEmpty) {
-    await db.into(db.songs).insert(owned);
-  }
+/// Creates a new local song (insert only: throws if the uuid already exists).
+///
+/// Local songs live in the built-in local bank ([BankAccess.local]), so
+/// they are never touched by bank updates and can be freely edited. Songs
+/// coming from a regular bank must not be written this way.
+Future<Song> createLocalSong(Song song) async {
+  final owned = await _asLocalSong(song, 'createLocalSong');
+  await db.into(db.songs).insert(owned);
   return owned;
+}
+
+/// Updates an existing local song by uuid (update only: never inserts).
+///
+/// Returns null, writing nothing, when the song no longer exists (e.g. it was
+/// deleted while a save was in flight). Attachment references (the
+/// [assetFieldExtensions] keys of the contentMap) are owned exclusively by
+/// [writeLocalSongAsset]/[removeLocalSongAsset]: they are always preserved
+/// from the stored row, whatever [song] holds for them. Returns the song as
+/// stored.
+Future<Song?> updateLocalSong(Song song) async {
+  final owned = await _asLocalSong(song, 'updateLocalSong');
+
+  return db.transaction(() async {
+    final current =
+        await (db.songs.select()..where((s) => s.uuid.equals(owned.uuid)))
+            .getSingleOrNull();
+    if (current == null) return null;
+
+    final contentMap = Map<String, Object>.of(owned.contentMap);
+    for (final key in assetFieldExtensions.keys) {
+      contentMap.remove(key);
+      final stored = current.contentMap[key];
+      if (stored != null) contentMap[key] = stored;
+    }
+    final toStore = owned.copyWith(contentMap: contentMap);
+
+    await (db.update(
+      db.songs,
+    )..where((s) => s.uuid.equals(toStore.uuid))).write(
+      SongsCompanion(
+        sourceBank: Value(toStore.sourceBank),
+        contentMap: Value(toStore.contentMap),
+        title: Value(toStore.title),
+        lyrics: Value(toStore.lyrics),
+        lyricsFormat: Value(toStore.lyricsFormat),
+        variationOf: Value(toStore.variationOf),
+        keyField: Value(toStore.keyField),
+        ownership: Value(toStore.ownership),
+      ),
+    );
+    return toStore;
+  });
 }
 
 /// Copies [song] (typically a bank song) into a new editable local song.
@@ -72,65 +100,80 @@ Future<Song> writeLocalSong(Song song) async {
 ///   also remembers the original's [Song.contentHash] at copy time, so the
 ///   UI can detect when the original changed since the copy was made.
 Future<Song> copySongToLocal(Song song, {AssetFetcher? fetchAsset}) async {
-  final copy = await writeLocalSong(
+  // Network happens before the transaction: it must not be held open.
+  final fetched = <String, Uint8List>{};
+  if (fetchAsset != null) {
+    for (final field in assetFieldExtensions.keys) {
+      if (song.contentString(field) == null) continue;
+
+      try {
+        final bytes = await fetchAsset(song, field);
+        if (bytes != null) fetched[field] = bytes;
+      } catch (error, stackTrace) {
+        log.warning(
+          'Nem sikerült átmásolni a(z) $field csatolmányt a másolatba.',
+          error,
+          stackTrace,
+        );
+      }
+    }
+  }
+
+  final uuid = UuidV4().generate();
+  final references = {
+    for (final field in fetched.keys)
+      field: localAssetReference(UuidV4().generate()),
+  };
+
+  final local = await _asLocalSong(
     Song(
-      uuid: UuidV4().generate(),
+      uuid: uuid,
       title: song.title,
       lyrics: song.lyrics,
       lyricsFormat: song.lyricsFormat,
       keyField: song.keyField,
-      contentMap:
-          Map.of(song.contentMap)
-            ..remove('svg')
-            ..remove('pdf'),
+      contentMap: {
+        ...Map.of(song.contentMap)
+          ..remove('svg')
+          ..remove('pdf'),
+        ...references,
+      },
     ),
+    'copySongToLocal',
   );
 
-  await db.songLinks.insert().insert(
-    SongLinksCompanion.insert(
-      sourceUuid: copy.uuid,
-      type: SongLinkType.localCopyOf,
-      targetUuid: song.uuid,
-      targetContentHash: Value(song.contentHash),
-    ),
-  );
-
-  if (fetchAsset != null) {
-    await _copyAttachments(song, copy, fetchAsset);
-  }
-
-  return copy;
-}
-
-/// Copies the attachments [original] currently has onto [copy] as local
-/// assets. A field that fails to fetch is logged and skipped.
-Future<void> _copyAttachments(
-  Song original,
-  Song copy,
-  AssetFetcher fetchAsset,
-) async {
-  for (final field in assetFieldExtensions.keys) {
-    if (original.contentString(field) == null) continue;
-
-    try {
-      final bytes = await fetchAsset(original, field);
-      if (bytes == null) continue;
-      await writeLocalSongAsset(copy, field, bytes);
-    } catch (error, stackTrace) {
-      log.warning(
-        'Nem sikerült átmásolni a(z) $field csatolmányt a másolatba.',
-        error,
-        stackTrace,
+  await db.transaction(() async {
+    await db.into(db.songs).insert(local);
+    await db.songLinks.insert().insert(
+      SongLinksCompanion.insert(
+        sourceUuid: local.uuid,
+        type: SongLinkType.localCopyOf,
+        targetUuid: song.uuid,
+        targetContentHash: Value(song.contentHash),
+      ),
+    );
+    for (final entry in fetched.entries) {
+      await db.assets.insert().insert(
+        AssetsCompanion.insert(
+          songUuid: local.uuid,
+          fieldName: entry.key,
+          sourceUrl: references[entry.key]!,
+          content: entry.value,
+        ),
       );
     }
-  }
+  });
+
+  return local;
 }
 
-/// Deletes a local song together with its links and any cached assets.
+/// Deletes a local song together with its links and any cached assets, in
+/// one transaction.
 Future<void> deleteLocalSong(Song song) async {
-  await db.songs.deleteWhere((s) => s.uuid.equals(song.uuid));
-  await (db.songLinks.delete()
-        ..where((l) => l.sourceUuid.equals(song.uuid)))
-      .go();
-  await deleteAssetsForSong(song);
+  await db.transaction(() async {
+    await db.songs.deleteWhere((s) => s.uuid.equals(song.uuid));
+    await (db.songLinks.delete()..where((l) => l.sourceUuid.equals(song.uuid)))
+        .go();
+    await deleteAssetsForSong(song);
+  });
 }

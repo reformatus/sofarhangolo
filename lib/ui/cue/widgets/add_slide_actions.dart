@@ -31,7 +31,7 @@ class _CueAddSlideActionsState extends ConsumerState<CueAddSlideActions> {
 
     setState(() => _adding = true);
     try {
-      final song = await writeLocalSong(Song.local(title: 'Új dal'));
+      final song = await createLocalSong(Song.local(title: 'Új dal'));
       final defaultViewType = await ref.read(
         viewTypeForProvider(song, null).future,
       );

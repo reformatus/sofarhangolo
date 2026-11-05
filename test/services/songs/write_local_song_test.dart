@@ -64,17 +64,16 @@ void main() {
       (db.songs.select()..where((s) => s.uuid.equals(uuid))).getSingle();
 
   Future<SongLink?> copyLinkOf(String localUuid) =>
-      (db.songLinks.select()
-            ..where(
-              (l) =>
-                  l.sourceUuid.equals(localUuid) &
-                  l.type.equals(SongLinkType.localCopyOf.index),
-            ))
+      (db.songLinks.select()..where(
+            (l) =>
+                l.sourceUuid.equals(localUuid) &
+                l.type.equals(SongLinkType.localCopyOf.index),
+          ))
           .getSingleOrNull();
 
-  group('writeLocalSong', () {
+  group('createLocalSong / updateLocalSong', () {
     test('inserts a new song into the local bank', () async {
-      final song = await writeLocalSong(
+      final song = await createLocalSong(
         Song.local(title: 'Én dal', lyrics: '<song/>'),
       );
 
@@ -86,25 +85,28 @@ void main() {
       expect(local.access, BankAccess.local);
     });
 
-    test('reuses the row when the uuid already exists', () async {
-      final song = await writeLocalSong(
+    test('updates the row in place', () async {
+      final song = await createLocalSong(
         Song.local(title: 'Első cím', lyrics: 'első'),
       );
 
-      final updated = await writeLocalSong(
+      final updated = await updateLocalSong(
         song.copyWith(title: 'Második cím', lyrics: 'második'),
       );
 
-      expect(updated.uuid, song.uuid);
+      expect(updated!.uuid, song.uuid);
       expect(await db.songs.select().get(), hasLength(1));
       expect((await storedSong(song.uuid)).title, 'Második cím');
     });
 
     test('persists contentMap and keyField', () async {
-      final song = await writeLocalSong(
+      final song = await createLocalSong(
         Song.local(
           title: 'Meta dal',
-          contentMap: {'composer': 'Bach', 'genre': ['klasszikus']},
+          contentMap: {
+            'composer': 'Bach',
+            'genre': ['klasszikus'],
+          },
           keyField: [KeyField('C', 'dur')],
         ),
       );
@@ -116,10 +118,7 @@ void main() {
     });
 
     test('rejects songs that belong to another bank', () {
-      expect(
-        () => writeLocalSong(bankSong('foreign')),
-        throwsArgumentError,
-      );
+      expect(() => createLocalSong(bankSong('foreign')), throwsArgumentError);
     });
   });
 
@@ -174,20 +173,23 @@ void main() {
       expect(assets.every((asset) => asset.songUuid == copy.uuid), isTrue);
     });
 
-    test('still creates the copy when an attachment cannot be fetched', () async {
-      final original = bankSong('orig-fail', contentMap: {'svg': 'orig.svg'});
-      await db.into(db.songs).insert(original);
+    test(
+      'still creates the copy when an attachment cannot be fetched',
+      () async {
+        final original = bankSong('orig-fail', contentMap: {'svg': 'orig.svg'});
+        await db.into(db.songs).insert(original);
 
-      final copy = await copySongToLocal(
-        original,
-        fetchAsset: (song, field) async => throw StateError('offline'),
-      );
+        final copy = await copySongToLocal(
+          original,
+          fetchAsset: (song, field) async => throw StateError('offline'),
+        );
 
-      final stored = await storedSong(copy.uuid);
-      expect(stored.uuid, copy.uuid);
-      expect(stored.contentMap, isNot(contains('svg')));
-      expect(await db.assets.select().get(), isEmpty);
-    });
+        final stored = await storedSong(copy.uuid);
+        expect(stored.uuid, copy.uuid);
+        expect(stored.contentMap, isNot(contains('svg')));
+        expect(await db.assets.select().get(), isEmpty);
+      },
+    );
 
     test('does not fetch attachments the original does not have', () async {
       final original = bankSong('orig-none');
@@ -206,7 +208,10 @@ void main() {
     });
 
     test('records the original and its content hash in a link', () async {
-      final original = bankSong('orig-2', lyrics: '<song><lyrics>a</lyrics></song>');
+      final original = bankSong(
+        'orig-2',
+        lyrics: '<song><lyrics>a</lyrics></song>',
+      );
       await db.into(db.songs).insert(original);
 
       final copy = await copySongToLocal(original);
@@ -226,10 +231,7 @@ void main() {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      expect(
-        await readStatus(container, original),
-        isNull,
-      );
+      expect(await readStatus(container, original), isNull);
     });
 
     test('is unchanged while the original content matches', () async {
@@ -240,29 +242,28 @@ void main() {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      expect(
-        await readStatus(container, copy),
-        OriginalSongStatus.unchanged,
-      );
+      expect(await readStatus(container, copy), OriginalSongStatus.unchanged);
     });
 
     test('is changed after the original song was updated', () async {
-      final original = bankSong('orig-5', lyrics: '<song><lyrics>a</lyrics></song>');
+      final original = bankSong(
+        'orig-5',
+        lyrics: '<song><lyrics>a</lyrics></song>',
+      );
       await db.into(db.songs).insert(original);
       final copy = await copySongToLocal(original);
 
       await (db.songs.update()..where((s) => s.uuid.equals(original.uuid)))
-          .write(SongsCompanion(lyrics: Value('<song><lyrics>b</lyrics></song>')));
+          .write(
+            SongsCompanion(lyrics: Value('<song><lyrics>b</lyrics></song>')),
+          );
       final updated = await storedSong(original.uuid);
       expect(updated.contentHash, isNot(original.contentHash));
 
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      expect(
-        await readStatus(container, copy),
-        OriginalSongStatus.changed,
-      );
+      expect(await readStatus(container, copy), OriginalSongStatus.changed);
     });
 
     test('is missing when the original song no longer exists', () async {
@@ -270,15 +271,13 @@ void main() {
       await db.into(db.songs).insert(original);
       final copy = await copySongToLocal(original);
 
-      await (db.songs.delete()..where((s) => s.uuid.equals(original.uuid))).go();
+      await (db.songs.delete()..where((s) => s.uuid.equals(original.uuid)))
+          .go();
 
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
-      expect(
-        await readStatus(container, copy),
-        OriginalSongStatus.missing,
-      );
+      expect(await readStatus(container, copy), OriginalSongStatus.missing);
     });
 
     test('is live: re-emits when the original changes or disappears', () async {
@@ -291,10 +290,7 @@ void main() {
 
       final container = ProviderContainer();
       addTearDown(container.dispose);
-      final sub = container.listen(
-        originalSongStatusProvider(copy),
-        (_, _) {},
-      );
+      final sub = container.listen(originalSongStatusProvider(copy), (_, _) {});
       addTearDown(sub.close);
 
       OriginalSongStatus? status() =>
@@ -308,7 +304,8 @@ void main() {
           );
       await _until(() => status() == OriginalSongStatus.changed);
 
-      await (db.songs.delete()..where((s) => s.uuid.equals(original.uuid))).go();
+      await (db.songs.delete()..where((s) => s.uuid.equals(original.uuid)))
+          .go();
       await _until(() => status() == OriginalSongStatus.missing);
     });
   });
@@ -356,7 +353,11 @@ void main() {
       final original = bankSong('orig-7');
       await db.into(db.songs).insert(original);
       final copy = await copySongToLocal(original);
-      await writeLocalSongAsset(copy, 'pdf', Uint8List.fromList([1, 2, 3]));
+      await writeLocalSongAsset(
+        copy.uuid,
+        'pdf',
+        Uint8List.fromList([1, 2, 3]),
+      );
       expect(await copyLinkOf(copy.uuid), isNotNull);
 
       await deleteLocalSong(copy);
@@ -367,21 +368,23 @@ void main() {
       );
       expect(await copyLinkOf(copy.uuid), isNull);
       expect(
-        await (db.assets.select()
-              ..where((a) => a.songUuid.equals(copy.uuid)))
+        await (db.assets.select()..where((a) => a.songUuid.equals(copy.uuid)))
             .get(),
         isEmpty,
       );
       // The original bank song stays untouched.
-      expect(await storedSong(original.uuid).then((s) => s.uuid), original.uuid);
+      expect(
+        await storedSong(original.uuid).then((s) => s.uuid),
+        original.uuid,
+      );
     });
   });
 
   group('writeLocalSongAsset', () {
     test('stores the asset and points the field at it', () async {
-      final song = await writeLocalSong(Song.local(title: 'Kottás dal'));
+      final song = await createLocalSong(Song.local(title: 'Kottás dal'));
 
-      await writeLocalSongAsset(song, 'pdf', Uint8List.fromList([9, 9]));
+      await writeLocalSongAsset(song.uuid, 'pdf', Uint8List.fromList([9, 9]));
 
       final stored = await storedSong(song.uuid);
       final reference = stored.contentMap['pdf'];
@@ -394,10 +397,10 @@ void main() {
     });
 
     test('replaces the previous asset of the same field', () async {
-      final song = await writeLocalSong(Song.local(title: 'Csere dal'));
+      final song = await createLocalSong(Song.local(title: 'Csere dal'));
 
-      await writeLocalSongAsset(song, 'pdf', Uint8List.fromList([1]));
-      await writeLocalSongAsset(song, 'pdf', Uint8List.fromList([2]));
+      await writeLocalSongAsset(song.uuid, 'pdf', Uint8List.fromList([1]));
+      await writeLocalSongAsset(song.uuid, 'pdf', Uint8List.fromList([2]));
 
       final assets = await db.assets.select().get();
       expect(assets, hasLength(1));
@@ -408,12 +411,61 @@ void main() {
     });
   });
 
+  group('asset functions on a missing song', () {
+    test('throw and write nothing', () async {
+      await expectLater(
+        writeLocalSongAsset('nope', 'pdf', Uint8List.fromList([1])),
+        throwsStateError,
+      );
+      await expectLater(removeLocalSongAsset('nope', 'pdf'), throwsStateError);
+      expect(await db.assets.select().get(), isEmpty);
+      expect(await db.songs.select().get(), isEmpty);
+    });
+
+    test('return the fresh song and do not mutate the passed one', () async {
+      final song = await createLocalSong(Song.local(title: 'Friss'));
+      final updated = await writeLocalSongAsset(
+        song.uuid,
+        'pdf',
+        Uint8List.fromList([1]),
+      );
+      expect(updated.contentMap['pdf'], startsWith('local://'));
+      expect(song.contentMap.containsKey('pdf'), isFalse);
+    });
+  });
+
+  group('copySongToLocal atomicity', () {
+    test('a failing link insert leaves no song or asset rows', () async {
+      final original = bankSong('orig-atomic', contentMap: {'pdf': 'a.pdf'});
+      await db.into(db.songs).insert(original);
+      await db.customStatement(
+        "CREATE TRIGGER fail_link BEFORE INSERT ON song_links "
+        "BEGIN SELECT RAISE(ABORT, 'boom'); END;",
+      );
+
+      await expectLater(
+        copySongToLocal(
+          original,
+          fetchAsset: (song, field) async => Uint8List.fromList([1]),
+        ),
+        throwsA(anything),
+      );
+
+      expect(await db.songs.select().get(), hasLength(1));
+      expect(await db.assets.select().get(), isEmpty);
+    });
+  });
+
   group('removeLocalSongAsset', () {
     test('deletes the asset and drops the contentMap entry', () async {
-      final song = await writeLocalSong(Song.local(title: 'Törlendő kotta'));
-      await writeLocalSongAsset(song, 'svg', Uint8List.fromList([1, 2, 3]));
+      final song = await createLocalSong(Song.local(title: 'Törlendő kotta'));
+      await writeLocalSongAsset(
+        song.uuid,
+        'svg',
+        Uint8List.fromList([1, 2, 3]),
+      );
 
-      await removeLocalSongAsset(song, 'svg');
+      await removeLocalSongAsset(song.uuid, 'svg');
 
       final stored = await storedSong(song.uuid);
       expect(stored.contentMap.containsKey('svg'), isFalse);

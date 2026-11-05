@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:sofarhangolo/data/database.dart';
 import 'package:sofarhangolo/data/song/song.dart';
+import 'package:sofarhangolo/services/assets/write_song_asset.dart';
 import 'package:sofarhangolo/services/song/from_uuid.dart';
 import 'package:sofarhangolo/services/songs/write_song.dart';
 import 'package:sofarhangolo/ui/song/edit/page.dart';
@@ -80,7 +81,7 @@ void main() {
   testWidgets('leaving a malformed editor normalizes and saves it', (
     tester,
   ) async {
-    final song = await writeLocalSong(
+    final song = await createLocalSong(
       Song.local(title: 'Helyi dal', lyrics: '[V1]\nHello\n.C G'),
     );
 
@@ -138,8 +139,7 @@ void main() {
 
     final songs = await makeCopyOfBankSong();
     // Edit the original's content so its hash drifts from the copy's link.
-    await (db.songs.update()
-          ..where((s) => s.uuid.equals(songs.original.uuid)))
+    await (db.songs.update()..where((s) => s.uuid.equals(songs.original.uuid)))
         .write(
           SongsCompanion(lyrics: Value('<song><lyrics>b</lyrics></song>')),
         );
@@ -165,8 +165,7 @@ void main() {
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     final songs = await makeCopyOfBankSong();
-    await (db.songs.delete()
-          ..where((s) => s.uuid.equals(songs.original.uuid)))
+    await (db.songs.delete()..where((s) => s.uuid.equals(songs.original.uuid)))
         .go();
 
     await pumpApp(tester);
@@ -176,7 +175,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Eredeti dal'), findsOneWidget);
-    expect(find.textContaining('Az eredeti dal már nincs meg.'), findsOneWidget);
+    expect(
+      find.textContaining('Az eredeti dal már nincs meg.'),
+      findsOneWidget,
+    );
     // A deleted original cannot be opened.
     expect(find.text('Eredeti megtekintése'), findsNothing);
   });
@@ -187,17 +189,15 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1500, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    final song = await writeLocalSong(Song.local(title: 'Törlendő dal'));
+    final song = await createLocalSong(Song.local(title: 'Törlendő dal'));
     await pumpApp(tester);
 
     // Open the editor the usual way: song page, editor on top of it.
-    tester
-        .element(find.text('bank-page-marker'))
-        .push('/song/${song.uuid}');
+    tester.element(find.text('bank-page-marker')).push('/song/${song.uuid}');
     await tester.pumpAndSettle();
-    tester.element(find.text('song-page-${song.uuid}')).push(
-      '/song/local/${song.uuid}',
-    );
+    tester
+        .element(find.text('song-page-${song.uuid}'))
+        .push('/song/local/${song.uuid}');
     await tester.pumpAndSettle();
     expect(find.byType(LocalSongEditor), findsOneWidget);
 
@@ -217,7 +217,7 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1500, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    final song = await writeLocalSong(Song.local(title: 'Maradó dal'));
+    final song = await createLocalSong(Song.local(title: 'Maradó dal'));
     await pumpApp(tester);
 
     tester
@@ -233,4 +233,39 @@ void main() {
     expect(find.byType(LocalSongEditor), findsOneWidget);
     expect(await dbSongFromUuid(song.uuid), isNotNull);
   });
+
+  testWidgets(
+    'an attachment written while editing survives the next autosave',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(1500, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final song = await createLocalSong(Song.local(title: 'Kottás dal'));
+      await pumpApp(tester);
+      tester
+          .element(find.text('bank-page-marker'))
+          .push('/song/local/${song.uuid}');
+      await tester.pumpAndSettle();
+
+      // Attach out of band (the file picker cannot be driven in tests); the
+      // editor still holds its stale copy of the song.
+      await writeLocalSongAsset(song.uuid, 'svg', Uint8List.fromList([1, 2]));
+
+      expect(find.widgetWithText(TextField, 'Kottás dal'), findsOneWidget);
+      await tester.enterText(
+        find.widgetWithText(TextField, 'Kottás dal'),
+        'Új cím',
+      );
+      // Let the debounce fire, then give the real database I/O time to finish.
+      await tester.pump(const Duration(seconds: 1));
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 300)),
+      );
+      await tester.pumpAndSettle();
+
+      final saved = (await tester.runAsync(() => dbSongFromUuid(song.uuid)))!;
+      expect(saved.title, 'Új cím');
+      expect(saved.contentMap['svg'], startsWith('local://'));
+    },
+  );
 }

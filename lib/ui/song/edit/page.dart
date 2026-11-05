@@ -54,7 +54,7 @@ class LocalSongEditPage extends ConsumerWidget {
 }
 
 /// The local song editor. Saving is automatic: content changes are debounced
-/// and written with [writeLocalSong], with the result reflected in the app
+/// and written with [updateLocalSong], with the result reflected in the app
 /// bar's autosave indicator.
 class LocalSongEditor extends ConsumerStatefulWidget {
   const LocalSongEditor({super.key, required this.song});
@@ -113,7 +113,7 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
     _autosaveTimer?.cancel();
     // Flush any pending edit so a quick back navigation does not lose it.
     if (_dirty) {
-      unawaited(writeLocalSong(_draft()));
+      unawaited(updateLocalSong(_draft()));
     }
     _titleController.removeListener(_markChanged);
     _lyricsController.removeListener(_markChanged);
@@ -168,8 +168,15 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
 
     _saving = true;
     try {
-      final saved = await writeLocalSong(_draft());
+      final saved = await updateLocalSong(_draft());
       if (!mounted) return;
+      if (saved == null) {
+        // The song was deleted under us: nothing left to save.
+        _autosaveTimer?.cancel();
+        _dirty = false;
+        setState(() => _autosaveStatus = AutosaveStatus.idle);
+        return;
+      }
       _song = saved;
       _dirty = false;
       _showSaved();
@@ -231,8 +238,7 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
         final isMobile =
             constraints.maxWidth <= appConfig.breakpoints.tabletFromWidth;
         final isLyricsView =
-            viewType == SongViewType.lyrics ||
-            viewType == SongViewType.chords;
+            viewType == SongViewType.lyrics || viewType == SongViewType.chords;
 
         return AdaptivePage(
           title: 'Dal szerkesztése',
@@ -265,8 +271,7 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
               child: ViewChooser(
                 song: _song,
                 songSlide: null,
-                useDropdown:
-                    constraints.maxWidth < _viewChooserDropdownBelow,
+                useDropdown: constraints.maxWidth < _viewChooserDropdownBelow,
                 // The editor can attach sheets, so let the SVG/PDF views be
                 // selected even before anything is attached.
                 allowUnavailableViews: true,
@@ -291,10 +296,7 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
           appBarActions: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: AutosaveIndicator(
-                status: _autosaveStatus,
-                onRetry: _save,
-              ),
+              child: AutosaveIndicator(status: _autosaveStatus, onRetry: _save),
             ),
             IconButton(
               tooltip: 'Dal törlése',
@@ -345,6 +347,20 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
     ];
   }
 
+  /// Takes over the attachment reference of [field] from [updated] (the song
+  /// as stored after an asset write), keeping the editor's own text edits.
+  void _adoptAttachment(Song updated, String field) {
+    setState(() {
+      _song = updated;
+      final reference = updated.contentMap[field];
+      if (reference == null) {
+        _contentMap.remove(field);
+      } else {
+        _contentMap[field] = reference;
+      }
+    });
+  }
+
   /// Picks a file for [field] and stores it as the song's attachment
   /// (replacing any existing one).
   Future<void> _replaceAttachment(String field) async {
@@ -352,8 +368,9 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
     if (bytes == null) return;
 
     try {
-      await writeLocalSongAsset(_song, field, bytes);
+      final updated = await writeLocalSongAsset(_song.uuid, field, bytes);
       if (!mounted) return;
+      _adoptAttachment(updated, field);
       ref.invalidate(getSongAssetProvider(_song, field));
       _showSaved();
     } catch (error, stackTrace) {
@@ -365,8 +382,9 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
 
   Future<void> _removeAttachment(String field) async {
     try {
-      await removeLocalSongAsset(_song, field);
+      final updated = await removeLocalSongAsset(_song.uuid, field);
       if (!mounted) return;
+      _adoptAttachment(updated, field);
       ref.invalidate(getSongAssetProvider(_song, field));
       _showSaved();
     } catch (error, stackTrace) {
@@ -388,9 +406,8 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
         isSvg: false,
         onAttach: () => _replaceAttachment('pdf'),
       ),
-      SongViewType.lyrics || SongViewType.chords => _buildLyricsArea(
-        previewWidth,
-      ),
+      SongViewType.lyrics ||
+      SongViewType.chords => _buildLyricsArea(previewWidth),
     };
   }
 

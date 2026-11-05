@@ -126,7 +126,7 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                           onPressed: () async {
                             // `/new` carries no meaning: create the song
                             // first and edit it by its uuid.
-                            final song = await writeLocalSong(
+                            final song = await createLocalSong(
                               Song.local(title: 'Új dal'),
                             );
                             if (!context.mounted) return;
@@ -375,9 +375,9 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                                 automaticallyImplyLeading: false,
                                 backgroundColor: _areAllFiltersEmpty
                                     ? Theme.of(context).colorScheme.surface
-                                    : Theme.of(
-                                        context,
-                                      ).colorScheme.secondaryContainer,
+                                    : Theme.of(context)
+                                          .colorScheme
+                                          .secondaryContainer,
                               ),
                               Expanded(
                                 child:

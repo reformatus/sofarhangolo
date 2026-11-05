@@ -24,7 +24,7 @@ class Song extends Insertable<Song> {
   /// fields as [String], multi-value fields as `List<String>`. Read it
   /// through the [SongContentAccessors] extension - raw access is only
   /// sanctioned in storage code.
-  Map<String, Object> contentMap;
+  final Map<String, Object> contentMap;
 
   /// Records which fields the song owns in its own (raw) bank data, as
   /// opposed to fields inherited from a variation parent. Set once when the
