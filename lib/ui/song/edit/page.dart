@@ -5,15 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../config/config.dart';
-import '../../../data/log/logger.dart';
 import '../../../data/song/extensions.dart';
 import '../../../data/song/song.dart';
-import '../../../services/assets/get_song_asset.dart';
 import '../../../services/assets/pick_asset.dart';
-import '../../../services/assets/write_song_asset.dart';
 import '../../../services/preferences/providers/lyrics_view_style.dart';
-import '../../../services/song/from_uuid.dart';
-import '../../../services/songs/write_song.dart';
 import '../../common/adaptive_page/page.dart';
 import '../../common/confirm_dialog.dart';
 import '../../common/error/card.dart';
@@ -22,6 +17,7 @@ import '../view_chooser.dart';
 import 'attachment_editor.dart';
 import 'autosave_indicator.dart';
 import 'details_pane.dart';
+import 'editor_controller.dart';
 import 'editor_view_toggle.dart';
 import 'lyrics_editor.dart';
 import 'lyrics_preview.dart';
@@ -38,7 +34,7 @@ class LocalSongEditPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return switch (ref.watch(songFromUuidProvider(songUuid))) {
+    return switch (ref.watch(localSongEditorControllerProvider(songUuid))) {
       AsyncError(:final error, :final stackTrace) => Center(
         child: LErrorCard.fromError(
           error: error,
@@ -47,19 +43,19 @@ class LocalSongEditPage extends ConsumerWidget {
           icon: Icons.music_note,
         ),
       ),
-      AsyncData(:final value) => LocalSongEditor(song: value),
+      AsyncData() => LocalSongEditor(songUuid: songUuid),
       _ => const Center(child: CircularProgressIndicator()),
     };
   }
 }
 
-/// The local song editor. Saving is automatic: content changes are debounced
-/// and written with [updateLocalSong], with the result reflected in the app
-/// bar's autosave indicator.
+/// The local song editor UI. The draft, autosave and deletion live in
+/// [LocalSongEditorController]; this only wires text fields, tabs and focus
+/// to it. The controller must already be loaded (see [LocalSongEditPage]).
 class LocalSongEditor extends ConsumerStatefulWidget {
-  const LocalSongEditor({super.key, required this.song});
+  const LocalSongEditor({super.key, required this.songUuid});
 
-  final Song song;
+  final String songUuid;
 
   @override
   ConsumerState<LocalSongEditor> createState() => _LocalSongEditorState();
@@ -67,22 +63,25 @@ class LocalSongEditor extends ConsumerStatefulWidget {
 
 class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
     with SingleTickerProviderStateMixin {
-  static const _saveDebounce = Duration(milliseconds: 500);
-  static const _savedLinger = Duration(seconds: 2);
-
   /// The action bar is narrower than the window (shell chrome chomps off the
   /// sides), and the segmented view chooser is ~500px wide, so collapse it to
   /// the dropdown below this page width.
   static const double _viewChooserDropdownBelow = 620;
 
-  late Song _song = widget.song;
-  late final Map<String, Object> _contentMap = Map.of(widget.song.contentMap);
-  late List<KeyField> _keyField = List.of(widget.song.keyField);
+  late final _provider = localSongEditorControllerProvider(widget.songUuid);
+
+  /// Cached: child widgets may edit the text while this widget is being
+  /// unmounted, when `ref.read` is no longer allowed.
+  late final LocalSongEditorController _controller = ref.read(
+    _provider.notifier,
+  );
+  LocalSongEditorState get _state => ref.read(_provider).requireValue;
+
   late final TextEditingController _titleController = TextEditingController(
-    text: _song.title,
+    text: _state.title,
   );
   late final TextEditingController _lyricsController = TextEditingController(
-    text: _song.lyrics ?? '',
+    text: _state.lyrics,
   );
   late final FocusNode _titleFocus = FocusNode();
   late final TabController _tabsController = TabController(
@@ -95,28 +94,20 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
   /// the edit/preview switch lives with the other contextual actions.
   bool _lyricsTabbed = false;
 
-  AutosaveStatus _autosaveStatus = AutosaveStatus.idle;
-  Timer? _autosaveTimer;
-  bool _dirty = false;
-  bool _saving = false;
-  bool _deleteConfirmed = false;
-
   @override
   void initState() {
     super.initState();
-    _titleController.addListener(_markChanged);
-    _lyricsController.addListener(_markChanged);
+    _titleController.addListener(_titleChanged);
+    _lyricsController.addListener(_lyricsChanged);
   }
 
   @override
   void dispose() {
-    _autosaveTimer?.cancel();
-    // Flush any pending edit so a quick back navigation does not lose it.
-    if (_dirty) {
-      unawaited(updateLocalSong(_draft()));
-    }
-    _titleController.removeListener(_markChanged);
-    _lyricsController.removeListener(_markChanged);
+    // Write a pending edit now (the fields have settled: children are already
+    // disposed), so a quick back navigation does not lose it.
+    _controller.flush();
+    _titleController.removeListener(_titleChanged);
+    _lyricsController.removeListener(_lyricsChanged);
     _titleController.dispose();
     _lyricsController.dispose();
     _titleFocus.dispose();
@@ -124,83 +115,11 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
     super.dispose();
   }
 
-  Song _draft() => _song.copyWith(
-    title: _titleController.text,
-    lyrics: _lyricsController.text,
-    contentMap: Map.of(_contentMap),
-    keyField: List.of(_keyField),
-  );
-
-  void _markChanged() {
-    _dirty = true;
-    _autosaveTimer?.cancel();
-    setState(() => _autosaveStatus = AutosaveStatus.saving);
-    _autosaveTimer = Timer(_saveDebounce, _save);
-  }
-
-  /// Updates one metadata field; blank values clear the key entirely.
-  void _setMetadataField(String apiName, Object? value) {
-    final cleared =
-        value == null ||
-        (value is String && value.trim().isEmpty) ||
-        (value is List && value.isEmpty);
-    setState(() {
-      if (cleared) {
-        _contentMap.remove(apiName);
-      } else {
-        _contentMap[apiName] = value;
-      }
-    });
-    _markChanged();
-  }
-
-  void _setKeys(List<KeyField> keys) {
-    setState(() => _keyField = List.of(keys));
-    _markChanged();
-  }
-
-  Future<void> _save() async {
-    if (_saving) {
-      // A write is already in flight; try again once it finishes.
-      _autosaveTimer = Timer(_saveDebounce, _save);
-      return;
-    }
-
-    _saving = true;
-    try {
-      final saved = await updateLocalSong(_draft());
-      if (!mounted) return;
-      if (saved == null) {
-        // The song was deleted under us: nothing left to save.
-        _autosaveTimer?.cancel();
-        _dirty = false;
-        setState(() => _autosaveStatus = AutosaveStatus.idle);
-        return;
-      }
-      _song = saved;
-      _dirty = false;
-      _showSaved();
-    } catch (error, stackTrace) {
-      if (!mounted) return;
-      log.warning('Nem sikerült elmenteni a helyi dalt.', error, stackTrace);
-      setState(() => _autosaveStatus = AutosaveStatus.error);
-    } finally {
-      _saving = false;
-    }
-  }
-
-  /// Shows the transient "saved" confirmation, then settles to the check.
-  void _showSaved() {
-    setState(() => _autosaveStatus = AutosaveStatus.saved);
-    _autosaveTimer?.cancel();
-    _autosaveTimer = Timer(_savedLinger, () {
-      if (!mounted) return;
-      setState(() => _autosaveStatus = AutosaveStatus.upToDate);
-    });
-  }
+  void _titleChanged() => _controller.setTitle(_titleController.text);
+  void _lyricsChanged() => _controller.setLyrics(_lyricsController.text);
 
   Future<void> _deleteSong() async {
-    _deleteConfirmed = false;
+    var confirmed = false;
     await showDialog(
       context: context,
       builder: (context) => ConfirmDialog(
@@ -209,14 +128,12 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
         actionIcon: Icons.delete_outline,
         dangerousAction: true,
         actionOnPressed: () async {
-          _autosaveTimer?.cancel();
-          _dirty = false;
-          _deleteConfirmed = true;
-          await deleteLocalSong(_song);
+          await _controller.delete();
+          confirmed = true;
         },
       ),
     );
-    if (!mounted || !_deleteConfirmed) return;
+    if (!mounted || !confirmed) return;
     // The deleted song's page may sit directly below us in the stack and
     // would only show a "not found" card, so return to the songs list.
     context.go('/bank');
@@ -224,9 +141,10 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
 
   @override
   Widget build(BuildContext context) {
+    final state = ref.watch(_provider).requireValue;
+    final song = state.song;
     final viewType =
-        ref.watch(viewTypeForProvider(_song, null)).value ??
-        SongViewType.chords;
+        ref.watch(viewTypeForProvider(song, null)).value ?? SongViewType.chords;
     final previewWidth = ref
         .watch(lyricsViewStylePreferencesProvider)
         .verseCardColumnWidth
@@ -255,13 +173,13 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
               ),
             ),
           ),
-          body: _buildBody(viewType, previewWidth),
+          body: _buildBody(state, viewType, previewWidth),
           rightDrawer: DetailsPane(
-            song: _song,
-            contentMap: _contentMap,
-            keyField: _keyField,
-            onFieldChanged: _setMetadataField,
-            onKeysChanged: _setKeys,
+            song: song,
+            contentMap: state.contentMap,
+            keyField: state.keyField,
+            onFieldChanged: _controller.setMetadataField,
+            onKeysChanged: _controller.setKeys,
           ),
           rightDrawerIcon: Icons.info_outline,
           rightDrawerTooltip: 'Részletek',
@@ -269,7 +187,7 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
               child: ViewChooser(
-                song: _song,
+                song: song,
                 songSlide: null,
                 useDropdown: constraints.maxWidth < _viewChooserDropdownBelow,
                 // The editor can attach sheets, so let the SVG/PDF views be
@@ -291,12 +209,15 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
                   ),
                 ),
               ),
-            ..._contextualActions(viewType),
+            ..._contextualActions(state.song, viewType),
           ],
           appBarActions: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: AutosaveIndicator(status: _autosaveStatus, onRetry: _save),
+              child: AutosaveIndicator(
+                status: state.status,
+                onRetry: _controller.retrySave,
+              ),
             ),
             IconButton(
               tooltip: 'Dal törlése',
@@ -313,7 +234,7 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
   /// Actions belonging to the currently selected, *attached* sheet view. When
   /// nothing is attached the attach button lives in the centered empty state
   /// instead, so the action bar stays empty.
-  List<Widget> _contextualActions(SongViewType viewType) {
+  List<Widget> _contextualActions(Song song, SongViewType viewType) {
     final field = switch (viewType) {
       SongViewType.svg => 'svg',
       SongViewType.pdf => 'pdf',
@@ -321,7 +242,7 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
     };
     if (field == null) return const [];
 
-    final attached = field == 'svg' ? _song.hasSvg : _song.hasPdf;
+    final attached = field == 'svg' ? song.hasSvg : song.hasPdf;
     if (!attached) return const [];
 
     return [
@@ -347,75 +268,43 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
     ];
   }
 
-  /// Takes over the attachment reference of [field] from [updated] (the song
-  /// as stored after an asset write), keeping the editor's own text edits.
-  void _adoptAttachment(Song updated, String field) {
-    setState(() {
-      _song = updated;
-      final reference = updated.contentMap[field];
-      if (reference == null) {
-        _contentMap.remove(field);
-      } else {
-        _contentMap[field] = reference;
-      }
-    });
-  }
-
   /// Picks a file for [field] and stores it as the song's attachment
   /// (replacing any existing one).
   Future<void> _replaceAttachment(String field) async {
     final bytes = await pickAssetBytes(field);
-    if (bytes == null) return;
-
-    try {
-      final updated = await writeLocalSongAsset(_song.uuid, field, bytes);
-      if (!mounted) return;
-      _adoptAttachment(updated, field);
-      ref.invalidate(getSongAssetProvider(_song, field));
-      _showSaved();
-    } catch (error, stackTrace) {
-      if (!mounted) return;
-      log.warning('Nem sikerült csatolni a kottát.', error, stackTrace);
-      setState(() => _autosaveStatus = AutosaveStatus.error);
-    }
+    if (bytes == null || !mounted) return;
+    await _controller.attach(field, bytes);
   }
 
-  Future<void> _removeAttachment(String field) async {
-    try {
-      final updated = await removeLocalSongAsset(_song.uuid, field);
-      if (!mounted) return;
-      _adoptAttachment(updated, field);
-      ref.invalidate(getSongAssetProvider(_song, field));
-      _showSaved();
-    } catch (error, stackTrace) {
-      if (!mounted) return;
-      log.warning('Nem sikerült eltávolítani a kottát.', error, stackTrace);
-      setState(() => _autosaveStatus = AutosaveStatus.error);
-    }
-  }
+  Future<void> _removeAttachment(String field) =>
+      _controller.removeAttachment(field);
 
-  Widget _buildBody(SongViewType viewType, double previewWidth) {
+  Widget _buildBody(
+    LocalSongEditorState state,
+    SongViewType viewType,
+    double previewWidth,
+  ) {
     return switch (viewType) {
       SongViewType.svg => AttachmentEditor(
-        song: _song,
+        song: state.song,
         isSvg: true,
         onAttach: () => _replaceAttachment('svg'),
       ),
       SongViewType.pdf => AttachmentEditor(
-        song: _song,
+        song: state.song,
         isSvg: false,
         onAttach: () => _replaceAttachment('pdf'),
       ),
       SongViewType.lyrics ||
-      SongViewType.chords => _buildLyricsArea(previewWidth),
+      SongViewType.chords => _buildLyricsArea(state.song, previewWidth),
     };
   }
 
-  Widget _buildLyricsArea(double previewWidth) {
+  Widget _buildLyricsArea(Song song, double previewWidth) {
     return LayoutBuilder(
       builder: (context, constraints) {
         final editor = OpenSongLyricsEditor(controller: _lyricsController);
-        final preview = LyricsPreview(song: _song, text: _lyricsController);
+        final preview = LyricsPreview(song: song, text: _lyricsController);
 
         // Side-by-side columns while the editor keeps enough room; below
         // that, fall back to a tabbed layout whose switch lives in the
