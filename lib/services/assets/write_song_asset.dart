@@ -23,6 +23,26 @@ Future<void> _writeContentMap(String songUuid, Map<String, Object> map) =>
       SongsCompanion(contentMap: Value(map)),
     );
 
+/// Replaces the (song, field) row of the assets table with [content]. Does
+/// not touch the song's contentMap and opens no transaction of its own, so
+/// callers can compose it into a larger one.
+Future<void> putLocalAssetRow(
+  String songUuid,
+  String fieldName,
+  Uint8List content,
+) async {
+  await db.assets.deleteWhere(
+    (a) => a.songUuid.equals(songUuid) & a.fieldName.equals(fieldName),
+  );
+  await db.assets.insert().insert(
+    AssetsCompanion.insert(
+      songUuid: songUuid,
+      fieldName: fieldName,
+      content: content,
+    ),
+  );
+}
+
 /// Stores an attachment for a local song: upserts the (song, [fieldName])
 /// row of the assets table with the content and sets the song's [fieldName]
 /// contentMap entry to its [localAssetHash], all in one transaction. Returns the
@@ -38,16 +58,7 @@ Future<Song> writeLocalSongAsset(
   return db.transaction(() async {
     final song = await _storedSong(songUuid);
 
-    await db.assets.deleteWhere(
-      (a) => a.songUuid.equals(songUuid) & a.fieldName.equals(fieldName),
-    );
-    await db.assets.insert().insert(
-      AssetsCompanion.insert(
-        songUuid: songUuid,
-        fieldName: fieldName,
-        content: content,
-      ),
-    );
+    await putLocalAssetRow(songUuid, fieldName, content);
     await _writeContentMap(songUuid, {...song.contentMap, fieldName: hash});
     return _storedSong(songUuid);
   });

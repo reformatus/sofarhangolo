@@ -2,7 +2,14 @@ import 'package:drift/drift.dart';
 
 /// Relationship between two songs. The set of values is append-only:
 /// never remove or reorder entries, only add new ones at the end.
-enum SongLinkType { localCopyOf }
+enum SongLinkType {
+  localCopyOf,
+
+  /// A local song created by a file import under a fresh uuid because the
+  /// incoming song clashed with one already present; the target is the uuid
+  /// the song had in the file (targetContentHash: its hash there).
+  importedCopyOf,
+}
 
 /// A directed edge from one song to another, e.g. a local copy pointing
 /// back to the bank song it was copied from (with the content hash observed

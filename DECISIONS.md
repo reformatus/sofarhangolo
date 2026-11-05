@@ -81,3 +81,40 @@ For an incoming song whose uuid I already have:
 For an unknown uuid whose bank origin matches one of my local copies
 (independent copies of the same bank song): identical hash → no-op; else ask
 "you already have your own version: keep both / replace".
+
+### 2026-11-05 — Song bundle file (v1): format and import choices
+- **Format:** a zip (`.sofar`, constant `songBundleExtension`) with
+  `manifest.json` (`format: "sofarhangolo.songs"`, `version: 1`, `songs`,
+  `cue`) and `assets/<md5>` (deduplicated). A song entry has uuid, title,
+  lyrics, lyricsFormat, keyField (DB string encoding), contentMap (attachment
+  values are md5s), checkpoints and `origin` (`bankSongUuid`,
+  `bankContentHash`, `bankUuid`) from its `localCopyOf` link. The current hash
+  and sourceBank are never sent. Only local-bank songs are exported; bank
+  songs in a cue are referenced by uuid. Export first checkpoints every
+  exported song. Reading: unknown format / newer version / malformed are typed
+  errors; an attachment whose md5 does not match is dropped from its song and
+  reported, the rest imports.
+- **Plan, then apply:** planning writes nothing; applying runs in one
+  transaction and re-classifies each song inside it, so a database that
+  changed after planning is still handled correctly.
+- **Choices:** conflict: overwrite / keepBoth; sibling: replace / keepBoth.
+  A missing choice means keepBoth (never destructive).
+- **Several local copies of the same bank song (sibling):** one with identical
+  content wins (no-op); otherwise the oldest copy (lowest link id) is offered.
+- **Replace keeps my uuid** (my cues stay valid). Cue slides of the imported
+  cue that point at the incoming uuid are remapped to my uuid (replace,
+  identical sibling) or to the fresh uuid (keepBoth).
+- **Keep both:** the incoming song keeps its title unchanged (a suffix would
+  change its hash and break checkpoint matching later), gets a fresh uuid, its
+  origin link and a `importedCopyOf` link (new last `SongLinkType` value, stored
+  as an int: no schema change) to the uuid it had in the file.
+- **Checkpoints on receive:** new/keep-both: incoming list + incoming hash;
+  replace: mine, then incoming entries I lack, then incoming hash; identical /
+  stale / identical sibling: mine plus incoming entries I lack. Capped at 50.
+- **Cue with an existing uuid:** `CueImportChoice` overwrite / keepBoth (fresh
+  cue uuid, the default) / skip.
+- **Origin link without the bank song:** the link is imported as is, so if the
+  recipient lacks that bank song the editor's original card reports "missing".
+  That is misleading for an imported song; suggest a distinct "bank song not
+  installed" state (e.g. mark imported links with `note`) when the UI step
+  touches it.
