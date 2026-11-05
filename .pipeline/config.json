@@ -1,0 +1,10 @@
+{
+  "type": "flutter-app",
+  "text": { "languages": ["hu"], "strings": "hard-coded" },
+  "protected_paths": ["drift_schemas/", "packaging/"],
+  "flutter": {
+    "web": { "base_href": "/" },
+    "build_steps": { "pre": ["tool/prepare_web.dart"], "post": ["tool/finalize_web_build.dart"] },
+    "extra_hosts": ["app.sofarhangolo.hu", "sofarkotta.hu", "reflabs.hu", "sofarhangolo.hu"]
+  }
+}
