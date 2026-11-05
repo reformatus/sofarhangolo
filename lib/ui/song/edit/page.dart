@@ -128,8 +128,13 @@ class _LocalSongEditorState extends ConsumerState<LocalSongEditor>
         actionIcon: Icons.delete_outline,
         dangerousAction: true,
         actionOnPressed: () async {
-          await _controller.delete();
-          confirmed = true;
+          try {
+            await _controller.delete();
+            confirmed = true;
+          } catch (_) {
+            // Already logged; the controller shows the error status. Let the
+            // dialog close instead of hanging on the failed action.
+          }
         },
       ),
     );
