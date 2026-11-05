@@ -30,3 +30,8 @@ class SongLinks extends Table {
     {sourceUuid, type, targetUuid},
   ];
 }
+
+/// `SongLinks.note` of a [SongLinkType.localCopyOf] link that came from a
+/// song file import (not from copying a bank song here): the bank song it
+/// points at may never have existed on this device.
+const String importedOriginLinkNote = 'imported';

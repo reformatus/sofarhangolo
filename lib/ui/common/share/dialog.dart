@@ -9,9 +9,31 @@ import 'package:sofarhangolo/data/song/song.dart';
 import 'package:sofarhangolo/ui/common/share/export_util.dart';
 
 import '../../../data/log/logger.dart';
+import '../../../services/platform/platform_provider.dart';
+import '../../../services/ui/messenger_service.dart';
 import '../error/card.dart';
 import '../hero_dialog_route.dart';
+import 'bundle_file.dart';
 import 'fullscreen_qr_dialog.dart';
+
+/// Offer to hand over a `.sofar` song bundle (local songs travel by file,
+/// not by link) from a share dialog.
+class ShareFileOption {
+  const ShareFileOption({
+    required this.fileName,
+    required this.build,
+    this.note,
+  });
+
+  /// Suggested file name, with extension.
+  final String fileName;
+
+  /// Builds the file's bytes when the user asks for it.
+  final Future<Uint8List> Function() build;
+
+  /// Short explanation shown above the button (why a file, not a link).
+  final String? note;
+}
 
 /// Shows an adaptive share dialog with QR code and native sharing functionality.
 ///
@@ -20,7 +42,10 @@ import 'fullscreen_qr_dialog.dart';
 /// [sharedTitle] - The name/title of the item being shared\
 /// [sharedDescription] - Optional description of the item being shared\
 /// [sharedIcon] - Optional icon for the shared item\
-/// [sharedLink] - The URL/link to be shared and displayed as QR code
+/// [sharedLink] - The URL/link to be shared and displayed as QR code; null
+/// hides the link and QR code altogether (local songs: a link would not open
+/// on any other device)\
+/// [fileShare] - Offers "Megosztás fájlként" for a `.sofar` bundle
 Future<void> showShareDialog(
   BuildContext context, {
   required String title,
@@ -28,8 +53,9 @@ Future<void> showShareDialog(
   required String sharedTitle,
   String? sharedDescription,
   IconData? sharedIcon,
-  required Uri sharedLink,
+  required Uri? sharedLink,
   Song? song,
+  ShareFileOption? fileShare,
 }) async {
   return showDialog<void>(
     context: context,
@@ -41,6 +67,7 @@ Future<void> showShareDialog(
       sharedIcon: sharedIcon,
       sharedLink: sharedLink,
       song: song,
+      fileShare: fileShare,
     ),
   );
 }
@@ -54,6 +81,7 @@ class ShareDialog extends ConsumerStatefulWidget {
     this.sharedIcon,
     required this.sharedLink,
     this.song,
+    this.fileShare,
     super.key,
   });
 
@@ -63,8 +91,9 @@ class ShareDialog extends ConsumerStatefulWidget {
   final String sharedTitle;
   final String? sharedDescription;
   final IconData? sharedIcon;
-  final Uri sharedLink;
+  final Uri? sharedLink;
   final Song? song;
+  final ShareFileOption? fileShare;
 
   @override
   ConsumerState<ShareDialog> createState() => _ShareDialogState();
@@ -73,6 +102,7 @@ class ShareDialog extends ConsumerStatefulWidget {
 class _ShareDialogState extends ConsumerState<ShareDialog> {
   bool _copySuccess = false;
   bool _pdfSharing = false;
+  bool _fileSharing = false;
   // TODO: expose the original/raw OpenSong lyrics format here (e.g. a
   // "Eredeti formátum másolása" action for power users). Decided 2026-09-18:
   // lyrics copy actions use the user-friendly format instead.
@@ -83,229 +113,282 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
 
     // No SelectionArea here: the link already has a dedicated copy button, and
     // selection areas around whole dialogs make taps and drags unreliable.
-    final linkShareWidget = Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        // Description if provided
-        if (widget.description != null) ...[
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 25, vertical: 15),
-            child: Text(widget.description!, style: theme.textTheme.bodyMedium),
-          ),
-        ],
+    final link = widget.sharedLink;
+    final fileShare = widget.fileShare;
+    final linkShareWidget = SingleChildScrollView(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Description if provided
+          if (widget.description != null) ...[
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 25, vertical: 15),
+              child: Text(
+                widget.description!,
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+          ],
 
-        SingleChildScrollView(
-          child: Container(
-            padding: EdgeInsets.all(25),
-            child: Column(
-              children: [
-                // Shared item header
-                Row(
-                  children: [
-                    if (widget.sharedIcon != null) ...[
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Icon(
-                          widget.sharedIcon,
-                          size: 24,
-                          color: colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                    ],
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.sharedTitle,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
+          SingleChildScrollView(
+            child: Container(
+              padding: EdgeInsets.all(25),
+              child: Column(
+                children: [
+                  // Shared item header
+                  Row(
+                    children: [
+                      if (widget.sharedIcon != null) ...[
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          if (widget.sharedDescription != null)
+                          child: Icon(
+                            widget.sharedIcon,
+                            size: 24,
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              widget.sharedDescription!,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
+                              widget.sharedTitle,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
-                        ],
+                            if (widget.sharedDescription != null)
+                              Text(
+                                widget.sharedDescription!,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  if (link != null) ...[
+                    const SizedBox(height: 24),
+                    if (link.toString().length < 2000)
+                      Hero(
+                        tag: 'ShareDialogQr',
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: colorScheme.outline.withAlpha(60),
+                              width: 1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: colorScheme.shadow.withValues(
+                                  alpha: 0.08,
+                                ),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          child: Material(
+                            color: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadiusGeometry.circular(12),
+                            ),
+                            clipBehavior: Clip.antiAlias,
+                            elevation: 0,
+                            child: Tooltip(
+                              message: 'Kód nagyítása',
+                              child: InkWell(
+                                onTap: () => _showFullscreenQr(context),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: SizedBox.square(
+                                    dimension: 200,
+                                    child: QrImageView(
+                                      data: link.toString(),
+                                      version: QrVersions.auto,
+                                      gapless: true,
+                                      errorCorrectionLevel:
+                                          QrErrorCorrectLevel.L,
+                                      errorStateBuilder: (context, error) {
+                                        return LErrorCard.fromError(
+                                          error:
+                                              error ??
+                                              StateError(
+                                                'A QR kód generálása sikertelen.',
+                                              ),
+                                          icon: Icons.qr_code,
+                                          title: 'Nem tudunk QR kódot mutatni - helyette küldd el a linket közvetlenül:',
+                                          showReportButton: false,
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      Text(
+                        'Ez a link túl hosszú QR kódos megosztáshoz. Helyette küldd tovább a linket közvetlenül:',
+                        style: TextStyle(fontStyle: FontStyle.italic),
+                      ),
+
+                    const SizedBox(height: 20),
+
+                    // Link text box with copy button
+                    Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: colorScheme.outline.withAlpha(80),
+                          width: 1,
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                        color: colorScheme.surface,
+                      ),
+                      child: IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Expanded(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 12,
+                                ),
+                                child: Text(
+                                  link.toString(),
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colorScheme.onSurface,
+                                    height: 1.3,
+                                  ),
+                                  maxLines: 2,
+                                  textAlign: TextAlign.left,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              width: 1,
+                              color: colorScheme.outline.withAlpha(80),
+                            ),
+                            Material(
+                              color: Colors.transparent,
+                              child: Tooltip(
+                                message: 'Másolás',
+                                child: InkWell(
+                                  onTap: () => _copyToClipboard(context),
+                                  borderRadius: const BorderRadius.only(
+                                    topRight: Radius.circular(8),
+                                    bottomRight: Radius.circular(8),
+                                  ),
+                                  child: Container(
+                                    width: 48,
+                                    decoration: _copySuccess
+                                        ? BoxDecoration(
+                                            color: Colors.green.withValues(
+                                              alpha: 0.1,
+                                            ),
+                                            borderRadius:
+                                                const BorderRadius.only(
+                                                  topRight: Radius.circular(8),
+                                                  bottomRight: Radius.circular(
+                                                    8,
+                                                  ),
+                                                ),
+                                          )
+                                        : null,
+                                    child: Icon(
+                                      _copySuccess ? Icons.check : Icons.copy,
+                                      size: 18,
+                                      color: _copySuccess
+                                          ? Colors.green
+                                          : colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // Share button integrated into the dialog body
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () => _shareLink(context),
+                        icon: const Icon(Icons.share, size: 20),
+                        label: const Text('Megosztás'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
                       ),
                     ),
                   ],
-                ),
-
-                const SizedBox(height: 24),
-                if (widget.sharedLink.toString().length < 2000)
-                  Hero(
-                    tag: 'ShareDialogQr',
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: colorScheme.outline.withAlpha(60),
-                          width: 1,
+                  if (fileShare != null) ...[
+                    const SizedBox(height: 20),
+                    if (fileShare.note != null) ...[
+                      Text(
+                        fileShare.note!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: colorScheme.shadow.withValues(alpha: 0.08),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                        textAlign: TextAlign.center,
                       ),
-                      child: Material(
-                        color: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadiusGeometry.circular(12),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        elevation: 0,
-                        child: Tooltip(
-                          message: 'Kód nagyítása',
-                          child: InkWell(
-                            onTap: () => _showFullscreenQr(context),
-                            child: Padding(
-                              padding: const EdgeInsets.all(12),
-                              child: SizedBox.square(
-                                dimension: 200,
-                                child: QrImageView(
-                                  data: widget.sharedLink.toString(),
-                                  version: QrVersions.auto,
-                                  gapless: true,
-                                  errorCorrectionLevel: QrErrorCorrectLevel.L,
-                                  errorStateBuilder: (context, error) {
-                                    return LErrorCard.fromError(
-                                      error:
-                                          error ??
-                                          StateError(
-                                            'A QR kód generálása sikertelen.',
-                                          ),
-                                      icon: Icons.qr_code,
-                                      title:
-                                          'Nem tudunk QR kódot mutatni - helyette küldd el a linket közvetlenül:',
-                                      showReportButton: false,
-                                    );
-                                  },
+                      const SizedBox(height: 10),
+                    ],
+                    SizedBox(
+                      width: double.infinity,
+                      child: link == null
+                          ? FilledButton.icon(
+                              key: const ValueKey('share-file'),
+                              onPressed: _fileSharing ? null : _shareFile,
+                              icon: const Icon(Icons.attach_file, size: 20),
+                              label: const Text('Megosztás fájlként'),
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                              ),
+                            )
+                          : OutlinedButton.icon(
+                              key: const ValueKey('share-file'),
+                              onPressed: _fileSharing ? null : _shareFile,
+                              icon: const Icon(Icons.attach_file, size: 20),
+                              label: const Text('Megosztás fájlként'),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 12,
                                 ),
                               ),
                             ),
-                          ),
-                        ),
-                      ),
                     ),
-                  )
-                else
-                  Text(
-                    'Ez a link túl hosszú QR kódos megosztáshoz. Helyette küldd tovább a linket közvetlenül:',
-                    style: TextStyle(fontStyle: FontStyle.italic),
-                  ),
-
-                const SizedBox(height: 20),
-
-                // Link text box with copy button
-                Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: colorScheme.outline.withAlpha(80),
-                      width: 1,
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                    color: colorScheme.surface,
-                  ),
-                  child: IntrinsicHeight(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Expanded(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 12,
-                            ),
-                            child: Text(
-                              widget.sharedLink.toString(),
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurface,
-                                height: 1.3,
-                              ),
-                              maxLines: 2,
-                              textAlign: TextAlign.left,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          width: 1,
-                          color: colorScheme.outline.withAlpha(80),
-                        ),
-                        Material(
-                          color: Colors.transparent,
-                          child: Tooltip(
-                            message: 'Másolás',
-                            child: InkWell(
-                              onTap: () => _copyToClipboard(context),
-                              borderRadius: const BorderRadius.only(
-                                topRight: Radius.circular(8),
-                                bottomRight: Radius.circular(8),
-                              ),
-                              child: Container(
-                                width: 48,
-                                decoration: _copySuccess
-                                    ? BoxDecoration(
-                                        color: Colors.green.withValues(
-                                          alpha: 0.1,
-                                        ),
-                                        borderRadius: const BorderRadius.only(
-                                          topRight: Radius.circular(8),
-                                          bottomRight: Radius.circular(8),
-                                        ),
-                                      )
-                                    : null,
-                                child: Icon(
-                                  _copySuccess ? Icons.check : Icons.copy,
-                                  size: 18,
-                                  color: _copySuccess
-                                      ? Colors.green
-                                      : colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Share button integrated into the dialog body
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: () => _shareLink(context),
-                    icon: const Icon(Icons.share, size: 20),
-                    label: const Text('Megosztás'),
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+                  ],
+                ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
 
     final List<Widget> shareWidgets = [];
@@ -385,10 +468,13 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
               ? linkShareWidget
               : Column(
                   children: [
-                    const TabBar(
+                    TabBar(
                       tabs: [
-                        SizedBox(height: 25, child: Text('Link')),
-                        SizedBox(height: 25, child: Text('Kotta')),
+                        SizedBox(
+                          height: 25,
+                          child: Text(link == null ? 'Fájl' : 'Link'),
+                        ),
+                        const SizedBox(height: 25, child: Text('Kotta')),
                       ],
                     ),
                     Expanded(
@@ -422,7 +508,9 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
   }
 
   Future<void> _copyToClipboard(BuildContext context) async {
-    await Clipboard.setData(ClipboardData(text: widget.sharedLink.toString()));
+    final link = widget.sharedLink;
+    if (link == null) return;
+    await Clipboard.setData(ClipboardData(text: link.toString()));
     if (mounted) {
       setState(() {
         _copySuccess = true;
@@ -439,20 +527,47 @@ class _ShareDialogState extends ConsumerState<ShareDialog> {
   }
 
   Future<void> _showFullscreenQr(BuildContext context) async {
+    final link = widget.sharedLink;
+    if (link == null) return;
     showHeroDialog(
       context: context,
-      builder: (context) =>
-          FullscreenQrDialog(data: widget.sharedLink.toString()),
+      builder: (context) => FullscreenQrDialog(data: link.toString()),
     );
   }
 
   Future<void> _shareLink(BuildContext context) async {
+    final link = widget.sharedLink;
+    if (link == null) return;
     try {
       await SharePlus.instance.share(
-        ShareParams(uri: widget.sharedLink, subject: widget.sharedTitle),
+        ShareParams(uri: link, subject: widget.sharedTitle),
       );
     } catch (e, s) {
       log.warning('Megosztás közben hiba lépett fel', e, s);
+    }
+  }
+
+  Future<void> _shareFile() async {
+    final option = widget.fileShare;
+    if (option == null || _fileSharing) return;
+    setState(() => _fileSharing = true);
+    final platform = ref.read(platformInfoProvider);
+    final messenger = ref.read(messengerServiceProviderProvider);
+    try {
+      final bytes = await option.build();
+      await shareBundleFile(
+        platform: platform,
+        messenger: messenger,
+        bytes: bytes,
+        fileName: option.fileName,
+      );
+    } catch (e, s) {
+      log.warning('Fájl készítése közben hiba lépett fel', e, s);
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Nem sikerült elkészíteni a fájlt.')),
+      );
+    } finally {
+      if (mounted) setState(() => _fileSharing = false);
     }
   }
 }

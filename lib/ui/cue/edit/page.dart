@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../services/app_links/get_shareable.dart';
 import '../../../services/app_links/navigation.dart';
+import '../../../services/songs/bundle/export_bundle.dart';
+import '../../../services/songs/bundle/song_bundle.dart';
 import '../../../services/ui/presentation_fullscreen.dart';
 import '../../common/adaptive_page/page.dart';
 import '../../common/browser_title.dart';
@@ -72,6 +74,31 @@ class _CueEditPageState extends ConsumerState<CueEditPage> {
     }
   }
 
+  /// Link share; when the cue has local songs (which a link cannot carry)
+  /// the dialog also offers the cue and those songs as a file.
+  Future<void> _share() async {
+    final cue = widget.session.cue;
+    final localSongs = await cueLocalSongUuids(cue);
+    if (!mounted) return;
+    await showShareDialog(
+      context,
+      title: 'Lista megosztása',
+      description: 'Mutasd meg a kódot vagy küldd el a linket valakinek. A megosztott lista a listái közé kerül (vagy frissül, ha korábban már megnyitotta).',
+      sharedTitle: cue.title,
+      sharedDescription: cue.description.isEmpty ? null : cue.description,
+      sharedLink: getShareableLinkFor(cue),
+      sharedIcon: Icons.list,
+      fileShare: localSongs.isEmpty
+          ? null
+          : ShareFileOption(
+              fileName: songBundleFileName(cue.title),
+              note:
+                  'A listában ${localSongs.length} helyi dal van, ezeket a link nem viszi át. A fájl a listát és a helyi dalokat is tartalmazza.',
+              build: () => exportSongBundle(const [], cue: cue),
+            ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BrowserTitle(
@@ -95,18 +122,7 @@ class _CueEditPageState extends ConsumerState<CueEditPage> {
         ],
         appBarActions: [
           IconButton.filledTonal(
-            onPressed: () => showShareDialog(
-              context,
-              title: 'Lista megosztása',
-              description:
-                  'Mutasd meg a kódot vagy küldd el a linket valakinek. A megosztott lista a listái közé kerül (vagy frissül, ha korábban már megnyitotta).',
-              sharedTitle: widget.session.cue.title,
-              sharedDescription: widget.session.cue.description.isEmpty
-                  ? null
-                  : widget.session.cue.description,
-              sharedLink: getShareableLinkFor(widget.session.cue),
-              sharedIcon: Icons.list,
-            ),
+            onPressed: _share,
             icon: const Icon(Icons.share),
             tooltip: 'Megosztási lehetőségek',
           ),

@@ -50,8 +50,11 @@ class DetailsPane extends ConsumerWidget {
           // "nothing to see here" box. The card is left out of the children
           // entirely (instead of building an empty box) so SidebarColumn's
           // spacing does not leave a stray gap where it used to be.
+          // An imported copy whose bank song is not here has nothing to
+          // report either (nothing was removed).
           if (originalStatus != null &&
-              originalStatus != OriginalSongStatus.unchanged)
+              originalStatus != OriginalSongStatus.unchanged &&
+              originalStatus != OriginalSongStatus.notInstalled)
             _OriginalSongCard(song, originalStatus),
           for (final field in editableSongFields())
             if (songFieldEditorKind(field) == SongFieldEditorKind.key)
@@ -89,6 +92,11 @@ class _OriginalSongCard extends ConsumerWidget {
     final original = ref.watch(originalSongProvider(song)).value;
 
     final (statusIcon, statusLabel, type) = switch (status) {
+      OriginalSongStatus.notInstalled => (
+        Icons.link_off,
+        'Az eredeti dal nincs ezen az eszközön.',
+        LNoticeType.info,
+      ),
       OriginalSongStatus.unchanged => (
         Icons.check_circle_outline,
         'Nem változott.',

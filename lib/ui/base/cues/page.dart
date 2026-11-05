@@ -7,6 +7,7 @@ import '../../../services/app_links/navigation.dart';
 import '../../../services/cue/cues.dart';
 import '../../common/centered_hint.dart';
 import '../../common/error/card.dart';
+import '../../common/import/song_bundle_import.dart';
 import '../../cue/cue_page_type.dart';
 import '../../cue/session/session_provider.dart';
 import 'dialogs.dart';
@@ -29,7 +30,17 @@ class _SetsPageState extends ConsumerState<SetsPage> {
     );
 
     return Scaffold(
-      appBar: AppBar(title: Text('Listáim')),
+      appBar: AppBar(
+        title: Text('Listáim'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.file_open_outlined),
+            tooltip: 'Importálás fájlból',
+            onPressed: () => pickAndImportSongBundle(context, ref),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () =>
             showDialog(

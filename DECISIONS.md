@@ -118,3 +118,32 @@ For an unknown uuid whose bank origin matches one of my local copies
   That is misleading for an imported song; suggest a distinct "bank song not
   installed" state (e.g. mark imported links with `note`) when the UI step
   touches it.
+
+### 2026-11-05 — Sharing and importing song files: UI choices
+- **Local songs have no link or QR code.** The share dialog for a local song
+  shows only "Megosztás fájlként" (and the existing "Kotta" tab); a link or
+  code that opens nothing on the recipient's device is worse than none.
+  `showShareDialog` takes a nullable `sharedLink` and an optional
+  `ShareFileOption`. The local song editor has no share button: it would
+  export the database copy while an autosave may still be pending; the song
+  page (one step back) has the share button.
+- **Cues keep the link** (bank songs resolve by uuid) and gain a file button
+  with a one-line reason when the cue has local-bank song slides
+  (`cueLocalSongUuids`). The file holds the cue and those songs.
+- **File handover:** mobile uses the system share sheet; desktop (incl.
+  Linux, where the share sheet does not exist) and web use
+  `FilePicker.saveFile` (save dialog / browser download).
+- **Import lives where things are managed:** a small button above "Új dal"
+  on the songs page and an app bar button on "Listáim". Both call
+  `pickAndImportSongBundle`, which ends in the reusable
+  `importSongBundleFromBytes(context, ref, bytes)` (future OS "open with").
+  Mobile pickers accept any file (an unknown extension is unreliable there);
+  the bundle check rejects non-bundles.
+- **Choices:** one dialog for all clashing songs plus an existing cue,
+  defaulting to keep both; Cancel writes nothing. A single imported song is
+  opened, an imported cue is opened (an overwritten active cue is reloaded).
+- **Original status:** the origin link of an imported song gets
+  `note = importedOriginLinkNote`. If its bank song is not here the status is
+  `notInstalled` (no card), not `missing` ("removed"). It turns into
+  `unchanged`/`changed` once the bank song is present. A later deletion of that
+  bank song is not distinguishable and also shows nothing.

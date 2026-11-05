@@ -17,6 +17,12 @@ enum OriginalSongStatus {
 
   /// The original bank song no longer exists in the database.
   missing,
+
+  /// The copy came from an imported file and the bank song it descends from is
+  /// not on this device (another bank, or never downloaded): nothing was
+  /// removed, there is just no original to compare with. Once the bank song
+  /// shows up, the status becomes [unchanged]/[changed] as usual.
+  notInstalled,
 }
 
 /// Watches the [SongLinkType.localCopyOf] link of [song] joined with the
@@ -51,11 +57,14 @@ Stream<OriginalSongStatus?> originalSongStatus(Ref ref, Song song) {
 
     final row = rows.first;
     final originalRow = row.readTableOrNull(original);
+    final linkRow = row.readTable(link);
     if (originalRow == null) {
-      return OriginalSongStatus.missing;
+      return linkRow.note == importedOriginLinkNote
+          ? OriginalSongStatus.notInstalled
+          : OriginalSongStatus.missing;
     }
 
-    return originalRow.contentHash == row.readTable(link).targetContentHash
+    return originalRow.contentHash == linkRow.targetContentHash
         ? OriginalSongStatus.unchanged
         : OriginalSongStatus.changed;
   });
@@ -80,13 +89,13 @@ Stream<Song?> originalSong(Ref ref, Song song) {
 /// The inverse of [originalSong]: it finds the [SongLinkType.localCopyOf] link
 /// whose target is [song] and loads that (first) copy.
 Future<Song?> localCopyOf(Song song) async {
-  final links = await (db.songLinks.select()
-        ..where(
-          (l) =>
-              l.targetUuid.equals(song.uuid) &
-              l.type.equals(SongLinkType.localCopyOf.index),
-        ))
-      .get();
+  final links =
+      await (db.songLinks.select()..where(
+            (l) =>
+                l.targetUuid.equals(song.uuid) &
+                l.type.equals(SongLinkType.localCopyOf.index),
+          ))
+          .get();
   if (links.isEmpty) return null;
 
   return (db.songs.select()
@@ -98,12 +107,11 @@ Future<Song?> localCopyOf(Song song) async {
 /// disappearing.
 @riverpod
 Stream<Song?> localCopyFor(Ref ref, Song song) {
-  return (db.songLinks.select()
-        ..where(
-          (l) =>
-              l.targetUuid.equals(song.uuid) &
-              l.type.equals(SongLinkType.localCopyOf.index),
-        ))
+  return (db.songLinks.select()..where(
+        (l) =>
+            l.targetUuid.equals(song.uuid) &
+            l.type.equals(SongLinkType.localCopyOf.index),
+      ))
       .watch()
       .asyncMap((links) async {
         if (links.isEmpty) return null;

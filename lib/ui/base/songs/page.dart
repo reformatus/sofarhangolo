@@ -12,6 +12,7 @@ import '../../../services/songs/write_song.dart';
 import '../../common/centered_hint.dart';
 import '../../common/bank_logo.dart';
 import '../../common/error/card.dart';
+import '../../common/import/song_bundle_import.dart';
 import '../../common/key_text.dart';
 import '../cue_shell_inset.dart';
 import 'widgets/filter/filters_column.dart';
@@ -122,18 +123,32 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                     Expanded(
                       child: Scaffold(
                         resizeToAvoidBottomInset: false,
-                        floatingActionButton: FloatingActionButton.extended(
-                          onPressed: () async {
-                            // `/new` carries no meaning: create the song
-                            // first and edit it by its uuid.
-                            final song = await createLocalSong(
-                              Song.local(title: 'Új dal'),
-                            );
-                            if (!context.mounted) return;
-                            context.push('/song/local/${song.uuid}');
-                          },
-                          icon: const Icon(Icons.add),
-                          label: const Text('Új dal'),
+                        floatingActionButton: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            FloatingActionButton.small(
+                              heroTag: null,
+                              tooltip: 'Importálás fájlból',
+                              onPressed: () =>
+                                  pickAndImportSongBundle(context, ref),
+                              child: const Icon(Icons.file_open_outlined),
+                            ),
+                            const SizedBox(height: 12),
+                            FloatingActionButton.extended(
+                              onPressed: () async {
+                                // `/new` carries no meaning: create the song
+                                // first and edit it by its uuid.
+                                final song = await createLocalSong(
+                                  Song.local(title: 'Új dal'),
+                                );
+                                if (!context.mounted) return;
+                                context.push('/song/local/${song.uuid}');
+                              },
+                              icon: const Icon(Icons.add),
+                              label: const Text('Új dal'),
+                            ),
+                          ],
                         ),
                         appBar: AppBar(
                           toolbarHeight: 51,

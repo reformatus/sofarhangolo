@@ -23,6 +23,20 @@ Iterable<String> cueSongUuids(Map cueJson) sync* {
   }
 }
 
+/// The uuids of the local-bank songs the slides of [cue] reference (the ones
+/// a link cannot carry), in slide order without repeats.
+Future<List<String>> cueLocalSongUuids(Cue cue) async {
+  final uuids = cueSongUuids(cue.toJson()).toSet();
+  if (uuids.isEmpty) return const [];
+  final localUuid = (await localBank()).uuid;
+  final rows =
+      await (db.songs.select()
+            ..where((s) => s.uuid.isIn(uuids) & s.sourceBank.equals(localUuid)))
+          .get();
+  final local = {for (final r in rows) r.uuid};
+  return uuids.where(local.contains).toList();
+}
+
 /// Builds a song bundle (see [songBundleVersion]) of the local songs
 /// [songUuids] plus, when [cue] is given, the cue and every local song its
 /// slides reference. Uuids of songs that are not in the local bank (bank

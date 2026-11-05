@@ -464,6 +464,7 @@ Future<void> _insertSong(
         type: SongLinkType.localCopyOf,
         targetUuid: origin.bankSongUuid,
         targetContentHash: Value(origin.bankContentHash),
+        note: const Value(importedOriginLinkNote),
       ),
     );
   }
