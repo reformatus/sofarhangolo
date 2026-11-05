@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../../../data/song/song_fields.dart';
-import '../../../../../../../services/songs/filter.dart';
+import '../../../../../../../services/songs/facet.dart';
 import '../../common/async_chip_row_handler.dart';
 import '../../common/base_filter_card.dart';
 import 'state.dart';
@@ -20,15 +20,20 @@ class MultiselectFilterCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final apiName = field.apiName;
-    final selectableValues = ref.watch(
-      selectableValuesForFilterableFieldProvider(apiName),
-    );
+    final available = ref.watch(fieldFacetProvider(apiName));
     final filterState = ref.watch(multiselectTagsFilterStateProvider);
     final filterStateNotifier = ref.read(
       multiselectTagsFilterStateProvider.notifier,
     );
 
+    final selected = filterState[apiName]?.toSet() ?? const <String>{};
     final isActive = filterState.containsKey(apiName);
+
+    // Values the query can still reach, plus the selected ones so they stay
+    // deselectable.
+    final asyncValues = available.whenData(
+      (values) => ({...values, ...selected}.toList()..sort()),
+    );
 
     return BaseFilterCard(
       icon: field.icon ?? Icons.filter_list,
@@ -48,10 +53,10 @@ class MultiselectFilterCard extends ConsumerWidget {
         ),
       ),
       child: AsyncChipRowHandlerOf<String>(
-        asyncValue: selectableValues,
-        selectedValues: filterState[apiName]?.toSet(),
-        onChipToggle: (item, selected) {
-          if (selected) {
+        asyncValue: asyncValues,
+        selectedValues: selected,
+        onChipToggle: (item, isSelected) {
+          if (isSelected) {
             filterStateNotifier.addFilter(apiName, item);
           } else {
             filterStateNotifier.removeFilter(apiName, item);

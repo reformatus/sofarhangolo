@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../../../data/bank/bank.dart';
 import '../../../../../../../services/bank/banks.dart';
+import '../../../../../../../services/songs/facet.dart';
 import '../../common/async_chip_row_handler.dart';
 import '../../common/base_filter_card.dart';
 import 'state.dart';
@@ -19,6 +20,18 @@ class _BankFilterCardState extends ConsumerState<BankFilterCard> {
   Widget build(BuildContext context) {
     final banks = ref.watch(watchAllBanksProvider);
     final bankUuids = ref.watch(banksFilterStateProvider);
+    final available = ref.watch(bankFacetProvider);
+
+    // Only the banks the current query can still reach, plus the selected ones.
+    final asyncBanks = banks.hasValue
+        ? available.whenData(
+            (uuids) => [
+              for (final bank in banks.requireValue)
+                if (uuids.contains(bank.uuid) || bankUuids.contains(bank.uuid))
+                  bank,
+            ],
+          )
+        : banks;
 
     return BaseFilterCard(
       icon: Icons.library_music,
@@ -26,7 +39,7 @@ class _BankFilterCardState extends ConsumerState<BankFilterCard> {
       isActive: bankUuids.isNotEmpty,
       onResetPressed: () => ref.read(banksFilterStateProvider.notifier).reset(),
       child: AsyncChipRowHandlerOf<Bank>(
-        asyncValue: banks,
+        asyncValue: asyncBanks,
         selectedValues: banks.hasValue
             ? banks.requireValue
                   .where((b) => bankUuids.contains(b.uuid))

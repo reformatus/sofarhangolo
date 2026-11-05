@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sofarhangolo/data/database.dart';
@@ -9,44 +11,111 @@ import 'package:sofarhangolo/ui/base/songs/widgets/filter/types/key/state.dart';
 import '../harness/test_database.dart';
 import '../harness/test_harness.dart' show waitForProviderValue;
 
+typedef FilterFields = Map<String, ({SongField field, int count})>;
+
 void main() {
-  group('existingFilterableFields', () {
-    Song buildSong({
-      required String uuid,
-      required String title,
-      String? key,
-      Map<String, dynamic> extra = const {},
-    }) {
-      return Song.fromBankApiJson({
-        'uuid': uuid,
-        'title': title,
-        'lyrics': '[V1]\n Hello $title',
-        'key': key == null ? null : [key],
-        ...extra,
-      });
+  late LyricDatabase testDb;
+
+  setUp(() async {
+    testDb = createTestDatabase();
+    db = testDb;
+    // Same as songs_update_test: the songs→banks FK is unusable with
+    // in-memory schemas, and these tests do not rely on it.
+    await testDb.customStatement('PRAGMA foreign_keys = OFF');
+  });
+
+  tearDown(() async {
+    await testDb.close();
+  });
+
+  Song buildSong({
+    required String uuid,
+    String? title,
+    List<String> keys = const [],
+    Map<String, Object> extra = const {},
+  }) {
+    return Song.fromBankApiJson({
+      'uuid': uuid,
+      'title': title ?? 'Song $uuid',
+      'lyrics': '[V1]\n Hello $uuid',
+      if (keys.isNotEmpty) 'key': keys,
+      ...extra,
+    });
+  }
+
+  Future<void> insertAll(Iterable<Song> songs) async {
+    for (final song in songs) {
+      await db.into(db.songs).insert(song);
     }
+  }
 
-    test('does not add a key filter when no songs have a key', () async {
-      final songs = [
-        buildSong(uuid: 'song-1', title: 'Song 1'),
-        buildSong(uuid: 'song-2', title: 'Song 2'),
-      ];
+  Future<FilterFields> existingFields([Map<String, SongField>? registry]) =>
+      buildExistingFilterableFields(registry).first;
 
-      final fields = buildExistingFilterableFields(songs);
+  group('buildExistingFilterableFields', () {
+    test('counts text and list fields with a filter use', () async {
+      await insertAll([
+        buildSong(
+          uuid: 'song-1',
+          extra: {
+            'genre': ['Rock', 'Pop'],
+            'language': 'magyar',
+            'composer': 'Composer A',
+          },
+        ),
+        buildSong(
+          uuid: 'song-2',
+          extra: {
+            'genre': ['Rock'],
+          },
+        ),
+      ]);
 
-      expect(fields.containsKey('key'), isFalse);
+      final fields = await existingFields();
+
+      expect(fields['genre']?.field.title, 'Stílus / műfaj');
+      expect(fields['genre']?.count, equals(2));
+      expect(fields['language']?.count, equals(1));
+      // No filter use in the default registry.
+      expect(fields['composer'], isNull);
+      expect(fields.containsKey('unknown_field'), isFalse);
+    });
+
+    test('does not count blank values or empty list elements', () async {
+      await insertAll([
+        buildSong(
+          uuid: 'song-1',
+          extra: {
+            'genre': [' '],
+            'language': '',
+          },
+        ),
+        buildSong(uuid: 'song-2', extra: {'genre': [], 'language': '   '}),
+        buildSong(
+          uuid: 'song-3',
+          extra: {
+            'genre': ['', 'Rock'],
+          },
+        ),
+      ]);
+
+      final fields = await existingFields();
+
+      // Only song-3 has a non-blank genre element; language is blank on all.
+      expect(fields['genre']?.count, equals(1));
+      expect(fields['language'], isNull);
     });
 
     test(
-      'adds a key filter from Song.keyField and counts populated songs',
+      'adds a key filter from key_field and counts populated songs',
       () async {
-        final songs = [
-          buildSong(uuid: 'song-1', title: 'Song 1', key: 'C-major'),
-          buildSong(uuid: 'song-2', title: 'Song 2'),
-          buildSong(uuid: 'song-3', title: 'Song 3', key: 'C-major'),
-        ];
+        await insertAll([
+          buildSong(uuid: 'song-1', keys: ['C-major']),
+          buildSong(uuid: 'song-2'),
+          buildSong(uuid: 'song-3', keys: ['A-moll', 'C-major']),
+        ]);
 
-        final fields = buildExistingFilterableFields(songs);
+        final fields = await existingFields();
 
         expect(fields.containsKey('key'), isTrue);
         expect(fields['key']?.field.core, isTrue);
@@ -54,59 +123,34 @@ void main() {
       },
     );
 
-    test('counts list and text fields with a filter use', () {
-      final songs = [
-        buildSong(
-          uuid: 'song-1',
-          title: 'Song 1',
-          extra: {
-            'genre': ['Rock'],
-            'language': 'magyar',
-            'composer': 'Composer A',
-          },
-        ),
-      ];
+    test('omits the key filter when no songs have a key', () async {
+      await insertAll([buildSong(uuid: 'song-1'), buildSong(uuid: 'song-2')]);
 
-      final fields = buildExistingFilterableFields(songs);
+      final fields = await existingFields();
 
-      expect(fields['genre']?.field.title, 'Stílus / műfaj');
-      expect(fields['genre']?.count, equals(1));
-      expect(fields['language']?.count, equals(1));
-      // No filter use in the default registry.
-      expect(fields['composer'], isNull);
-      expect(fields.containsKey('unknown_field'), isFalse);
+      expect(fields.containsKey('key'), isFalse);
     });
 
-    test('skips blank content', () {
-      final songs = [
-        buildSong(
-          uuid: 'song-1',
-          title: 'Song 1',
-          extra: {
-            'genre': [' '],
-            'language': '',
-          },
-        ),
-      ];
+    test('recomputes when the songs table changes', () async {
+      await insertAll([
+        buildSong(uuid: 'song-1', extra: {'language': 'magyar'}),
+      ]);
 
-      final fields = buildExistingFilterableFields(songs);
+      final iterator = StreamIterator(buildExistingFilterableFields());
+      addTearDown(iterator.cancel);
+      await iterator.moveNext();
+      expect(iterator.current['language']?.count, equals(1));
 
-      expect(fields['genre'], isNull);
-      expect(fields['language'], isNull);
+      await insertAll([
+        buildSong(uuid: 'song-2', extra: {'language': 'angol'}),
+      ]);
+      await iterator.moveNext();
+      expect(iterator.current['language']?.count, equals(2));
     });
   });
 
   group('buildExistingFilterableFields with registry', () {
-    Song buildSong(String uuid, Map<String, Object> extra) {
-      return Song.fromBankApiJson({
-        'uuid': uuid,
-        'title': 'Song $uuid',
-        'lyrics': '[V1]\n Hello Song',
-        ...extra,
-      });
-    }
-
-    test('counts fields the overlay registry grants a filter use', () {
+    test('counts fields the overlay registry grants a filter use', () async {
       final registry = mergeSongFields(defaultSongFieldRegistry, {
         'orchestra': {
           'title': 'Zenekar',
@@ -114,14 +158,17 @@ void main() {
           'uses': ['details', 'filter_multiselect'],
         },
       });
-      final songs = [
-        buildSong('s1', {
-          'orchestra': ['Big Band'],
-          'genre': ['Rock'],
-        }),
-      ];
+      await insertAll([
+        buildSong(
+          uuid: 's1',
+          extra: {
+            'orchestra': ['Big Band'],
+            'genre': ['Rock'],
+          },
+        ),
+      ]);
 
-      final fields = buildExistingFilterableFields(songs, registry);
+      final fields = await existingFields(registry);
 
       expect(fields['orchestra']?.field.title, 'Zenekar');
       expect(
@@ -133,37 +180,58 @@ void main() {
       expect(fields['genre']?.count, equals(1));
     });
 
-    test('drops fields whose def lost its filter use in an overlay', () {
+    test('drops fields whose def lost its filter use in an overlay', () async {
       final registry = mergeSongFields(defaultSongFieldRegistry, {
         'genre': {
           'uses': ['details'],
         },
       });
-      final songs = [
-        buildSong('s1', {
-          'genre': ['Rock'],
-        }),
-      ];
+      await insertAll([
+        buildSong(
+          uuid: 's1',
+          extra: {
+            'genre': ['Rock'],
+          },
+        ),
+      ]);
 
-      expect(buildExistingFilterableFields(songs, registry)['genre'], isNull);
+      expect((await existingFields(registry))['genre'], isNull);
       // The base registry is untouched: overlay merge returns a new map.
-      expect(buildExistingFilterableFields(songs)['genre']?.count, equals(1));
+      expect((await existingFields())['genre']?.count, equals(1));
     });
   });
 
   group('existingFilterableFields provider', () {
-    late LyricDatabase testDb;
+    Future<void> until(bool Function() predicate) async {
+      final deadline = DateTime.now().add(const Duration(seconds: 5));
+      while (!predicate()) {
+        if (DateTime.now().isAfter(deadline)) {
+          throw StateError('condition not reached before timeout');
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 5));
+      }
+    }
 
-    setUp(() async {
-      testDb = createTestDatabase();
-      db = testDb;
-      // Same as songs_update_test: the songs→banks FK is unusable with
-      // in-memory schemas, and these tests do not rely on it.
-      await testDb.customStatement('PRAGMA foreign_keys = OFF');
-    });
+    test('recomputes when the songs table changes', () async {
+      await insertAll([
+        buildSong(uuid: 'song-1', extra: {'language': 'magyar'}),
+      ]);
 
-    tearDown(() async {
-      await testDb.close();
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final values = <FilterFields>[];
+      container.listen(existingFilterableFieldsProvider, (previous, next) {
+        if (next.hasValue) values.add(next.value!);
+      }, fireImmediately: true);
+
+      await until(() => values.isNotEmpty);
+      expect(values.last['language']?.count, equals(1));
+
+      await insertAll([
+        buildSong(uuid: 'song-2', extra: {'language': 'angol'}),
+      ]);
+      await until(() => values.length >= 2);
+      expect(values.last['language']?.count, equals(2));
     });
 
     test('merges bank overlays over the default registry', () async {
@@ -214,17 +282,12 @@ void main() {
   });
 
   group('matchesKeyFilters', () {
-    Song buildSong(String key) {
-      return Song.fromBankApiJson({
-        'uuid': 'song-$key',
-        'title': 'Song $key',
-        'lyrics': '[V1]\n Hello Song',
-        'key': [key],
-      });
+    Song buildKeySong(String key) {
+      return buildSong(uuid: 'song-$key', keys: [key]);
     }
 
     test('matches a complete key even when pitch and mode filters differ', () {
-      final song = buildSong('A-dur');
+      final song = buildKeySong('A-dur');
       final keyFilters = (
         pitches: {'H'},
         modes: {'moll'},
@@ -235,9 +298,9 @@ void main() {
     });
 
     test('requires both pitch and mode when partial key filters are used', () {
-      final pitchOnlySong = buildSong('A-moll');
-      final modeOnlySong = buildSong('H-dur');
-      final matchingSong = buildSong('A-dur');
+      final pitchOnlySong = buildKeySong('A-moll');
+      final modeOnlySong = buildKeySong('H-dur');
+      final matchingSong = buildKeySong('A-dur');
       final KeyFilters keyFilters = (pitches: {'A'}, modes: {'dur'}, keys: {});
 
       expect(matchesKeyFilters(pitchOnlySong, keyFilters), isFalse);
@@ -246,7 +309,7 @@ void main() {
     });
 
     test('ORs complete keys with partial key filters', () {
-      final song = buildSong('H-moll');
+      final song = buildKeySong('H-moll');
       final keyFilters = (
         pitches: {'A'},
         modes: {'dur'},

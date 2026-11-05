@@ -62,6 +62,72 @@ class _SongsPageState extends ConsumerState<SongsPage> {
 
   bool filtersScrolled = false;
 
+  /// Whether the mobile filter expansion is open. The cards are only built (and
+  /// their facet queries only run) while it is.
+  bool _filtersExpanded = false;
+
+  /// Loads the next page once the list has been scrolled to its end: building
+  /// the last item means the viewport reached the end of what is loaded, which
+  /// is when the next page should be fetched. Deferred to after the frame
+  /// because it updates providers while the list is being built.
+  void _loadMoreIfNeeded(int index, int loadedCount, bool isLoading) {
+    if (index < loadedCount - 1) return;
+    if (isLoading) return;
+    // The last page was not full, so there is nothing left to load.
+    if (loadedCount < ref.read(songResultsLimitProvider)) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref.read(songResultsLimitProvider.notifier).loadMore();
+    });
+  }
+
+  /// The results list. While the next page is being fetched it keeps showing
+  /// the loaded results and appends a footer spinner (rather than swapping the
+  /// whole list for a spinner). The next page is requested once the last
+  /// loaded item is built - that is, when the list has been scrolled to its
+  /// end - see [_loadMoreIfNeeded].
+  Widget _buildResultsList(
+    BuildContext context, {
+    required List<SongResult> results,
+    required List<Bank> banks,
+    required Set<String> banksFilterState,
+    required bool isLoading,
+  }) {
+    // A running fetch that asks for more than is currently displayed.
+    final showFooter =
+        isLoading && results.length < ref.watch(songResultsLimitProvider);
+
+    return ListView.builder(
+      itemCount: results.length + (showFooter ? 1 : 0),
+      itemBuilder: (context, index) {
+        if (index >= results.length) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        }
+
+        _loadMoreIfNeeded(index, results.length, isLoading);
+
+        final result = results[index];
+        return LSongResultTile(
+          result,
+          banksFilterState.length == 1
+              ? null
+              : banks.firstWhere((b) => b.uuid == result.song.sourceBank),
+          onTap: () => _searchFieldFocusNode.unfocus(),
+        );
+      },
+    );
+  }
+
   late OverlayPortalController _overlayPortalController;
   late ScrollController _filterExpansionScrollController;
   late ScrollController _filterSidebarScrollController;
@@ -242,6 +308,11 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                                                         .onSecondaryContainer,
                                               controller:
                                                   _filterExpansionTileController,
+                                              onExpansionChanged: (expanded) =>
+                                                  setState(
+                                                    () => _filtersExpanded =
+                                                        expanded,
+                                                  ),
                                               leading: Transform.translate(
                                                 offset: const Offset(-3, 0),
                                                 child: const Icon(
@@ -255,7 +326,14 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                                                 banksFilterState:
                                                     banksFilterState,
                                               ),
-                                              children: [FiltersColumn()],
+                                              children: [
+                                                if (_filtersExpanded)
+                                                  FiltersColumn(
+                                                    shrinkWrap: true,
+                                                    physics:
+                                                        const NeverScrollableScrollPhysics(),
+                                                  ),
+                                              ],
                                             ),
                                           ),
                                         ),
@@ -295,40 +373,20 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                                       ? const Center(
                                           child: CircularProgressIndicator(),
                                         )
-                                      : searchString.trim().isNotEmpty &&
-                                            searchString.trim().length < 3
+                                      : value.results.isEmpty
                                       ? CenteredHint(
-                                          'Írj be legalább három betűt a kereséshez.',
-                                          iconData: Icons.search,
-                                          alignment: Alignment.topCenter,
-                                        )
-                                      : value.isEmpty
-                                      ? CenteredHint(
-                                          'Nincs találat :(',
+                                          searchString.trim().isEmpty
+                                              ? 'Nincs dal'
+                                              : 'Nincs találat :(',
                                           iconData: Icons.search_off,
                                           alignment: Alignment.topCenter,
                                         )
-                                      : ListView.builder(
-                                          itemBuilder:
-                                              (BuildContext context, int i) {
-                                                return LSongResultTile(
-                                                  value.elementAt(i),
-                                                  banksFilterState.length == 1
-                                                      ? null
-                                                      : banks.firstWhere(
-                                                          (b) =>
-                                                              b.uuid ==
-                                                              value
-                                                                  .elementAt(i)
-                                                                  .song
-                                                                  .sourceBank,
-                                                        ),
-                                                  onTap: () =>
-                                                      _searchFieldFocusNode
-                                                          .unfocus(),
-                                                );
-                                              },
-                                          itemCount: value.length,
+                                      : _buildResultsList(
+                                          context,
+                                          results: value.results,
+                                          banks: banks,
+                                          banksFilterState: banksFilterState,
+                                          isLoading: songResults.isLoading,
                                         ),
                               },
                             ),
@@ -358,19 +416,16 @@ class _SongsPageState extends ConsumerState<SongsPage> {
                                 automaticallyImplyLeading: false,
                                 backgroundColor: _areAllFiltersEmpty
                                     ? Theme.of(context).colorScheme.surface
-                                    : Theme.of(
-                                        context,
-                                      ).colorScheme.secondaryContainer,
+                                    : Theme.of(context)
+                                          .colorScheme
+                                          .secondaryContainer,
                               ),
                               Expanded(
-                                child:
-                                    FadingEdgeScrollView.fromSingleChildScrollView(
-                                      child: SingleChildScrollView(
-                                        controller:
-                                            _filterSidebarScrollController,
-                                        child: FiltersColumn(),
-                                      ),
-                                    ),
+                                child: FiltersColumn(
+                                  scrollController:
+                                      _filterSidebarScrollController,
+                                  fadeEdges: true,
+                                ),
                               ),
                             ],
                           ),
@@ -425,47 +480,72 @@ class FiltersTitle extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final total = ref.watch(songTotalCountProvider).value;
+    final matches = ref.watch(songMatchCountProvider);
+    final filtering =
+        ref.watch(searchStringStateProvider).trim().isNotEmpty ||
+        filterState.isNotEmpty ||
+        keyFilterState.isNotEmpty ||
+        banksFilterState.isNotEmpty;
+    final subtitle = total == null
+        ? null
+        : filtering && matches != null
+        ? '$matches találat / $total dal'
+        : '$total dal';
+
     return AnimatedSize(
       duration: Durations.medium1,
       curve: Curves.easeInOutCubicEmphasized,
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              (filterState.isEmpty && keyFilterState.isEmpty)
-                  ? 'Szűrők'
-                  : ([
-                      if (keyFilterState.isNotEmpty)
-                        [
-                          if (keyFilterState.keys.isNotEmpty)
-                            keyFilterState.keys
-                                .map(displayKeyField)
-                                .join(' vagy '),
-                          if (keyFilterState.pitches.isNotEmpty ||
-                              keyFilterState.modes.isNotEmpty)
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  (filterState.isEmpty && keyFilterState.isEmpty)
+                      ? 'Szűrők'
+                      : ([
+                          if (keyFilterState.isNotEmpty)
                             [
-                              if (keyFilterState.pitches.isNotEmpty)
-                                'alaphangja ${keyFilterState.pitches.map(displayKeyPitch).join(' vagy ')}',
-                              if (keyFilterState.modes.isNotEmpty)
-                                'hangsora ${keyFilterState.modes.map(displayKeyMode).join(' vagy ')}',
-                            ].join(' és '),
-                        ].join(', vagy '),
-                      if (filterState.isNotEmpty)
-                        filterState.values
-                            .map((e) => e.join(' vagy '))
-                            .join(', és '),
-                    ].join(', valamint ')),
-              style: TextStyle(
-                color: (filterState.isEmpty && keyFilterState.isEmpty)
-                    ? null
-                    : Theme.of(context).colorScheme.onSecondaryContainer,
-                fontSize: (filterState.isEmpty && keyFilterState.isEmpty)
-                    ? null
-                    : Theme.of(context).textTheme.bodyMedium!.fontSize,
-              ),
-              softWrap: true,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
+                              if (keyFilterState.keys.isNotEmpty)
+                                keyFilterState.keys
+                                    .map(displayKeyField)
+                                    .join(' vagy '),
+                              if (keyFilterState.pitches.isNotEmpty ||
+                                  keyFilterState.modes.isNotEmpty)
+                                [
+                                  if (keyFilterState.pitches.isNotEmpty)
+                                    'alaphangja ${keyFilterState.pitches.map(displayKeyPitch).join(' vagy ')}',
+                                  if (keyFilterState.modes.isNotEmpty)
+                                    'hangsora ${keyFilterState.modes.map(displayKeyMode).join(' vagy ')}',
+                                ].join(' és '),
+                            ].join(', vagy '),
+                          if (filterState.isNotEmpty)
+                            filterState.values
+                                .map((e) => e.join(' vagy '))
+                                .join(', és '),
+                        ].join(', valamint ')),
+                  style: TextStyle(
+                    color: (filterState.isEmpty && keyFilterState.isEmpty)
+                        ? null
+                        : Theme.of(context).colorScheme.onSecondaryContainer,
+                    fontSize: (filterState.isEmpty && keyFilterState.isEmpty)
+                        ? null
+                        : Theme.of(context).textTheme.bodyMedium!.fontSize,
+                  ),
+                  softWrap: true,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (subtitle != null)
+                  Text(
+                    subtitle,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+              ],
             ),
           ),
           ...banksFilterState

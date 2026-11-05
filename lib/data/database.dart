@@ -26,7 +26,7 @@ late LyricDatabase db;
 
 @DriftDatabase(
   tables: [Songs, Banks, Assets, Cues, PreferenceStorage],
-  include: {'song/song.drift', '../services/songs/filter.drift'},
+  include: {'song/song.drift'},
 )
 class LyricDatabase extends _$LyricDatabase {
   // LyricDatabase() : super(_openConnection()); //used for debugging
@@ -131,8 +131,14 @@ class LyricDatabase extends _$LyricDatabase {
   }
 
   static QueryExecutor _openConnection() {
+    // `LYRIC_DB_PATH` opens a throwaway database instead of the user's real
+    // one. An env override cannot do this: XDG_DOCUMENTS_DIR wins over HOME.
+    const dbPath = String.fromEnvironment('LYRIC_DB_PATH');
     return driftDatabase(
       name: 'lyric3',
+      native: DriftNativeOptions(
+        databasePath: dbPath.isEmpty ? null : () async => dbPath,
+      ),
       web: DriftWebOptions(
         sqlite3Wasm: Uri.parse('sqlite3.wasm'),
         driftWorker: Uri.parse('drift_worker.js'),

@@ -115,7 +115,14 @@ class BankSongUpdateTask extends BackgroundTask {
 
   Future<void> _upsertSong(Song song) async {
     try {
-      await db.into(db.songs).insert(song, mode: InsertMode.insertOrReplace);
+      // Upsert by uuid — deliberately NOT `InsertMode.insertOrReplace`:
+      // REPLACE's implicit delete skips DELETE triggers, orphaning the old
+      // rowid's FTS entry. The target must be uuid: Song has no id column.
+      // DO UPDATE fires the UPDATE trigger and keeps the rowid stable.
+      await db.into(db.songs).insert(
+        song,
+        onConflict: DoUpdate((_) => song, target: [db.songs.uuid]),
+      );
 
       await deleteAssetsForSong(song);
 
